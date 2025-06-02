@@ -1,8 +1,6 @@
-<aside style="width:200px;float:left;background:#f4f4f4;height:100vh;padding:20px;">
-    <ul style="list-style:none;padding:0;">
-        <li><a href="#">Clientes</a></li>
-        <li><a href="#">Empresas</a></li>
-        <li><a href="#">Exámenes</a></li>
-        <li><a href="#">Cotizaciones</a></li>
+<aside style="width:200px; background:#343a40; color:#fff; min-height:100vh; padding:20px 0;">
+    <ul style="list-style:none; padding:0; margin:0;"> <?php if ($_SESSION['rol'] !== 'cliente'): ?> <li style="margin-bottom:15px;"> <a href="<?php echo BASE_URL; ?>dashboard.php?vista=tabla_clientes" style="color:#fff; text-decoration:none; padding:10px 20px; display:block;">Clientes</a> </li>
+            <li style="margin-bottom:15px;"> <a href="<?php echo BASE_URL; ?>dashboard.php?vista=tabla_usuarios" style="color:#fff; text-decoration:none; padding:10px 20px; display:block;">Usuarios</a> </li>
+            <li style="margin-bottom:15px;"> <a href="<?php echo BASE_URL; ?>dashboard.php?vista=tabla_empresas" style="color:#fff; text-decoration:none; padding:10px 20px; display:block;">Empresas</a> </li> <?php endif; ?> <li> <a href="<?php echo BASE_URL; ?>auth/logout.php" style="color:#fff; text-decoration:none; padding:10px 20px; display:block; background:#dc3545; border-radius:4px;">Cerrar sesión</a> </li>
     </ul>
 </aside>

@@ -7,8 +7,8 @@
 </head>
 
 <body>
-    <h1>Bienvenido a INBIOSLAB</h1>
-    <p>Haz clic en el botón para ir al panel principal.</p> <a href="dashboard.php"><button>Ir al Dashboard</button></a>
+    <h1>Bienvenido al Sistema de Laboratorio Clínico INBIOSLAB</h1>
+    <p>Por favor, inicia sesión para acceder al panel.</p> <a href="auth/login.php"> <button>Iniciar sesión</button> </a>
 </body>
 
 </html>

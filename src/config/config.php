@@ -1,0 +1,1 @@
+<?php define('BASE_URL', '/base-php/src/'); // Para tu entorno local actual 
