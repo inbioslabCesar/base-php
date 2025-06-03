@@ -1,81 +1,91 @@
-<?php class Crud
-{
-    protected $pdo;
-    protected $table;
-    public function __construct($pdo, $table)
-    {
-        $this->pdo = $pdo;
-        $this->table = $table;
+<?php
+// src/helpers/crud.php
+
+function insertarRegistro($tabla, $datos, $pdo) {
+    $tablasPermitidas = ['usuarios', 'clientes', 'empresas'];
+    if (!in_array($tabla, $tablasPermitidas)) {
+        die('Tabla no permitida');
     }
-    // Validar campos únicos 
-    public function existeUnico($unicos)
-    {
-        $where = [];
-        foreach ($unicos as $campo => $valor) {
-            $where[] = "$campo = :$campo";
-        }
-        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE " . implode(' OR ', $where);
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($unicos as $campo => $valor) {
-            $stmt->bindValue(":$campo", $valor, PDO::PARAM_STR);
-        }
-        $stmt->execute();
-        return $stmt->fetchColumn() > 0;
-    }
-    // Insertar registro 
-    public function insertar($datos)
-    {
-        $campos = array_keys($datos);
-        $sql = "INSERT INTO {$this->table} (" . implode(',', $campos) . ") VALUES (:" . implode(',:', $campos) . ")";
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($datos as $campo => $valor) {
-            $stmt->bindValue(":$campo", $valor, PDO::PARAM_STR);
-        }
-        return $stmt->execute();
-    }
-    // Obtener un registro por ID 
-    public function obtenerPorId($id)
-    {
-        $sql = "SELECT * FROM {$this->table} WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    // Actualizar registro por ID 
-    public function actualizar($id, $datos)
-    {
-        $campos = [];
-        foreach ($datos as $campo => $valor) {
-            $campos[] = "$campo = :$campo";
-        }
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $campos) . " WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($datos as $campo => $valor) {
-            $stmt->bindValue(":$campo", $valor, PDO::PARAM_STR);
-        }
-        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        return $stmt->execute();
-    }
-    // Eliminar registro por ID 
-    public function eliminar($id)
-    {
-        $sql = "DELETE FROM {$this->table} WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-        return $stmt->execute();
-    }
-    // Listar todos los registros 
-    public function listar()
-    {
-        $sql = "SELECT * FROM {$this->table}";
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    public function contar()
-    {
-        $sql = "SELECT COUNT(*) FROM {$this->table}";
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetchColumn();
-    }
+
+    // Lista blanca de campos permitidos según tu estructura
+    $camposPermitidos = [
+        'usuarios' => [
+            'usuario', 'password', 'nombre', 'apellido', 'dni', 'sexo', 'email', 
+            'telefono', 'direccion', 'profesion', 'rol', 'estado', 'fecha_registro'
+        ],
+        'clientes' => [
+            'codigo_cliente', 'nombre', 'apellido', 'edad', 'email', 'password', 
+            'telefono', 'direccion', 'dni', 'sexo', 'origen', 'referencia', 'estado', 'fecha_registro'
+        ],
+        'empresas' => [
+            'ruc', 'razon_social', 'nombre_comercial', 'direccion', 'telefono', 'email', 
+            'representante', 'password', 'convenio', 'estado', 'fecha_registro'
+        ]
+    ];
+
+    $datosFiltrados = array_intersect_key($datos, array_flip($camposPermitidos[$tabla]));
+    $campos = implode(", ", array_keys($datosFiltrados));
+    $placeholders = ":" . implode(", :", array_keys($datosFiltrados));
+
+    $sql = "INSERT INTO $tabla ($campos) VALUES ($placeholders)";
+    $stmt = $pdo->prepare($sql);
+    return $stmt->execute($datosFiltrados);
 }
+
+function actualizarRegistro($tabla, $datos, $id, $pdo, $campoId = 'id') {
+    $tablasPermitidas = ['usuarios', 'clientes', 'empresas'];
+    if (!in_array($tabla, $tablasPermitidas)) {
+        die('Tabla no permitida');
+    }
+
+    $camposPermitidos = [
+        'usuarios' => [
+            'usuario', 'password', 'nombre', 'apellido', 'dni', 'sexo', 'email', 
+            'telefono', 'direccion', 'profesion', 'rol', 'estado', 'fecha_registro'
+        ],
+        'clientes' => [
+            'codigo_cliente', 'nombre', 'apellido', 'edad', 'email', 'password', 
+            'telefono', 'direccion', 'dni', 'sexo', 'origen', 'referencia', 'estado', 'fecha_registro'
+        ],
+        'empresas' => [
+            'ruc', 'razon_social', 'nombre_comercial', 'direccion', 'telefono', 'email', 
+            'representante', 'password', 'convenio', 'estado', 'fecha_registro'
+        ]
+    ];
+
+    $datosFiltrados = array_intersect_key($datos, array_flip($camposPermitidos[$tabla]));
+    $sets = [];
+    foreach ($datosFiltrados as $campo => $valor) {
+        $sets[] = "$campo = :$campo";
+    }
+    $setsStr = implode(", ", $sets);
+
+    $sql = "UPDATE $tabla SET $setsStr WHERE $campoId = :id";
+    $stmt = $pdo->prepare($sql);
+    $datosFiltrados['id'] = $id;
+    return $stmt->execute($datosFiltrados);
+}
+
+function eliminarRegistro($tabla, $id, $pdo, $campoId = 'id') {
+    $tablasPermitidas = ['usuarios', 'clientes', 'empresas'];
+    if (!in_array($tabla, $tablasPermitidas)) {
+        die('Tabla no permitida');
+    }
+
+    $sql = "DELETE FROM $tabla WHERE $campoId = :id";
+    $stmt = $pdo->prepare($sql);
+    return $stmt->execute(['id' => $id]);
+}
+
+function obtenerRegistro($tabla, $id, $pdo, $campoId = 'id') {
+    $tablasPermitidas = ['usuarios', 'clientes', 'empresas'];
+    if (!in_array($tabla, $tablasPermitidas)) {
+        die('Tabla no permitida');
+    }
+
+    $sql = "SELECT * FROM $tabla WHERE $campoId = :id";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['id' => $id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+?>

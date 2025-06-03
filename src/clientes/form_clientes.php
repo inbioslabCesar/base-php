@@ -57,12 +57,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <option value="masculino" <?php if ($sexo === 'masculino') echo 'selected'; ?>>Masculino</option>
         <option value="femenino" <?php if ($sexo === 'femenino') echo 'selected'; ?>>Femenino</option>
         <option value="otro" <?php if ($sexo === 'otro') echo 'selected'; ?>>Otro</option>
-    </select><br><br> <label>Procedencia:</label> <input type="text" name="procedencia" value="<?php echo htmlspecialchars($procedencia); ?>"><br><br> <label>Referencia:</label> <input type="text" name="referencia" value="<?php echo htmlspecialchars($referencia); ?>"><br><br> <button type="submit">Guardar</button> <a href="<?php echo BASE_URL; ?>dashboard.php"><button type="button">Regresar a la tabla</button></a> </form>
+    </select><br><br> <label>Procedencia:</label> <input type="text" name="procedencia" value="<?php echo htmlspecialchars($procedencia); ?>"><br><br> <label>Referencia:</label> <input type="text" name="referencia" value="<?php echo htmlspecialchars($referencia); ?>"><br><br> <button type="submit">Guardar</button> <a href="<?= BASE_URL ?>dashboard.php?vista=clientes" style="display:inline-block;padding:8px 16px;background:#343a40;color:#fff;text-decoration:none;border-radius:4px;">Regresar a la tabla</a>
+ </form>
 <script>
     function generarCodigoCliente() {
-        const prefijo = "HC-";
-        const random = Math.floor(100000 + Math.random() * 900000);
-        const codigo = prefijo + random;
-        document.getElementById('codigo_cliente').value = codigo;
-    }
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2); // últimos 2 dígitos del año
+    const month = ("0" + (now.getMonth() + 1)).slice(-2); // mes con 2 dígitos
+    const day = ("0" + now.getDate()).slice(-2); // día con 2 dígitos
+    const random = Math.floor(1000 + Math.random() * 9000); // 4 dígitos aleatorios
+    const codigo = `LAB-${year}${month}${day}-${random}`;
+    document.getElementById('codigo_cliente').value = codigo;
+}
+
 </script>

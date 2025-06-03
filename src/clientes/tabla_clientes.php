@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../config/config.php';
 // Parámetros de paginación 
+
 $por_pagina = 10;
 $pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
 $inicio = ($pagina - 1) * $por_pagina;

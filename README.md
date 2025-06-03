@@ -27,3 +27,89 @@ Agregar control de acceso por roles y sesiones.
 Autor:
 Cesar & Kodee (Hostinger AI)
 2025
+
+
+
+INBIOSLAB - Sistema de Gestión de Clientes
+Descripción
+Este proyecto es un sistema modular para la gestión de clientes de un laboratorio clínico, desarrollado en PHP y MySQL. Permite a los usuarios con permisos (admin) registrar, listar, editar y eliminar clientes, y cuenta con control de acceso por roles.
+Características principales
+CRUD de clientes: Alta, listado, edición y eliminación.
+Campos únicos: Código de cliente, email y DNI no pueden repetirse.
+Generación automática de código de cliente: Botón para generar códigos tipo HC-XXXXXX.
+Campos adicionales: Edad, procedencia y referencia incluidos en el formulario y base de datos.
+Paginación: El listado de clientes muestra 10 por página, con buscador dinámico.
+Roles: Solo el admin puede gestionar clientes; los clientes solo ven una bienvenida.
+Seguridad: Contraseñas hasheadas y validaciones en el backend.
+Interfaz modular: Uso de componentes (header, navbar, sidebar, footer) para fácil personalización.
+Estructura del proyecto
+/src/ /clientes/ tabla_clientes.php form_clientes.php editar_cliente.php eliminar_cliente.php /componentes/ header.php navbar.php sidebar.php footer.php /conexion/ conexion.php /config/ config.php dashboard.php index.php 
+
+Instalación
+Clona el repositorio o sube los archivos a tu servidor local/hosting.
+Importa la base de datos y ejecuta este SQL para agregar los nuevos campos:
+ALTER TABLE clientes ADD COLUMN edad INT(3) AFTER apellido, ADD COLUMN procedencia VARCHAR(100) AFTER sexo, ADD COLUMN referencia VARCHAR(100) AFTER procedencia; 
+
+Configura la conexión a la base de datos en /src/conexion/conexion.php. Accede al sistema desde:
+http://localhost/base-php/src/dashboard.php
+Uso
+Agregar cliente: Ve a "Clientes" en el sidebar y haz clic en "Agregar Cliente". Llena el formulario y usa el botón "Generar" para crear un código automático si lo deseas.
+Listar clientes: El listado muestra el código de cliente, nombre, apellido, email y acciones (editar/eliminar), con paginación y buscador.
+Editar/eliminar: Usa los enlaces en la tabla para editar o eliminar clientes existentes.
+Roles: El admin puede gestionar todo el CRUD; el cliente solo ve una bienvenida y puede cerrar sesión.
+Notas
+Para personalizar la apariencia, edita los archivos en /src/componentes/.
+El sistema está preparado para extenderse a otros módulos (usuarios, empresas, etc.).
+Si tienes dudas, revisa los archivos PHP comentados y la estructura modular.
+¿Quieres que agregue instrucciones para otros módulos o más detalles técnicos?
+
+
+++-------03-----
+Proyecto: INBIOSLAB - Laboratorio Clínico Estructura de carpetas y archivos principales
+Copy
+src/
+  ├── auth/
+  │     ├── login.php, registro.php, recuperar.php, restablecer.php
+  ├── clases/
+  ├── clientes/
+  │     ├── tabla_clientes.php, form_clientes.php, editar_cliente.php, eliminar_cliente.php
+  ├── empresas/
+  │     ├── tabla_empresas.php, form_empresa.php, editar_empresa.php, eliminar_empresa.php
+  ├── usuarios/
+  │     ├── tabla_usuarios.php, form_usuario.php, editar_usuario.php, eliminar_usuario.php
+  ├── componentes/
+  │     ├── header.php, navbar.php, sidebar.php, footer.php
+  ├── config/
+  │     ├── config.php
+  ├── conexion/
+  │     ├── conexion.php
+  └── dashboard.php
+Variables y lógica clave Variables de sesión
+$_SESSION[&apos;usuario&apos;] → Email del usuario autenticado.
+$_SESSION[&apos;nombre&apos;] → Nombre visible del usuario.
+$_SESSION[&apos;rol&apos;] → Rol principal: admin, recepcionista, laboratorista, cliente, empresa.
+(En empresas/clientes, el acceso es personalizado; en usuarios el acceso depende del rol ENUM.)
+Roles y permisos
+admin: Acceso total a CRUD de clientes, usuarios y empresas.
+recepcionista: Verá solo su panel personalizado (por implementar).
+laboratorista: Verá solo su panel personalizado (por implementar).
+empresa: Panel propio, sin acceso a CRUD generales.
+cliente: Solo saludo y futuras funciones como cotización y resultados.
+Campos ENUM en la base de datos
+usuarios.rol: &apos;admin&apos;, &apos;recepcionista&apos;, &apos;laboratorista&apos;
+usuarios.sexo: &apos;masculino&apos;, &apos;femenino&apos;, &apos;otro&apos;
+Validaciones en formularios
+Los selects de rol y sexo usan exactamente los valores ENUM de la base de datos.
+Validaciones PHP con in_array para evitar errores de truncado.
+Email único para usuarios.
+CRUD Modular
+Cada entidad (clientes, usuarios, empresas) tiene sus propios archivos: tabla, form, editar, eliminar.
+Todos los includes usan rutas absolutas con __DIR__.
+Sidebar y dashboard
+Sidebar muestra solo los enlaces permitidos según el rol.
+dashboard.php valida permisos y carga vistas dinámicamente según el rol y el parámetro vista.
+Pendientes y futuras tareas
+Implementar vistas personalizadas para recepcionista, laboratorista, empresa y cliente.
+Mejorar validaciones y feedback visual en formularios.
+Agregar módulos de cotización, reportes, y paneles personalizados.
+Documentar nuevos módulos y campos ENUM si se agregan.
