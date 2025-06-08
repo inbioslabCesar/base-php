@@ -5,6 +5,7 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 ?>
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <title>Panel de Administración - Inbioslab</title>
@@ -20,14 +21,18 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
             background: #143a51;
             color: #fff;
         }
+
         .sidebar-custom .nav-link,
         .sidebar-custom .nav-link i {
             color: #fff;
         }
-        .sidebar-custom .nav-link.active, .sidebar-custom .nav-link:hover {
+
+        .sidebar-custom .nav-link.active,
+        .sidebar-custom .nav-link:hover {
             background: #1e5270;
             color: #fff;
         }
+
         .sidebar-custom .nav-link {
             font-size: 1.15rem;
             margin-bottom: 0.7rem;
@@ -35,11 +40,13 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
             border-radius: 0.7rem;
             transition: background 0.2s;
         }
+
         .sidebar-custom .nav-link i {
             font-size: 1.6rem;
             vertical-align: middle;
             margin-right: 0.7rem;
         }
+
         @media (max-width: 991.98px) {
             #sidebarMenu {
                 position: fixed;
@@ -50,16 +57,26 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
                 z-index: 1045;
                 transition: left 0.3s;
             }
+
             #sidebarMenu.show {
                 left: 0;
             }
+
             header {
                 z-index: 1050;
                 position: relative;
             }
+
+            @media (max-width: 767.98px) {
+                main[style] {
+                    margin-left: 0 !important;
+                }
+            }
+
         }
     </style>
 </head>
+
 <body>
     <header class="bg-white shadow-sm mb-3 position-relative" style="z-index: 1050;">
         <div class="container-fluid d-flex align-items-center justify-content-between py-2">
@@ -69,8 +86,10 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
                     Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!
                 </span>
             </div>
-            <button class="btn d-lg-none p-2" type="button" id="sidebarToggle" aria-label="Abrir menú lateral" style="width:48px; height:48px;">
-                <i class="bi bi-list" style="font-size: 2rem; width:100%;"></i>
+            <!-- Botón solo visible en móvil -->
+            <button class="btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
+                <i class="bi bi-list fs-2"></i>
             </button>
+
         </div>
     </header>

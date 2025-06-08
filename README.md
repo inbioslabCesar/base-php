@@ -114,3 +114,66 @@ Mejorar validaciones y feedback visual en formularios.
 Agregar módulos de cotización, reportes, y paneles personalizados.
 Documentar nuevos módulos y campos ENUM si se agregan.
 
+----08-06-25------
+BASE-PHP – Documentación de Módulos Estructura General
+componentes/header.php: Contiene el encabezado del sitio y el botón hamburguesa para abrir el sidebar en dispositivos móviles.
+componentes/sidebar.php: Sidebar responsivo. Es fijo en escritorio/tablet y se muestra como offcanvas en móvil. Los enlaces se muestran según el rol del usuario.
+componentes/footer.php: Pie de página fijo para todo el sistema.
+dashboard.php: Orquesta la carga dinámica de vistas y módulos según el rol y las acciones del usuario.
+config/config.php: Define constantes como BASE_URL para rutas absolutas.
+Roles Soportados
+admin: Acceso completo a usuarios, empresas y clientes.
+empresa: Acceso a su propio panel.
+recepcionista: Acceso a su propio panel.
+laboratorista: Acceso a su propio panel.
+cliente: Acceso a su propio panel.
+Sidebar
+Fijo en escritorio/tablet (d-none d-md-block).
+Offcanvas en móvil (d-md-none), activado por el botón hamburguesa del header.
+Enlaces dinámicos según el rol del usuario.
+Estilos con Bootstrap 5 y Bootstrap Icons.
+Main Content
+El contenido principal (&lt;main&gt;) se alinea al costado del sidebar usando Bootstrap Flexbox.
+En móvil, el main ocupa el 100% del ancho cuando el sidebar está oculto.
+Responsive
+Totalmente responsivo con Bootstrap 5.
+El botón hamburguesa solo aparece en móvil y controla el sidebar offcanvas.
+Espaciado adicional en el sidebar móvil para mejorar la experiencia de usuario.
+Rutas y Includes
+Todos los includes usan rutas absolutas con __DIR__ para evitar errores de ubicación.
+Los archivos de vistas para cada rol están organizados en carpetas específicas.
+Ejemplo de Estructura
+Copy
+BASE-PHP/
+│
+├── componentes/
+│   ├── header.php
+│   ├── sidebar.php
+│   └── footer.php
+│
+├── config/
+│   └── config.php
+│
+├── usuarios/
+│   └── vistas/
+│       └── panel_cliente.php
+│
+├── empresas/
+│   └── vistas/
+│       └── panel_empresa.php
+│
+├── recepcionista/
+│   └── vistas/
+│       └── panel_recepcionista.php
+│
+├── laboratorista/
+│   └── vistas/
+│       └── panel_laboratorista.php
+│
+├── dashboard.php
+└── ...
+Notas
+Asegúrate de tener Bootstrap 5 y Bootstrap Icons correctamente cargados en tu header.
+Para agregar nuevos roles o vistas, sigue la estructura y lógica de los módulos existentes.
+Todos los cambios de diseño deben hacerse en los archivos de componentes para mantener la modularidad.
+
