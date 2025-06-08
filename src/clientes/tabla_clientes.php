@@ -1,50 +1,105 @@
-<?php require_once __DIR__ . '/../conexion/conexion.php';
+<?php
 require_once __DIR__ . '/../config/config.php';
-// Parámetros de paginación 
+require_once __DIR__ . '/funciones/clientes_crud.php';
+$clientes = obtenerTodosLosClientes();
+?>
 
-$por_pagina = 10;
-$pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
-$inicio = ($pagina - 1) * $por_pagina;
-// Búsqueda 
-$busqueda = $_GET['busqueda'] ?? '';
-$where = '';
-$params = [];
-if ($busqueda) {
-    $where = "WHERE nombre LIKE :busqueda OR apellido LIKE :busqueda OR email LIKE :busqueda";
-    $params[':busqueda'] = '%' . $busqueda . '%';
-}
-// Total de clientes para paginación 
-$sql_total = "SELECT COUNT(*) FROM clientes $where";
-$stmt_total = $pdo->prepare($sql_total);
-$stmt_total->execute($params);
-$total_clientes = $stmt_total->fetchColumn();
-$total_paginas = max(1, ceil($total_clientes / $por_pagina));
-// Obtener clientes para la página actual 
-$sql = "SELECT * FROM clientes $where ORDER BY id DESC LIMIT :inicio, :por_pagina";
-$stmt = $pdo->prepare($sql);
-foreach ($params as $key => $value) {
-    $stmt->bindValue($key, $value, PDO::PARAM_STR);
-}
-$stmt->bindValue(':inicio', $inicio, PDO::PARAM_INT);
-$stmt->bindValue(':por_pagina', $por_pagina, PDO::PARAM_INT);
-$stmt->execute();
-$clientes = $stmt->fetchAll(PDO::FETCH_ASSOC); ?> <h2>Clientes</h2>
-<form method="get" action=""> <input type="text" name="busqueda" placeholder="Buscar cliente..." value="<?php echo htmlspecialchars($busqueda); ?>"> <button type="submit">Buscar</button> </form> <br> <a href="<?php echo BASE_URL; ?>dashboard.php?vista=form_clientes"><button type="button">Agregar Cliente</button></a> <br><br>
-<table border="1" cellpadding="5" cellspacing="0">
-    <tr>
-        <th>Código Cliente</th>
-        <th>Nombre</th>
-        <th>Apellido</th>
-        <th>Email</th>
-        <th>Acciones</th>
-    </tr> <?php foreach ($clientes as $cliente): ?> <tr>
-            <td><?php echo htmlspecialchars($cliente['codigo_cliente'] ?? ''); ?></td>
-            <td><?php echo htmlspecialchars($cliente['nombre'] ?? ''); ?></td>
-            <td><?php echo htmlspecialchars($cliente['apellido'] ?? ''); ?></td>
-            <td><?php echo htmlspecialchars($cliente['email'] ?? ''); ?></td>
-            <td> <a href="<?php echo BASE_URL; ?>dashboard.php?vista=editar_cliente&id=<?php echo $cliente['id']; ?>">Editar</a> | <a href="<?php echo BASE_URL; ?>dashboard.php?vista=eliminar_cliente&id=<?php echo $cliente['id']; ?>" onclick="return confirm('¿Seguro que deseas eliminar este cliente?')">Eliminar</a> </td>
-        </tr> <?php endforeach; ?>
-</table> <!-- Paginación -->
-<div style="margin-top:10px;"> <?php if ($total_paginas > 1): ?> <?php for ($i = 1; $i <= $total_paginas; $i++): ?> <?php if ($i == $pagina): ?> <strong><?php echo $i; ?></strong> <?php else: ?> <a href="?pagina=<?php echo $i; ?>&busqueda=<?php echo urlencode($busqueda); ?>"><?php echo $i; ?></a> <?php endif; ?> <?php endfor; ?> <?php endif; ?> </div>
-<!-- Paginación -->
-<div style="margin-top:20px; text-align:center;"> <?php if ($total_paginas > 1): ?> <?php for ($i = 1; $i <= $total_paginas; $i++): ?> <?php if ($i == $pagina): ?> <span style="background:#007bff; color:#fff; padding:6px 12px; border-radius:3px; margin:2px; font-weight:bold;"><?php echo $i; ?></span> <?php else: ?> <a href="?pagina=<?php echo $i; ?>&busqueda=<?php echo urlencode($busqueda); ?>" style="background:#f2f2f2; color:#007bff; padding:6px 12px; border-radius:3px; margin:2px; text-decoration:none;"> <?php echo $i; ?> </a> <?php endif; ?> <?php endfor; ?> <?php endif; ?> </div>
+<div class="container-fluid py-3">
+    <div class="row justify-content-center">
+        <div class="col-xl-11 col-lg-12">
+            <?php if (isset($_GET['success'])): ?>
+                <?php if ($_GET['success'] == 1): ?>
+                    <div class="alert alert-success">¡Cliente registrado exitosamente!</div>
+                <?php elseif ($_GET['success'] == 2): ?>
+                    <div class="alert alert-success">¡Cliente actualizado correctamente!</div>
+                <?php elseif ($_GET['success'] == 3): ?>
+                    <div class="alert alert-success">¡Cliente eliminado correctamente!</div>
+                <?php endif; ?>
+            <?php endif; ?>
+            <div class="card shadow">
+                <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+                    <h4 class="mb-0">Gestión de Clientes</h4>
+                    <a href="<?= BASE_URL ?>dashboard.php?vista=form_clientes" class="btn btn-light btn-sm">
+                        <i class="bi bi-plus-circle"></i> Nuevo Cliente
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table id="tablaClientes" class="table table-hover table-bordered align-middle mb-0" style="width:100%;">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Código</th>
+                                    <th>Nombre</th>
+                                    <th>Apellido</th>
+                                    <th>DNI</th>
+                                    <th>Email</th>
+                                    <th>Teléfono</th>
+                                    <th>Sexo</th>
+                                    <th>Edad</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($clientes as $cliente): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($cliente['id'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['codigo_cliente'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['nombre'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['apellido'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['dni'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['email'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['telefono'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['sexo'] ?? '') ?></td>
+                                        <td><?= htmlspecialchars($cliente['edad'] ?? '') ?></td>
+                                        <td>
+                                            <span class="badge bg-<?= ($cliente['estado'] ?? '') === 'activo' ? 'success' : 'secondary' ?>">
+                                                <?= htmlspecialchars($cliente['estado'] ?? '') ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="<?= BASE_URL ?>dashboard.php?vista=editar_cliente&id=<?= $cliente['id'] ?>" class="btn btn-sm btn-warning" title="Editar"><i class="bi bi-pencil"></i></a>
+                                            <a href="<?= BASE_URL ?>clientes/eliminar_cliente.php?id=<?= $cliente['id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('¿Seguro que deseas eliminar este cliente?')">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DataTables y Bootstrap JS (solo si no están ya incluidos en el footer) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#tablaClientes').DataTable({
+            responsive: true,
+            language: {
+                url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+            },
+            dom: 'Bfrtip',
+            buttons: [
+                'excelHtml5',
+                'pdfHtml5',
+                'print'
+            ]
+        });
+    });
+</script>

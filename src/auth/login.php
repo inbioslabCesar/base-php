@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $authUsuario = new Auth($pdo, 'usuarios');
     $usuario = $authUsuario->login($email, $password);
     if ($usuario) {
-        $_SESSION['usuario'] = $usuario['usuario'];
+        $_SESSION['usuario'] = $usuario['email'];
         // o 
         $_SESSION['email'] = $usuario['email']; 
         $_SESSION['nombre'] = $usuario['nombre'];

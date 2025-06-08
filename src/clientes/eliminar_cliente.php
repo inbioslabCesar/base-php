@@ -1,12 +1,12 @@
-<?php require_once __DIR__ . '/../conexion/conexion.php';
+<?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/funciones/clientes_crud.php';
+
 $id = $_GET['id'] ?? null;
 if ($id) {
-    $sql = "DELETE FROM clientes WHERE id = :id";
+    $sql = "DELETE FROM clientes WHERE id=?";
     $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->execute();
+    $stmt->execute([$id]);
 }
-// Redirige de vuelta a la tabla de clientes 
-header('Location: ' . BASE_URL . 'dashboard.php?vista=tabla_clientes');
-exit();
+header("Location: " . BASE_URL . "dashboard.php?vista=clientes&success=3");
+exit;

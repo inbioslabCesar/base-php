@@ -1,30 +1,40 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/funciones/usuarios_crud.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-
-if ($id > 0) {
-    // Eliminar usuario solo si existe
-    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
-    $stmt->execute([$id]);
-    if ($stmt->fetch()) {
-        $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
-        $stmt->execute([$id]);
-        $mensaje = "Usuario eliminado correctamente.";
-    } else {
-        $mensaje = "Usuario no encontrado.";
-    }
-} else {
-    $mensaje = "ID inválido.";
+$id = $_GET['id'] ?? null;
+if (!$id) {
+    header("Location:" . BASE_URL . "dashboard.php?vista=usuarios");
+    exit;
 }
 
-// Redirigir de vuelta a la tabla de usuarios después de 1 segundo
-header("refresh:1;url=" . BASE_URL . "dashboard.php?vista=usuarios");
-?>
+$usuario = obtenerUsuarioPorId($id);
+if (!$usuario) {
+    echo "<div class='alert alert-danger'>Usuario no encontrado.</div>";
+    exit;
+}
 
-<div style="padding:20px;">
-    <h2>Eliminar Usuario</h2>
-    <div style="color:<?= strpos($mensaje, 'correctamente') !== false ? 'green' : 'red' ?>;"><?= htmlspecialchars($mensaje) ?></div>
-    <p>Redirigiendo a la tabla de usuarios...</p>
+// Procesar confirmación
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/../conexion/conexion.php';
+    $sql = "DELETE FROM usuarios WHERE id=?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id]);
+    header("Location: " . BASE_URL . "dashboard.php?vista=usuarios&success=3");
+
+    exit;
+}
+?>
+<div class="container mt-4">
+    <div class="alert alert-warning">
+        <h4>¿Estás seguro de que deseas eliminar al usuario <strong><?= htmlspecialchars($usuario['nombre'] . ' ' . $usuario['apellido']) ?></strong>?</h4>
+        <form method="POST">
+            <a href="<?= BASE_URL ?>dashboard.php?vista=usuarios" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Eliminar Usuario
+            </button>
+        </form>
+    </div>
 </div>

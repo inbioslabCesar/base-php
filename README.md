@@ -113,3 +113,4 @@ Implementar vistas personalizadas para recepcionista, laboratorista, empresa y c
 Mejorar validaciones y feedback visual en formularios.
 Agregar módulos de cotización, reportes, y paneles personalizados.
 Documentar nuevos módulos y campos ENUM si se agregan.
+

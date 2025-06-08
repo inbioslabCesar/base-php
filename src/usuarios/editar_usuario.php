@@ -1,126 +1,102 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/funciones/usuarios_crud.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id = ?");
-$stmt->execute([$id]);
-$usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-
+$id = $_GET['id'] ?? null;
+$usuario = $id ? obtenerUsuarioPorId($id) : null;
 if (!$usuario) {
-    echo "Usuario no encontrado.";
+    echo "<div class='alert alert-danger'>Usuario no encontrado.</div>";
     exit;
-}
-
-$mensaje = '';
-$nombre = $usuario['nombre'] ?? '';
-$apellido = $usuario['apellido'] ?? '';
-$dni = $usuario['dni'] ?? '';
-$sexo = $usuario['sexo'] ?? '';
-$email = $usuario['email'] ?? '';
-$telefono = $usuario['telefono'] ?? '';
-$direccion = $usuario['direccion'] ?? '';
-$profesion = $usuario['profesion'] ?? '';
-$rol = $usuario['rol'] ?? '';
-$estado = $usuario['estado'] ?? '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre = $_POST['nombre'];
-    $apellido = $_POST['apellido'];
-    $dni = $_POST['dni'];
-    $sexo = $_POST['sexo'];
-    $email = $_POST['email'];
-    $telefono = $_POST['telefono'];
-    $direccion = $_POST['direccion'];
-    $profesion = $_POST['profesion'];
-    $rol = $_POST['rol'];
-    $estado = $_POST['estado'];
-
-    // Validar único email
-    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
-    $stmt->execute([$email, $id]);
-    if ($stmt->fetch()) {
-        $mensaje = "El correo ya existe en otro usuario.";
-    } elseif (!in_array($rol, ['admin', 'recepcionista', 'laboratorista'])) {
-        $mensaje = "Rol inválido.";
-    } elseif (!in_array($sexo, ['masculino', 'femenino', 'otro'])) {
-        $mensaje = "Sexo inválido.";
-    } else {
-        // Actualizar contraseña solo si se ingresó una nueva
-        $updatePassword = "";
-        $params = [
-            $nombre, $apellido, $dni, $sexo, $email, $telefono, $direccion, $profesion, $rol, $estado, $id
-        ];
-        if (!empty($_POST['password'])) {
-            $nuevoHash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $updatePassword = ", password = ?";
-            $params = [
-                $nombre, $apellido, $dni, $sexo, $email, $telefono, $direccion, $profesion, $rol, $estado, $nuevoHash, $id
-            ];
-        }
-
-        $sql = "UPDATE usuarios SET nombre = ?, apellido = ?, dni = ?, sexo = ?, email = ?, telefono = ?, direccion = ?, profesion = ?, rol = ?, estado = ? $updatePassword WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        if ($stmt->execute($params)) {
-            $mensaje = "Usuario actualizado correctamente.";
-        } else {
-            $mensaje = "Error al actualizar el usuario.";
-        }
-    }
 }
 ?>
 
-<h2>Editar Usuario</h2>
-<?php if ($mensaje): ?>
-    <div style="color:<?= strpos($mensaje, 'correctamente') !== false ? 'green' : 'red' ?>;"><?= htmlspecialchars($mensaje) ?></div>
-<?php endif; ?>
-<form method="POST">
-    <label>Nombre:</label>
-    <input type="text" name="nombre" value="<?= htmlspecialchars($nombre) ?>" required><br>
-
-    <label>Apellido:</label>
-    <input type="text" name="apellido" value="<?= htmlspecialchars($apellido) ?>" required><br>
-
-    <label>DNI:</label>
-    <input type="text" name="dni" value="<?= htmlspecialchars($dni) ?>"><br>
-
-    <label>Sexo:</label>
-    <select name="sexo" required>
-        <option value="">Seleccione</option>
-        <option value="masculino" <?= $sexo == "masculino" ? "selected" : "" ?>>Masculino</option>
-        <option value="femenino" <?= $sexo == "femenino" ? "selected" : "" ?>>Femenino</option>
-        <option value="otro" <?= $sexo == "otro" ? "selected" : "" ?>>Otro</option>
-    </select><br>
-
-    <label>Email:</label>
-    <input type="email" name="email" value="<?= htmlspecialchars($email) ?>" required><br>
-
-    <label>Teléfono:</label>
-    <input type="text" name="telefono" value="<?= htmlspecialchars($telefono) ?>"><br>
-
-    <label>Dirección:</label>
-    <input type="text" name="direccion" value="<?= htmlspecialchars($direccion) ?>"><br>
-
-    <label>Profesión:</label>
-    <input type="text" name="profesion" value="<?= htmlspecialchars($profesion) ?>"><br>
-
-    <label>Contraseña (dejar en blanco para no cambiar):</label>
-    <input type="password" name="password"><br>
-
-    <label>Rol:</label>
-    <select name="rol" required>
-        <option value="">Seleccione</option>
-        <option value="admin" <?= $rol == "admin" ? "selected" : "" ?>>Administrador</option>
-        <option value="recepcionista" <?= $rol == "recepcionista" ? "selected" : "" ?>>Recepcionista</option>
-        <option value="laboratorista" <?= $rol == "laboratorista" ? "selected" : "" ?>>Laboratorista</option>
-    </select><br>
-
-    <label>Estado:</label>
-    <select name="estado">
-        <option value="activo" <?= $estado == "activo" ? "selected" : "" ?>>Activo</option>
-        <option value="inactivo" <?= $estado == "inactivo" ? "selected" : "" ?>>Inactivo</option>
-    </select><br>
-
-    <button type="submit">Actualizar</button>
-    <a href="<?= BASE_URL ?>dashboard.php?vista=usuarios" style="display:inline-block;padding:8px 16px;background:#343a40;color:#fff;text-decoration:none;border-radius:4px;">Regresar a la tabla</a>
-</form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">Editar Usuario</h4>
+                </div>
+                <div class="card-body">
+                    <form action="<?= BASE_URL ?>usuarios/funciones/usuarios_crud.php" method="POST" autocomplete="off">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($usuario['id'] ?? '') ?>">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" name="nombre" id="nombre" required value="<?= htmlspecialchars($usuario['nombre'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="apellido" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" name="apellido" id="apellido" required value="<?= htmlspecialchars($usuario['apellido'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dni" class="form-label">DNI</label>
+                                <input type="text" class="form-control" name="dni" id="dni" required maxlength="15" value="<?= htmlspecialchars($usuario['dni'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sexo" class="form-label">Sexo</label>
+                                <select class="form-select" name="sexo" id="sexo" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="masculino" <?= ($usuario['sexo'] ?? '') === 'masculino' ? 'selected' : '' ?>>Masculino</option>
+                                    <option value="femenino" <?= ($usuario['sexo'] ?? '') === 'femenino' ? 'selected' : '' ?>>Femenino</option>
+                                    <option value="otro" <?= ($usuario['sexo'] ?? '') === 'otro' ? 'selected' : '' ?>>Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" name="fecha_nacimiento" id="fecha_nacimiento" required value="<?= htmlspecialchars($usuario['fecha_nacimiento'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Correo electrónico</label>
+                                <input type="email" class="form-control" name="email" id="email" required value="<?= htmlspecialchars($usuario['email'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telefono" class="form-label">Teléfono</label>
+                                <input type="text" class="form-control" name="telefono" id="telefono" required value="<?= htmlspecialchars($usuario['telefono'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-8">
+                                <label for="direccion" class="form-label">Dirección</label>
+                                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($usuario['direccion'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="profesion" class="form-label">Profesión</label>
+                                <input type="text" class="form-control" name="profesion" id="profesion" value="<?= htmlspecialchars($usuario['profesion'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="rol" class="form-label">Rol</label>
+                                <select class="form-select" name="rol" id="rol" required>
+                                    <option value="admin" <?= ($usuario['rol'] ?? '') === 'admin' ? 'selected' : '' ?>>Administrador</option>
+                                    <option value="recepcionista" <?= ($usuario['rol'] ?? '') === 'recepcionista' ? 'selected' : '' ?>>Recepcionista</option>
+                                    <option value="laboratorista" <?= ($usuario['rol'] ?? '') === 'laboratorista' ? 'selected' : '' ?>>Laboratorista</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="estado" class="form-label">Estado</label>
+                                <select class="form-select" name="estado" id="estado" required>
+                                    <option value="activo" <?= ($usuario['estado'] ?? '') === 'activo' ? 'selected' : '' ?>>Activo</option>
+                                    <option value="inactivo" <?= ($usuario['estado'] ?? '') === 'inactivo' ? 'selected' : '' ?>>Inactivo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password" class="form-label">Nueva Contraseña (opcional)</label>
+                                <input type="password" class="form-control" name="password" id="password" minlength="6">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="confirm_password" class="form-label">Confirmar Contraseña</label>
+                                <input type="password" class="form-control" name="confirm_password" id="confirm_password" minlength="6">
+                            </div>
+                        </div>
+                        <div class="mt-4 d-flex justify-content-between">
+                            <a href="<?= BASE_URL ?>dashboard.php?vista=usuarios" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Volver
+                            </a>
+                            <button type="submit" name="actualizar_usuario" class="btn btn-warning">
+                                <i class="bi bi-check-circle"></i> Actualizar Usuario
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

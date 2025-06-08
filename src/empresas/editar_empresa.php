@@ -1,110 +1,89 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/funciones/empresas_crud.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$stmt = $pdo->prepare("SELECT * FROM empresas WHERE id = ?");
-$stmt->execute([$id]);
-$empresa = $stmt->fetch(PDO::FETCH_ASSOC);
-
+$id = $_GET['id'] ?? null;
+$empresa = $id ? obtenerEmpresaPorId($id) : null;
 if (!$empresa) {
-    echo "Empresa no encontrada.";
+    echo "<div class='alert alert-danger'>Empresa no encontrada.</div>";
     exit;
-}
-
-$mensaje = '';
-// Inicializar variables con valores actuales
-$ruc = $empresa['ruc'] ?? '';
-$razon_social = $empresa['razon_social'] ?? '';
-$nombre_comercial = $empresa['nombre_comercial'] ?? '';
-$direccion = $empresa['direccion'] ?? '';
-$telefono = $empresa['telefono'] ?? '';
-$email = $empresa['email'] ?? '';
-$representante = $empresa['representante'] ?? '';
-$convenio = $empresa['convenio'] ?? '';
-$estado = $empresa['estado'] ?? '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $ruc = $_POST['ruc'];
-    $razon_social = $_POST['razon_social'];
-    $nombre_comercial = $_POST['nombre_comercial'];
-    $direccion = $_POST['direccion'];
-    $telefono = $_POST['telefono'];
-    $email = $_POST['email'];
-    $representante = $_POST['representante'];
-    $convenio = $_POST['convenio'];
-    $estado = $_POST['estado'];
-
-    // Validar único RUC y email
-    $stmt = $pdo->prepare("SELECT id FROM empresas WHERE (ruc = ? OR email = ?) AND id != ?");
-    $stmt->execute([$ruc, $email, $id]);
-    if ($stmt->fetch()) {
-        $mensaje = "El RUC o el Email ya existe en otra empresa.";
-    } else {
-        // Actualizar contraseña solo si se ingresó una nueva
-        $updatePassword = "";
-        $params = [
-            $ruc, $razon_social, $nombre_comercial, $direccion, $telefono, $email,
-            $representante, $convenio, $estado, $id
-        ];
-        if (!empty($_POST['password'])) {
-            $nuevoHash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $updatePassword = ", password = ?";
-            $params = [
-                $ruc, $razon_social, $nombre_comercial, $direccion, $telefono, $email,
-                $representante, $convenio, $estado, $nuevoHash, $id
-            ];
-        }
-
-        $sql = "UPDATE empresas SET ruc = ?, razon_social = ?, nombre_comercial = ?, direccion = ?, telefono = ?, email = ?, representante = ?, convenio = ?, estado = ? $updatePassword WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        if ($stmt->execute($params)) {
-            $mensaje = "Empresa actualizada correctamente.";
-        } else {
-            $mensaje = "Error al actualizar la empresa.";
-        }
-    }
 }
 ?>
 
-<h2>Editar Empresa</h2>
-<?php if ($mensaje): ?>
-    <div style="color:<?= strpos($mensaje, 'correctamente') !== false ? 'green' : 'red' ?>;"><?= htmlspecialchars($mensaje) ?></div>
-<?php endif; ?>
-<form method="POST">
-    <label>RUC:</label>
-    <input type="text" name="ruc" value="<?= htmlspecialchars($ruc) ?>" required><br>
-
-    <label>Razón Social:</label>
-    <input type="text" name="razon_social" value="<?= htmlspecialchars($razon_social) ?>" required><br>
-
-    <label>Nombre Comercial:</label>
-    <input type="text" name="nombre_comercial" value="<?= htmlspecialchars($nombre_comercial) ?>"><br>
-
-    <label>Dirección:</label>
-    <input type="text" name="direccion" value="<?= htmlspecialchars($direccion) ?>"><br>
-
-    <label>Teléfono:</label>
-    <input type="text" name="telefono" value="<?= htmlspecialchars($telefono) ?>"><br>
-
-    <label>Email:</label>
-    <input type="email" name="email" value="<?= htmlspecialchars($email) ?>" required><br>
-
-    <label>Representante:</label>
-    <input type="text" name="representante" value="<?= htmlspecialchars($representante) ?>"><br>
-
-    <label>Contraseña (dejar en blanco para no cambiar):</label>
-    <input type="password" name="password"><br>
-
-    <label>Convenio:</label>
-    <input type="text" name="convenio" value="<?= htmlspecialchars($convenio) ?>"><br>
-
-    <label>Estado:</label>
-    <select name="estado">
-        <option value="activo" <?= $estado == "activo" ? "selected" : "" ?>>Activo</option>
-        <option value="inactivo" <?= $estado == "inactivo" ? "selected" : "" ?>>Inactivo</option>
-    </select><br>
-
-    <button type="submit">Actualizar</button>
-    <a href="<?= BASE_URL ?>dashboard.php?vista=empresas" style="display:inline-block;padding:8px 16px;background:#007bff;color:#fff;text-decoration:none;border-radius:4px;">Regresar a la tabla</a>
-</form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">Editar Empresa</h4>
+                </div>
+                <div class="card-body">
+                    <?php
+                    if (isset($_SESSION['errores_empresa'])) {
+                        foreach ($_SESSION['errores_empresa'] as $error) {
+                            echo '<div class="alert alert-danger">' . htmlspecialchars($error) . '</div>';
+                        }
+                        unset($_SESSION['errores_empresa']);
+                    }
+                    ?>
+                    <form action="<?= BASE_URL ?>empresas/funciones/empresas_crud.php" method="POST" autocomplete="off">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($empresa['id'] ?? '') ?>">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">RUC *</label>
+                                <input type="text" class="form-control" name="ruc" required value="<?= htmlspecialchars($empresa['ruc'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Razón Social *</label>
+                                <input type="text" class="form-control" name="razon_social" required value="<?= htmlspecialchars($empresa['razon_social'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nombre Comercial</label>
+                                <input type="text" class="form-control" name="nombre_comercial" value="<?= htmlspecialchars($empresa['nombre_comercial'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Dirección</label>
+                                <input type="text" class="form-control" name="direccion" value="<?= htmlspecialchars($empresa['direccion'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Teléfono</label>
+                                <input type="text" class="form-control" name="telefono" value="<?= htmlspecialchars($empresa['telefono'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Correo electrónico *</label>
+                                <input type="email" class="form-control" name="email" required value="<?= htmlspecialchars($empresa['email'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Representante</label>
+                                <input type="text" class="form-control" name="representante" value="<?= htmlspecialchars($empresa['representante'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Convenio</label>
+                                <input type="text" class="form-control" name="convenio" value="<?= htmlspecialchars($empresa['convenio'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Estado</label>
+                                <select class="form-select" name="estado">
+                                    <option value="activo" <?= ($empresa['estado'] ?? '') === 'activo' ? 'selected' : '' ?>>Activo</option>
+                                    <option value="inactivo" <?= ($empresa['estado'] ?? '') === 'inactivo' ? 'selected' : '' ?>>Inactivo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nueva Contraseña (opcional)</label>
+                                <input type="password" class="form-control" name="password" minlength="6">
+                            </div>
+                        </div>
+                        <div class="mt-4 d-flex justify-content-between">
+                            <a href="<?= BASE_URL ?>dashboard.php?vista=empresas" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Volver
+                            </a>
+                            <button type="submit" name="actualizar_empresa" class="btn btn-warning">
+                                <i class="bi bi-check-circle"></i> Actualizar Empresa
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

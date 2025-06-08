@@ -1,98 +1,95 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../conexion/conexion.php';
-
-$mensaje = '';
-$nombre = $apellido = $dni = $sexo = $email = $telefono = $direccion = $profesion = $rol = $estado = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nombre    = trim($_POST['nombre'] ?? '');
-    $apellido  = trim($_POST['apellido'] ?? '');
-    $dni       = trim($_POST['dni'] ?? '');
-    $sexo      = $_POST['sexo'] ?? '';
-    $email     = trim($_POST['email'] ?? '');
-    $telefono  = trim($_POST['telefono'] ?? '');
-    $direccion = trim($_POST['direccion'] ?? '');
-    $profesion = trim($_POST['profesion'] ?? '');
-    $rol       = $_POST['rol'] ?? '';
-    $estado    = $_POST['estado'] ?? 'activo';
-    $password  = $_POST['password'] ?? '';
-
-    if (empty($nombre) || empty($apellido) || empty($email) || empty($password) || empty($rol) || empty($sexo)) {
-        $mensaje = "Todos los campos obligatorios deben estar completos.";
-    } elseif (!in_array($rol, ['admin', 'recepcionista', 'laboratorista'])) {
-        $mensaje = "Rol inválido.";
-    } elseif (!in_array($sexo, ['masculino', 'femenino', 'otro'])) {
-        $mensaje = "Sexo inválido.";
-    } else {
-        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            $mensaje = "El correo ya existe.";
-        } else {
-            $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO usuarios (password, nombre, apellido, dni, sexo, email, telefono, direccion, profesion, rol, estado, fecha_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            if ($stmt->execute([$hash, $nombre, $apellido, $dni, $sexo, $email, $telefono, $direccion, $profesion, $rol, $estado])) {
-                $mensaje = "Usuario creado correctamente.";
-                $nombre = $apellido = $dni = $sexo = $email = $telefono = $direccion = $profesion = $rol = $estado = '';
-            } else {
-                $mensaje = "Error al crear el usuario.";
-            }
-        }
-    }
-}
 ?>
 
-<h2>Registrar Usuario</h2>
-<?php if ($mensaje): ?>
-    <div style="color:<?= strpos($mensaje, 'correctamente') !== false ? 'green' : 'red' ?>;"><?= htmlspecialchars($mensaje) ?></div>
-<?php endif; ?>
-<form method="POST" autocomplete="off">
-    <label>Nombre:</label>
-    <input type="text" name="nombre" value="<?= htmlspecialchars($nombre) ?>" required><br>
-
-    <label>Apellido:</label>
-    <input type="text" name="apellido" value="<?= htmlspecialchars($apellido) ?>" required><br>
-
-    <label>DNI:</label>
-    <input type="text" name="dni" value="<?= htmlspecialchars($dni) ?>"><br>
-
-    <label>Sexo:</label>
-    <select name="sexo" required>
-        <option value="">Seleccione</option>
-        <option value="masculino" <?= $sexo == "masculino" ? "selected" : "" ?>>Masculino</option>
-        <option value="femenino" <?= $sexo == "femenino" ? "selected" : "" ?>>Femenino</option>
-        <option value="otro" <?= $sexo == "otro" ? "selected" : "" ?>>Otro</option>
-    </select><br>
-
-    <label>Email:</label>
-    <input type="email" name="email" value="<?= htmlspecialchars($email) ?>" required><br>
-
-    <label>Teléfono:</label>
-    <input type="text" name="telefono" value="<?= htmlspecialchars($telefono) ?>"><br>
-
-    <label>Dirección:</label>
-    <input type="text" name="direccion" value="<?= htmlspecialchars($direccion) ?>"><br>
-
-    <label>Profesión:</label>
-    <input type="text" name="profesion" value="<?= htmlspecialchars($profesion) ?>"><br>
-
-    <label>Contraseña:</label>
-    <input type="password" name="password" required><br>
-
-    <label>Rol:</label>
-    <select name="rol" required>
-        <option value="">Seleccione</option>
-        <option value="admin" <?= $rol == "admin" ? "selected" : "" ?>>Administrador</option>
-        <option value="recepcionista" <?= $rol == "recepcionista" ? "selected" : "" ?>>Recepcionista</option>
-        <option value="laboratorista" <?= $rol == "laboratorista" ? "selected" : "" ?>>Laboratorista</option>
-    </select><br>
-
-    <label>Estado:</label>
-    <select name="estado">
-        <option value="activo" <?= $estado == "activo" ? "selected" : "" ?>>Activo</option>
-        <option value="inactivo" <?= $estado == "inactivo" ? "selected" : "" ?>>Inactivo</option>
-    </select><br>
-
-    <button type="submit">Guardar</button>
-    <a href="<?= BASE_URL ?>dashboard.php?vista=usuarios" style="display:inline-block;padding:8px 16px;background:#343a40;color:#fff;text-decoration:none;border-radius:4px;">Regresar a la tabla</a>
-</form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Registrar Nuevo Usuario</h4>
+                </div>
+                <div class="card-body">
+                    <form action="<?= BASE_URL ?>usuarios/funciones/usuarios_crud.php" method="POST" autocomplete="off">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" name="nombre" id="nombre" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="apellido" class="form-label">Apellido</label>
+                                <input type="text" class="form-control" name="apellido" id="apellido" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="dni" class="form-label">DNI</label>
+                                <input type="text" class="form-control" name="dni" id="dni" required maxlength="15">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sexo" class="form-label">Sexo</label>
+                                <select class="form-select" name="sexo" id="sexo" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="masculino">Masculino</option>
+                                    <option value="femenino">Femenino</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" name="fecha_nacimiento" id="fecha_nacimiento" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Correo electrónico</label>
+                                <input type="email" class="form-control" name="email" id="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telefono" class="form-label">Teléfono</label>
+                                <input type="text" class="form-control" name="telefono" id="telefono" required>
+                            </div>
+                            <div class="col-md-8">
+                                <label for="direccion" class="form-label">Dirección</label>
+                                <input type="text" class="form-control" name="direccion" id="direccion">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="profesion" class="form-label">Profesión</label>
+                                <input type="text" class="form-control" name="profesion" id="profesion">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="rol" class="form-label">Rol</label>
+                                <select class="form-select" name="rol" id="rol" required>
+                                    <option value="">Seleccionar</option>
+                                    <option value="admin">Administrador</option>
+                                    <option value="recepcionista">Recepcionista</option>
+                                    <option value="laboratorista">Laboratorista</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="estado" class="form-label">Estado</label>
+                                <select class="form-select" name="estado" id="estado" required>
+                                    <option value="activo">Activo</option>
+                                    <option value="inactivo">Inactivo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password" class="form-label">Contraseña</label>
+                                <input type="password" class="form-control" name="password" id="password" required minlength="6">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="confirm_password" class="form-label">Confirmar Contraseña</label>
+                                <input type="password" class="form-control" name="confirm_password" id="confirm_password" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="mt-4 d-flex justify-content-between">
+                            <a href="<?= BASE_URL ?>dashboard.php?vista=usuarios" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Volver
+                            </a>
+                            <button type="submit" name="registrar_usuario" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Registrar Usuario
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php include_once __DIR__ . '/../componentes/footer.php'; ?>
