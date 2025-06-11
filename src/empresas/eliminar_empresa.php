@@ -1,30 +1,20 @@
 <?php
-require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$id = $_GET['id'] ?? null;
 
-if ($id > 0) {
-    // Eliminar empresa solo si existe
-    $stmt = $pdo->prepare("SELECT id FROM empresas WHERE id = ?");
-    $stmt->execute([$id]);
-    if ($stmt->fetch()) {
+if ($id) {
+    try {
         $stmt = $pdo->prepare("DELETE FROM empresas WHERE id = ?");
         $stmt->execute([$id]);
-        $mensaje = "Empresa eliminada correctamente.";
-    } else {
-        $mensaje = "Empresa no encontrada.";
+        $_SESSION['mensaje'] = "Empresa eliminada exitosamente.";
+    } catch (PDOException $e) {
+        $_SESSION['mensaje'] = "Error al eliminar la empresa: " . $e->getMessage();
     }
 } else {
-    $mensaje = "ID inválido.";
+    $_SESSION['mensaje'] = "ID de empresa no válido.";
 }
 
-// Redirigir de vuelta a la tabla de empresas después de 1 segundo
-header("refresh:1;url=" . BASE_URL . "dashboard.php?vista=empresas");
+header('Location: dashboard.php?vista=empresas');
+exit;
 ?>
-
-<div style="padding:20px;">
-    <h2>Eliminar Empresa</h2>
-    <div style="color:<?= strpos($mensaje, 'correctamente') !== false ? 'green' : 'red' ?>;"><?= htmlspecialchars($mensaje) ?></div>
-    <p>Redirigiendo a la tabla de empresas...</p>
-</div>

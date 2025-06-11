@@ -3,9 +3,12 @@
   <div class="d-none d-md-block bg-light shadow h-100 position-fixed" style="width:250px; min-height:100vh; z-index:1030;">
     <nav class="nav nav-pills flex-column p-3">
         <?php if ($_SESSION['rol'] == 'admin'): ?>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=admin"><i class="bi bi-people"></i> Panel Admin</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=usuarios"><i class="bi bi-people"></i> Usuarios</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresas"><i class="bi bi-building"></i> Empresas</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Clientes</a>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
         <?php elseif ($_SESSION['rol'] == 'empresa'): ?>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=panel_empresa"><i class="bi bi-building"></i> Panel Empresa</a>
         <?php elseif ($_SESSION['rol'] == 'recepcionista'): ?>
@@ -28,9 +31,13 @@
   <div class="offcanvas-body p-0">
     <nav class="nav nav-pills flex-column p-3 mt-5">
         <?php if ($_SESSION['rol'] == 'admin'): ?>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=admin"><i class="bi bi-people"></i> Panel Admin</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=usuarios"><i class="bi bi-people"></i> Usuarios</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresas"><i class="bi bi-building"></i> Empresas</a>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Clientes</a>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
+            <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
+
         <?php elseif ($_SESSION['rol'] == 'empresa'): ?>
             <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=panel_empresa"><i class="bi bi-building"></i> Panel Empresa</a>
         <?php elseif ($_SESSION['rol'] == 'recepcionista'): ?>

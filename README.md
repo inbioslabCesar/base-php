@@ -144,7 +144,7 @@ Todos los includes usan rutas absolutas con __DIR__ para evitar errores de ubica
 Los archivos de vistas para cada rol están organizados en carpetas específicas.
 Ejemplo de Estructura
 Copy
-BASE-PHP/
+BASE-PHP/src/
 │
 ├── componentes/
 │   ├── header.php
@@ -155,20 +155,40 @@ BASE-PHP/
 │   └── config.php
 │
 ├── usuarios/
-│   └── vistas/
-│       └── panel_cliente.php
+│   └── editar_usuario.php
+│   └── eliminar_usuario.php
+│   └── form_usuarios.php
+│   └── tabla_usuarios.php vistas/
+│                          └── panel_admin.php
+│                          │__ panel_recepcionista.php
+│                          │__ panel_laboratorista.php
 │
 ├── empresas/
-│   └── vistas/
-│       └── panel_empresa.php
+│   └── editar_empresa.php
+│   └── eliminar_empresa.php
+│   └── form_empresa.php
+│   └── tabla_uempresas.php vistas/
+│                           └── panel_empresa.php
+|
+├── convenios/
+│   └── editar_convenio.php
+│   └── eliminar_convenio.php
+│   └── form_convenios.php
+│   └── tabla_convenios.php vistas/
+│                           └── panel_cconvenio.php
 │
-├── recepcionista/
-│   └── vistas/
-│       └── panel_recepcionista.php
-│
-├── laboratorista/
-│   └── vistas/
-│       └── panel_laboratorista.php
+├── clientes/
+│   └── editar_cliente.php
+│   └── eliminar_cliente.php
+│   └── form_clientes.php
+│   └── tabla_clientes.php vistas/
+│                           └── panel_cliente.php
+├── examenes/
+│   └── editar_examen.php
+│   └── eliminar_examen.php
+│   └── form_examenes.php
+│   └── tabla_examenes.php funciones/
+|                          |__examenes_crud.php
 │
 ├── dashboard.php
 └── ...

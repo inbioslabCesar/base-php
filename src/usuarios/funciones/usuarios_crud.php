@@ -145,4 +145,3 @@ if (isset($_GET['eliminar_usuario'])) {
 
     exit;
 }
-?>
