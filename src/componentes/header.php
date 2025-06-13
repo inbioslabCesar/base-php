@@ -1,5 +1,6 @@
 <?php
-$nombreUsuario = $_SESSION['nombre'] ?? 'Usuario';
+$nombreUsuario = $_SESSION['usuario'] ?? 'Usuario';
+
 // Convierte solo la primera letra en mayúscula, el resto en minúscula
 $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 ?>

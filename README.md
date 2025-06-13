@@ -197,3 +197,271 @@ Asegúrate de tener Bootstrap 5 y Bootstrap Icons correctamente cargados en tu h
 Para agregar nuevos roles o vistas, sigue la estructura y lógica de los módulos existentes.
 Todos los cambios de diseño deben hacerse en los archivos de componentes para mantener la modularidad.
 
+----------11-06-2025-------------
+# Módulo de Cotizaciones – INBIOSLAB
+
+Este módulo permite la generación, gestión y consulta de cotizaciones de exámenes para clientes, empresas y convenios, tanto desde el panel de usuario como desde los perfiles de recepcionista y laboratorista.
+
+---
+
+## Estructura de Base de Datos
+
+### Tabla: cotizaciones
+- `id`: INT, clave primaria, auto-incremental.
+- `codigo`: VARCHAR(30), código único de cotización (ej: COT-2024-0001).
+- `id_cliente`: INT, referencia a clientes (nullable).
+- `id_empresa`: INT, referencia a empresas (nullable).
+- `id_convenio`: INT, referencia a convenios (nullable).
+- `tipo_usuario`: ENUM('cliente','empresa','convenio'), identifica el tipo de usuario.
+- `fecha`: DATETIME, fecha de generación.
+- `total`: DECIMAL(10,2), monto total de la cotización.
+- `estado_pago`: ENUM('pendiente','pagado'), estado del pago.
+- `observaciones`: TEXT, comentarios adicionales.
+- `pdf_url`: VARCHAR(255), ruta del PDF generado (opcional).
+- `creado_por`: INT, ID del usuario que generó la cotización.
+- `rol_creador`: ENUM('cliente','recepcionista','laboratorista','admin'), rol del creador.
+
+### Tabla: cotizaciones_detalle
+- `id`: INT, clave primaria.
+- `id_cotizacion`: INT, referencia a cotizaciones.
+- `id_examen`: INT, referencia a examenes.
+- `nombre_examen`: VARCHAR(100), nombre del examen al momento de cotizar.
+- `precio_unitario`: DECIMAL(10,2), precio por examen.
+- `cantidad`: INT, cantidad solicitada.
+- `subtotal`: DECIMAL(10,2), total por examen.
+
+---
+
+## Funcionalidades
+
+### 1. Generación de Cotizaciones
+- El usuario (cliente, empresa, convenio, recepcionista o laboratorista) selecciona exámenes y genera una cotización.
+- El sistema calcula precios según el tipo de usuario y muestra el total.
+- Se genera un PDF formal con logo, datos del laboratorio, datos del cliente/empresa/convenio, lista de exámenes, totales y condiciones.
+- El PDF incluye el código de cotización y los datos para rotulación de muestras.
+
+### 2. Consulta e Historial
+- Cada usuario puede ver su historial de cotizaciones filtrando por fecha, estado de pago, etc.
+- Recepcionistas y laboratoristas pueden buscar clientes por DNI, código, nombre o apellido para generar cotizaciones en el laboratorio.
+- El sistema registra quién y cuándo realizó cada cotización.
+- El historial muestra estado del pago y permite descargar/imprimir el PDF.
+
+### 3. Restricciones y Seguridad
+- Si la cotización tiene exámenes pendientes de pago, el usuario no puede descargar los resultados.
+- Solo el usuario correspondiente o personal autorizado puede ver y descargar sus cotizaciones y resultados.
+
+### 4. Reportes y Auditoría
+- Para empresas/convenios: resumen de producción y deuda según el contrato (mensual, quincenal, semanal, diario).
+- Auditoría de cotizaciones por usuario creador (recepcionista/laboratorista).
+
+---
+
+## Ejemplo de Flujo
+
+1. Recepcionista busca cliente y genera cotización en el sistema.
+2. El cliente recibe su cotización formal en PDF, con todos los datos y código para rotulación.
+3. El cliente paga y, una vez confirmado el pago, puede descargar sus resultados.
+4. El sistema guarda todo el historial y permite reportes por usuario, periodo, estado de pago, etc.
+
+---
+
+## Tecnologías Recomendadas
+
+- PHP + MySQL (PDO)
+- Bootstrap 5 + DataTables para la interfaz
+- Librería para PDF: mPDF, DomPDF o TCPDF
+
+---
+
+## Seguridad y Buenas Prácticas
+
+- Validación de datos en servidor y cliente.
+- Control de permisos según rol.
+- Uso de IDs y códigos únicos para trazabilidad.
+- Protección de archivos PDF y datos sensibles.
+
+---
+
+## Futuras Mejoras
+
+- Notificaciones por email/SMS al generar cotizaciones o cuando el resultado esté disponible.
+- Integración con pasarela de pagos.
+- Reportes gráficos de producción y deuda.
+
+---
+
+**INBIOSLAB – Gestión inteligente de laboratorio clínico**
+
+src/
+└── cotizaciones/
+    ├── cotizaciones.php             # Listado e historial de cotizaciones del cliente
+    ├── form_cotizacion.php          # Formulario para crear nueva cotización
+    ├── crear_cotizacion.php         # Lógica para crear cotización (procesa el formulario)
+    ├── ver_cotizacion.php           # Vista/Detalle de una cotización específica
+    ├── descargar_pdf.php            # Descarga la cotización en PDF (si está pagada)
+    ├── imprimir_cotizacion.php      # Vista amigable para imprimir
+    ├── data/
+    │   └── cotizaciones_detalle.php # Gestión AJAX/detalle de exámenes en la cotización (opcional)
+    └── assets/
+        ├── cotizacion.css           # Estilos específicos para cotizaciones (opcional)
+        └── cotizacion.js            # JS específico para formularios/cotizaciones (opcional)
+
+
+¿Qué hace cada archivo?
+cotizaciones.php:
+Muestra el historial de cotizaciones del cliente, con filtros por fecha, estado y acciones de ver, descargar o imprimir.
+
+form_cotizacion.php:
+Formulario para seleccionar exámenes y generar una nueva cotización.
+
+crear_cotizacion.php:
+Recibe los datos del formulario, guarda la cabecera y el detalle en la base de datos, y redirige al detalle o historial.
+
+ver_cotizacion.php:
+Muestra todos los datos de una cotización específica, con opción de descargar PDF o imprimir si está pagada.
+
+descargar_pdf.php:
+Genera y descarga el PDF de la cotización (solo si el estado es “pagado”).
+
+imprimir_cotizacion.php:
+Muestra la cotización en un formato optimizado para impresión (A4/A5).
+
+data/cotizaciones_detalle.php (opcional):
+Para cargar detalles dinámicamente vía AJAX si quieres una experiencia más interactiva.
+
+assets/:
+Para tus estilos y scripts propios del módulo de cotizaciones.    
+
+-----------12-06-25-------------
+Módulo de Cotizaciones – INBIOSLAB Descripción General
+Este módulo permite la gestión integral de cotizaciones para el laboratorio clínico INBIOSLAB, soportando múltiples roles de usuario (admin, cliente, empresa, convenio, recepcionista, laboratorista). Incluye historial, generación, edición, eliminación, exportación, impresión y manejo seguro de sesiones.
+
+Estructura de Archivos
+cotizaciones/
+    crear_cotizacion.php
+    descargar_pdf.php
+    editar_cotizacion.php
+    eliminar_cotizacion.php
+    form_cotizacion.php
+    imprimir_cotizacion.php
+    ver_cotizacion.php
+    cotizaciones.php
+ assets/
+    cotizacion.css
+    cotizacion.js
+ data/
+    cotizaciones_detalle.php
+
+
+funcionalidades recomendadas para continuar y fortalecer tu sistema:
+
+1. Edición de Cotizaciones
+Permitir que los usuarios editen cotizaciones pendientes.
+Archivo sugerido: editar_cotizacion.php.
+Validar que solo el creador o roles autorizados puedan editar.
+2. Eliminación de Cotizaciones
+Permitir borrar cotizaciones (solo pendientes o según permisos).
+Archivo sugerido: eliminar_cotizacion.php.
+Confirmación antes de eliminar.
+3. Ver Detalle de Cotización
+Mostrar todos los datos y exámenes de una cotización en una vista detallada.
+Archivo sugerido: ver_cotizacion.php.
+4. Descargar e Imprimir PDF
+Mejorar la presentación del PDF.
+Archivo sugerido: descargar_pdf.php, imprimir_cotizacion.php.
+5. Notificaciones y Seguimiento
+Enviar email al crear o actualizar una cotización (opcional).
+Mostrar historial de cambios o auditoría.
+6. Filtrado y Búsqueda Avanzada
+Permitir filtrar cotizaciones por fecha, estado, cliente, etc.
+7. Gestión de Pagos
+Marcar cotizaciones como pagadas, agregar comprobante o fecha de pago.
+Cambiar el estado_pago desde la interfaz.
+8. Gráficas y Reportes
+Mostrar estadísticas: cotizaciones por mes, por estado, por usuario, etc.
+
+Flujo y Convenciones 1. Acceso y Sesiones
+Control de acceso: Todas las vistas y acciones verifican el rol y el ID del usuario mediante variables de sesión ($_SESSION[&apos;rol&apos;], $_SESSION[&apos;usuario_id&apos;], $_SESSION[&apos;cliente_id&apos;], etc.).
+Redirecciones: Toda lógica que use header() se ejecuta antes de incluir header.php/sidebar.php para evitar errores de headers.
+Roles soportados: admin, cliente, empresa, convenio, recepcionista, laboratorista.
+2. CRUD de Cotizaciones
+Crear: El formulario se accede vía dashboard.php?vista=form_cotizacion y se procesa con dashboard.php?action=crear_cotizacion.
+Ver: Detalles completos en ver_cotizacion.php, mostrando exámenes, cantidades y totales.
+Editar y Eliminar: Solo para cotizaciones pendientes y según permisos.
+Listar: Vista responsiva con DataTables, muestra código, fecha, exámenes, total, estado y acciones.
+3. Base de Datos
+Campos clave:
+codigo (string, generado automáticamente)
+creado_por (ID del usuario que crea)
+rol_creador (rol del creador)
+nombre_examen (en cotizaciones_detalle, obligatorio)
+Relaciones: Cada cotización puede estar asociada a cliente, empresa o convenio, y guarda historial de detalles.
+4. Interfaz y Usabilidad
+Responsividad: Tablas y botones adaptados para PC, tablet y móvil, usando Bootstrap y Bootstrap Icons.
+Acciones: En PC/tablet, botones directos; en móvil, menú desplegable.
+Mensajes: Uso de $_SESSION[&apos;mensaje&apos;] para retroalimentación al usuario.
+5. Seguridad y Buenas Prácticas
+Validación: Todos los formularios validan datos requeridos y roles antes de procesar.
+Preparación de consultas: Uso de PDO y consultas preparadas para evitar inyección SQL.
+No acceso directo: Todos los archivos lógicos se acceden mediante el dashboard y no directamente.
+6. Recomendaciones para Continuar
+Implementa edición y eliminación segura de cotizaciones.
+Mejora la gestión de pagos y permite cambiar el estado desde la interfaz.
+Agrega notificaciones por email/SMS (opcional).
+Añade filtros avanzados y reportes gráficos.
+Documenta cualquier nuevo endpoint, vista o lógica siguiendo este estándar.
+Cómo contribuir
+Sigue la estructura de carpetas y la lógica modular.
+Usa siempre validaciones de sesión y rol.
+Ejecuta lógica de redirección antes de cualquier renderizado HTML.
+Mantén los mensajes y la interfaz consistentes con Bootstrap y DataTables.
+Documenta cualquier cambio importante en este archivo.
+
+
+Documentación: Visualización de Cotizaciones Pendientes en Panel Cliente Descripción
+El panel del cliente muestra un resumen de cotizaciones pendientes, incluyendo el número de cotizaciones en proceso y el monto total a pagar. Esta funcionalidad es clave para que el cliente tenga visibilidad clara y rápida de sus deudas y procesos activos.
+
+Consulta SQL utilizada
+Se obtiene el total y la suma de los importes de cotizaciones agrupadas por estado de pago:
+
+Copy
+$stmt = $pdo->prepare("
+    SELECT estado_pago, COUNT(*) as total, COALESCE(SUM(total),0) as suma
+    FROM cotizaciones
+    WHERE id_cliente = ?
+    GROUP BY estado_pago
+");
+$stmt->execute([$id_cliente]);
+$estados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+Procesamiento en PHP
+Se recorre el array resultante para identificar las cotizaciones pendientes y sumar el total:
+
+Copy
+$pendientes = 0;
+$total_deuda = 0;
+foreach ($estados as $e) {
+    if (strtolower($e['estado_pago']) === 'pendiente') {
+        $pendientes = $e['total'];
+        $total_deuda = $e['suma'];
+    }
+}
+Se utiliza strtolower para evitar problemas con mayúsculas/minúsculas.
+No se usa floatval/intval si la consulta y la base de datos ya devuelven datos correctos, pero puede agregarse para mayor robustez.
+Visualización en la interfaz
+El resultado se muestra en una card Bootstrap:
+
+Copy
+<p class="mb-0"><strong>Total a pagar:</strong> S/ <?= number_format($total_deuda, 2) ?></p>
+Esto asegura que el cliente vea el monto exacto de sus cotizaciones pendientes, con formato monetario adecuado.
+
+Recomendaciones y buenas prácticas
+Asegurarse de que el campo total en la tabla cotizaciones sea numérico y nunca NULL.
+Usar COALESCE o IFNULL en la consulta SQL para evitar valores NULL en la suma.
+Siempre validar y sanitizar los datos antes de mostrarlos en la interfaz.
+Si se agregan nuevos estados de pago, actualizar la lógica del foreach en consecuencia.
+Resumen
+Este flujo garantiza que el cliente siempre vea el número correcto de cotizaciones pendientes y el total a pagar, mejorando la experiencia y la transparencia en el sistema.
+<form action="dashboard.php?action=<?= $esEdicion ? 'editar_promocion&id=' . $promo['id'] : 'crear_promocion' ?>" method="post" enctype="multipart/form-data">
+
+<button type="submit" class="btn btn-primary"><?= $esEdicion ? 'Actualizar' : 'Crear' ?> Cotización</button>
+        <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Cancelar</a>

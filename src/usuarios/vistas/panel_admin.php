@@ -9,27 +9,38 @@ require_once __DIR__ . '/../../config/config.php';
     <h2>Panel de Administrador</h2>
     <div class="row mt-4">
         <div class="col-md-3 mb-3">
-            <a href="<?= BASE_URL ?>empresas/vistas/panel_empresa.php" class="btn btn-primary w-100">
+            <a href="<?= BASE_URL ?>dashboard.php?vista=empresa" class="btn btn-primary w-100">
                 <i class="bi bi-building"></i>Vista Empresa
             </a>
         </div>
         <div class="col-md-3 mb-3">
-            <a href="<?= BASE_URL ?>dashboard.php?vista=precio_empresa" class="btn btn-success w-100">
-                <i class="bi bi-cash-coin"></i> Vista Usuario
+            <a href="<?= BASE_URL ?>dashboard.php?vista=laboratorista" class="btn btn-success w-100">
+                <i class="bi bi-cash-coin"></i> Vista laboratorista
+            </a>
+        </div>
+         <div class="col-md-3 mb-3">
+            <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-success w-100">
+                <i class="bi bi-cash-coin"></i> Vista recepcionista
             </a>
         </div>
         <div class="col-md-3 mb-3">
-            <a href="<?= BASE_URL ?>clientes/vistas/panel_cliente.php" class="btn btn-info w-100">
+            <a href="<?= BASE_URL ?>dashboard.php?vista=cliente" class="btn btn-info w-100">
                 <i class="bi bi-people"></i>Vista Cliente
             </a>
         </div>
         <div class="col-md-3 mb-3">
-            <a href="<?= BASE_URL ?>examenes/tabla_examenes.php" class="btn btn-warning w-100">
+            <a href="<?= BASE_URL ?>dashboard.php?vista=convenio" class="btn btn-warning w-100">
                 <i class="bi bi-file-earmark-medical"></i> Vista Convenio
             </a>
         </div>
         <!-- Agrega aquí más botones para otras funcionalidades administrativas -->
          <a href="<?= BASE_URL ?>dashboard.php?vista=seleccionar_empresa" class="btn btn-outline-primary">Precios por Empresa</a>
+         <?php if ($_SESSION['rol'] === 'admin'): ?>
+    <a href="dashboard.php?vista=promociones" class="btn btn-warning mb-3">
+        <i class="bi bi-megaphone"></i> Gestionar Promociones
+    </a>
+<?php endif; ?>
+
 
     </div>
 </div>
