@@ -59,7 +59,7 @@ function capitalizar($texto) {
         <div class="row">
             <div class="col-md-4 mb-3">
                 <label for="sexo" class="form-label">Sexo</label>
-                <select class="form-select" id="sexo" name="sexo">
+                <select class="form-select" id="sexo" name="sexo" >
                     <option value="">Seleccionar</option>
                     <option value="masculino" <?= (isset($usuario['sexo']) && $usuario['sexo'] == 'masculino') ? 'selected' : '' ?>>Masculino</option>
                     <option value="femenino" <?= (isset($usuario['sexo']) && $usuario['sexo'] == 'femenino') ? 'selected' : '' ?>>Femenino</option>

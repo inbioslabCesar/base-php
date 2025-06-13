@@ -72,7 +72,7 @@ function capitalizar($texto) {
             </div>
             <div class="col-md-4 mb-3">
                 <label for="sexo" class="form-label">Sexo</label>
-                <select class="form-select" id="sexo" name="sexo">
+                <select class="form-select" id="sexo" name="sexo" required>
                     <option value="">Seleccionar</option>
                     <option value="masculino" <?= (isset($cliente['sexo']) && $cliente['sexo'] == 'masculino') ? 'selected' : '' ?>>Masculino</option>
                     <option value="femenino" <?= (isset($cliente['sexo']) && $cliente['sexo'] == 'femenino') ? 'selected' : '' ?>>Femenino</option>
@@ -94,7 +94,7 @@ function capitalizar($texto) {
             <div class="col-md-4 mb-3">
                 <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
                 <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
-                    value="<?= htmlspecialchars($cliente['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    value="<?= htmlspecialchars($cliente['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
             </div>
         </div>
         <div class="row">
@@ -108,7 +108,7 @@ function capitalizar($texto) {
             <div class="col-md-4 mb-3">
                 <label for="descuento" class="form-label">Descuento (%)</label>
                 <input type="number" step="0.01" min="0" max="100" class="form-control" id="descuento" name="descuento"
-                    value="<?= htmlspecialchars($cliente['descuento'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    value="<?= htmlspecialchars($cliente['descuento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
             </div>
         </div>
         <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Crear' ?></button>
