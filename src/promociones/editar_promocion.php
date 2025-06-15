@@ -5,6 +5,26 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../conexion/conexion.php';
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+            if ($id > 0) {
+                $stmt = $pdo->prepare("SELECT * FROM promociones WHERE id = ?");
+                $stmt->execute([$id]);
+                $promocion = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($promocion) {
+                    $_SESSION['promocion_editar'] = $promocion;
+                    header('Location: dashboard.php?vista=form_promocion');
+                    exit;
+                } else {
+                    $_SESSION['error'] = 'Promoción no encontrada.';
+                    header('Location: dashboard.php?vista=promociones');
+                    exit;
+                }
+            } else {
+                $_SESSION['error'] = 'ID de promoción no válido.';
+                header('Location: dashboard.php?vista=promociones');
+                exit;
+            }
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $titulo = trim($_POST['titulo'] ?? '');

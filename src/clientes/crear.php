@@ -31,6 +31,8 @@ if ($nombre && $apellido && $email && $password) {
             $estado,
             $descuento
         ]);
+        
+        $_SESSION['cliente_id'] = $pdo->lastInsertId();
 
         $_SESSION['mensaje'] = "Cliente creado exitosamente.";
     } catch (PDOException $e) {
