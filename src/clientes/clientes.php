@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 
 // Obtener todos los clientes
@@ -6,7 +7,8 @@ $stmt = $pdo->query("SELECT * FROM clientes");
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Función para capitalizar
-function capitalizar($texto) {
+function capitalizar($texto)
+{
     return $texto ? mb_convert_case($texto, MB_CASE_TITLE, "UTF-8") : '';
 }
 ?>
@@ -37,30 +39,36 @@ function capitalizar($texto) {
                 </tr>
             </thead>
             <tbody>
-            <?php if ($clientes): ?>
-                <?php foreach ($clientes as $cliente): ?>
+                <?php if ($clientes): ?>
+                    <?php foreach ($clientes as $cliente): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($cliente['id'], ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($cliente['codigo_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars(capitalizar($cliente['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars(capitalizar($cliente['apellido'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($cliente['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars(capitalizar($cliente['sexo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($cliente['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($cliente['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($cliente['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars(capitalizar($cliente['estado'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                            <td>
+                                <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
+                                <a href="dashboard.php?action=eliminar_cliente&id=<?= $cliente['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este cliente?');">Eliminar</a>
+                                <?php
+                                $mostrar = ($_SESSION['rol'] === 'recepcionista'); // Ajusta si necesitas más roles
+                                $cliente_id = $cliente['id'];
+                                include $_SERVER['DOCUMENT_ROOT'] . BASE_URL . 'componentes/boton_cotizar.php';
+
+                                ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
                     <tr>
-                        <td><?= htmlspecialchars($cliente['id'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($cliente['codigo_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($cliente['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($cliente['apellido'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($cliente['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($cliente['sexo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($cliente['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($cliente['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($cliente['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($cliente['estado'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td>
-                            <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                            <a href="dashboard.php?action=eliminar_cliente&id=<?= $cliente['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este cliente?');">Eliminar</a>
-                        </td>
+                        <td colspan="11">No hay clientes registrados.</td>
                     </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr>
-                    <td colspan="11">No hay clientes registrados.</td>
-                </tr>
-            <?php endif; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -80,29 +88,28 @@ function capitalizar($texto) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 
 <script>
-$(document).ready(function() {
-    $('#tabla-clientes').DataTable({
-        language: {
-            url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-        },
-        dom: 'Bfrtip',
-        buttons: [
-            {
-                extend: 'excelHtml5',
-                text: 'Exportar Excel',
-                className: 'btn btn-success'
+    $(document).ready(function() {
+        $('#tabla-clientes').DataTable({
+            language: {
+                url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
-            {
-                extend: 'pdfHtml5',
-                text: 'Exportar PDF',
-                className: 'btn btn-danger'
-            },
-            {
-                extend: 'print',
-                text: 'Imprimir',
-                className: 'btn btn-info'
-            }
-        ]
+            dom: 'Bfrtip',
+            buttons: [{
+                    extend: 'excelHtml5',
+                    text: 'Exportar Excel',
+                    className: 'btn btn-success'
+                },
+                {
+                    extend: 'pdfHtml5',
+                    text: 'Exportar PDF',
+                    className: 'btn btn-danger'
+                },
+                {
+                    extend: 'print',
+                    text: 'Imprimir',
+                    className: 'btn btn-info'
+                }
+            ]
+        });
     });
-});
 </script>

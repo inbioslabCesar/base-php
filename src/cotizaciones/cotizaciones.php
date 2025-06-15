@@ -2,45 +2,37 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 require_once __DIR__ . '/../conexion/conexion.php';
+
 
 // Consulta de cotizaciones (ajusta los filtros según el rol si lo necesitas)
 
-$nombre_columna = '';
 if (isset($_SESSION['cliente_id'])) {
-    $sql = "SELECT c.*, cl.nombre AS cliente 
-            FROM cotizaciones c 
-            INNER JOIN clientes cl ON c.id_cliente = cl.id 
-            WHERE c.id_cliente = :id 
-            ORDER BY c.fecha DESC";
-    $id = $_SESSION['cliente_id'];
-    $nombre_columna = 'cliente';
-} elseif (isset($_SESSION['empresa_id'])) {
-    $sql = "SELECT c.*, e.nombre AS empresa 
-            FROM cotizaciones c 
-            INNER JOIN empresas e ON c.id_empresa = e.id 
-            WHERE c.id_empresa = :id 
-            ORDER BY c.fecha DESC";
-    $id = $_SESSION['empresa_id'];
-    $nombre_columna = 'empresa';
-} elseif (isset($_SESSION['convenio_id'])) {
-    $sql = "SELECT c.*, v.nombre AS convenio 
-            FROM cotizaciones c 
-            INNER JOIN convenios v ON c.id_convenio = v.id 
-            WHERE c.id_convenio = :id 
-            ORDER BY c.fecha DESC";
-    $id = $_SESSION['convenio_id'];
-    $nombre_columna = 'convenio';
-} else {
-    $cotizaciones = [];
-}
-
-if (isset($id)) {
+    $sql = "SELECT * FROM cotizaciones WHERE id_cliente = :id ORDER BY fecha DESC";
     $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->bindParam(':id', $_SESSION['cliente_id'], PDO::PARAM_INT);
     $stmt->execute();
     $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif (isset($_SESSION['empresa_id'])) {
+    $sql = "SELECT * FROM cotizaciones WHERE id_empresa = :id ORDER BY fecha DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':id', $_SESSION['empresa_id'], PDO::PARAM_INT);
+    $stmt->execute();
+    $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif (isset($_SESSION['convenio_id'])) {
+    $sql = "SELECT * FROM cotizaciones WHERE id_convenio = :id ORDER BY fecha DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindParam(':id', $_SESSION['convenio_id'], PDO::PARAM_INT);
+    $stmt->execute();
+    $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    // Mostrar todas las cotizaciones si no hay filtro de cliente, empresa o convenio
+    $sql = "SELECT * FROM cotizaciones ORDER BY fecha DESC";
+    $stmt = $pdo->query($sql);
+    $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 ?>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
@@ -51,68 +43,58 @@ if (isset($id)) {
             <i class="bi bi-plus-circle"></i> Nueva Cotización
         </a>
     </div>
-    <table id="cotizacionesTable" class="table table-striped table-bordered table-responsive">
-        <thead>
+    <table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Cliente</th>
+            <th>Fecha</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th class="capitalize">Rol Creador</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+    <?php if (!empty($cotizaciones)): ?>
+        <?php foreach ($cotizaciones as $cotizacion): ?>
             <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Fecha</th>
-                <th class="text-end">Total</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <td><?php echo isset($cotizacion['codigo']) ? htmlspecialchars($cotizacion['codigo']) : ''; ?></td>
+                <td class="capitalize">
+                    <?php
+                    // Si solo tienes id_cliente, muestra el ID o haz un JOIN en la consulta para mostrar el nombre real.
+                    echo isset($cotizacion['id_cliente']) ? htmlspecialchars($cotizacion['id_cliente']) : 'Sin cliente';
+                    ?>
+                </td>
+                <td><?php echo isset($cotizacion['fecha']) ? htmlspecialchars($cotizacion['fecha']) : ''; ?></td>
+                <td><?php echo isset($cotizacion['total']) ? number_format($cotizacion['total'], 2) : '0.00'; ?></td>
+                <td><?php echo isset($cotizacion['estado_pago']) ? htmlspecialchars($cotizacion['estado_pago']) : ''; ?></td>
+                <td class="capitalize">
+                    <?php echo isset($cotizacion['rol_creador']) && $cotizacion['rol_creador'] !== null
+                        ? htmlspecialchars($cotizacion['rol_creador'])
+                        : ''; ?>
+                </td>
+                <td>
+                    <a href="dashboard.php?vista=ver_cotizacion&id=<?php echo $cotizacion['id']; ?>" class="btn btn-info btn-sm" title="Ver">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <a href="dashboard.php?vista=buscar_cotizacion&id=<?php echo $cotizacion['id']; ?>" class="btn btn-secondary btn-sm" title="Buscar">
+                        <i class="fas fa-search"></i>
+                    </a>
+                    <a href="dashboard.php?vista=descargar_pdf&id=<?php echo $cotizacion['id']; ?>" class="btn btn-danger btn-sm" title="Descargar PDF">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            <?php if (count($cotizaciones) > 0): ?>
-                <?php foreach ($cotizaciones as $cot): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($cot['codigo']); ?></td>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr>
+            <td colspan="7" class="text-center">No hay cotizaciones registradas.</td>
+        </tr>
+    <?php endif; ?>
+    </tbody>
+</table>
 
-                    <td class="capitalize"><?php echo ucwords(strtolower($cot['cliente'])); ?></td>
-                    
-                    <td><?php echo htmlspecialchars($cot['fecha']); ?></td>
-                    <td class="text-end">S/. <?php echo number_format($cot['total'], 2); ?></td>
-                    <td>
-                        <?php if ($cot['estado_pago'] === 'pagado'): ?>
-                            <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Completado</span>
-                        <?php else: ?>
-                            <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> En Proceso</span>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-info btn-sm btn-detalle-cot" data-id="<?php echo $cot['id']; ?>" title="Ver Detalles">
-                            <i class="bi bi-search"></i>
-                        </button>
-                        <a href="dashboard.php?vista=ver_cotizacion&id=<?php echo $cot['id']; ?>" class="btn btn-secondary btn-sm" title="Ver">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                        <a href="dashboard.php?vista=descargar_pdf&id=<?php echo $cot['id']; ?>" class="btn btn-danger btn-sm" title="PDF">
-                            <i class="bi bi-file-earmark-pdf"></i>
-                        </a>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr>
-                    <td colspan="6" class="text-center">No hay cotizaciones para mostrar.</td>
-                </tr>
-            <?php endif; ?>
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-<script>
-$(document).on('click', '.btn-detalle-cot', function(){
-    var idCot = $(this).data('id');
-    $('#detalleCotizacionBody').html('<div class="text-center"><div class="spinner-border text-primary"></div> Cargando...</div>');
-    var modal = new bootstrap.Modal(document.getElementById('modalDetalleCotizacion'));
-    modal.show();
-    $.get('cotizaciones/detalle_cotizacion.php', {id: idCot}, function(res){
-        $('#detalleCotizacionBody').html(res);
-    });
-});
-</script>
-
-        </tbody>
-    </table>
 </div>
 <!-- Modal Detalles de Cotización -->
 <div class="modal fade" id="modalDetalleCotizacion" tabindex="-1" aria-labelledby="modalDetalleCotizacionLabel" aria-hidden="true">
