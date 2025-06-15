@@ -4,101 +4,59 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/config/config.php';
 
-
 if (!isset($_SESSION['rol'])) {
     header('Location: ' . BASE_URL . 'auth/login.php');
     exit;
 }
-if (isset($_GET['action'])) {
-    switch ($_GET['action']) {
-        //usuarios funciones que devuelve header()
-        case 'crear_usuario':
-            include __DIR__ . '/usuarios/crear_usuario.php';
-            break;
-        case 'eliminar_usuario':
-            include __DIR__ . '/usuarios/eliminar_usuario.php';
-            break;
-        case 'editar_usuario':
-            include __DIR__ . '/usuarios/editar_usuario.php';
-            break;
-        //clientes funciones que devuelve header()
-        case 'crear_cliente':
-            include __DIR__ . '/clientes/crear.php';
-            break;
-        case 'eliminar_cliente':
-            include __DIR__ . '/clientes/eliminar.php';
-            break;
-        case 'editar_cliente':
-            include __DIR__ . '/clientes/editar.php';
-            break;
-        //empresas funciones que devuelve header()
-        case 'crear_empresa':
-            include __DIR__ . '/empresas/crear_empresa.php';
-            break;
-        case 'eliminar_empresa':
-            include __DIR__ . '/empresas/eliminar_empresa.php';
-            break;
-        case 'editar_empresa':
-            include __DIR__ . '/empresas/editar_empresa.php';
-            break;
-        //convenios funciones que devuelve header()
-        case 'crear_convenio':
-            include __DIR__ . '/convenios/crear_convenio.php';
-            break;
-        case 'eliminar_convenio':
-            include __DIR__ . '/convenios/eliminar_convenio.php';
-            break;
-        case 'editar_convenio':
-            include __DIR__ . '/convenios/editar_convenio.php';
-            break;
-        //examenes funciones que devuelve header()
-        case 'crear_examen':
-            include __DIR__ . '/examenes/crear_examen.php';
-            break;
-        case 'eliminar_examen':
-            include __DIR__ . '/examenes/eliminar_examen.php';
-            break;
-        case 'editar_examen':
-            include __DIR__ . '/examenes/editar_examen.php';
-            break;
-        // cotizaciones
-        case 'crear_cotizacion':
-            include __DIR__ . '/cotizaciones/crear_cotizacion.php';
-            break;
-        //promociones funciones que devuelve header()
-        case 'crear_promocion':
-            include 'promociones/crear_promocion.php';
-            exit; // Evita doble renderizado
-        case 'editar_promocion':
-            $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-            if ($id > 0) {
-                $stmt = $pdo->prepare("SELECT * FROM promociones WHERE id = ?");
-                $stmt->execute([$id]);
-                $promocion = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($promocion) {
-                    $_SESSION['promocion_editar'] = $promocion;
-                    header('Location: dashboard.php?vista=form_promocion');
-                    exit;
-                } else {
-                    $_SESSION['error'] = 'Promoción no encontrada.';
-                    header('Location: dashboard.php?vista=promociones');
-                    exit;
-                }
-            } else {
-                $_SESSION['error'] = 'ID de promoción no válido.';
-                header('Location: dashboard.php?vista=promociones');
-                exit;
-            }
-        case 'eliminar_promocion':
-            include 'promociones/eliminar_promocion.php';
+$acciones_por_rol = [
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa','editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario'],
+
+    'laboratorista' => [],
+    'recepcionista' => ['crear_cotizacion','crear_cliente', 'editar_cliente', 'eliminar_cliente'],
+    'empresa' => ['crear_cotizacion'],
+    'cliente' => ['crear_cotizacion'],
+    'convenio' => ['crear_cotizacion']
+];
+
+$acciones = [
+    'crear_usuario' => __DIR__ . '/usuarios/crear_usuario.php',
+    'eliminar_usuario' => __DIR__ . '/usuarios/eliminar_usuario.php',
+    'editar_usuario' => __DIR__ . '/usuarios/editar_usuario.php',
+    'crear_cliente' => __DIR__ . '/clientes/crear.php',
+    'eliminar_cliente' => __DIR__ . '/clientes/eliminar.php',
+    'editar_cliente' => __DIR__ . '/clientes/editar.php',
+    'crear_empresa' => __DIR__ . '/empresas/crear_empresa.php',
+    'eliminar_empresa' => __DIR__ . '/empresas/eliminar_empresa.php',
+    'editar_empresa' => __DIR__ . '/empresas/editar_empresa.php',
+    'crear_convenio' => __DIR__ . '/convenios/crear_convenio.php',
+    'eliminar_convenio' => __DIR__ . '/convenios/eliminar_convenio.php',
+    'editar_convenio' => __DIR__ . '/convenios/editar_convenio.php',
+    'crear_examen' => __DIR__ . '/examenes/crear_examen.php',
+    'eliminar_examen' => __DIR__ . '/examenes/eliminar_examen.php',
+    'editar_examen' => __DIR__ . '/examenes/editar_examen.php',
+    'crear_cotizacion' => __DIR__ . '/cotizaciones/crear_cotizacion.php',
+    'crear_promocion' => __DIR__ . '/promociones/crear_promocion.php',
+    'editar_promocion' => __DIR__ . '/promociones/editar_promocion.php',
+    'eliminar_promocion' => __DIR__ . '/promociones/eliminar_promocion.php'
+];
+
+$rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
+$action = isset($_GET['action']) ? $_GET['action'] : null;
+
+if ($action && isset($acciones[$action])) {
+    if (isset($acciones_por_rol[$rol_actual]) && in_array($action, $acciones_por_rol[$rol_actual])) {
+        include $acciones[$action];
+        exit;
+    } else {
+        echo "<div class='alert alert-warning'>Acceso no permitido para el rol: $rol_actual en la acción: $action</div>";
+
+        exit;
     }
-    exit;
 }
 
 include __DIR__ . '/componentes/header.php';
 include __DIR__ . '/componentes/sidebar.php';
-
 
 ?>
 
@@ -110,109 +68,52 @@ include __DIR__ . '/componentes/sidebar.php';
     }
     // Lista de vistas permitidas por rol
     $acceso_por_rol = [
-        'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'crear_cotizacion', 'promociones', 'form_promocion', 'editar_promocion', 'crear_promocion', 'eliminar_promocion', 'editar_promocion'],
+        'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion',],
 
-        'laboratorista' => ['laboratorista', 'cotizaciones', 'form_cotizacion', 'crear_cotizacion'],
-        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'crear_cotizacion'],
-        'empresa' => ['empresa', 'cotizaciones', 'form_cotizacion', 'crear_cotizacion'],
-        'cliente' => ['cliente', 'cotizaciones', 'form_cotizacion','detalle_cotizacion', 'crear_cotizacion', 'promociones'],
-        'convenio' => ['convenio', 'cotizaciones', 'form_cotizacion', 'crear_cotizacion']
+        'laboratorista' => [],
+        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion','clientes', 'form_cliente'],
+        'empresa' => ['empresa'],
+        'cliente' => ['cliente'],
+        'convenio' => ['convenio']
     ];
+
+    $vistas = [
+        'admin' => __DIR__ . '/usuarios/vistas/panel_admin.php',
+        'usuarios' => __DIR__ . '/usuarios/usuarios.php',
+        'form_usuario' => __DIR__ . '/usuarios/form_usuario.php',
+        'clientes' => __DIR__ . '/clientes/clientes.php',
+        'form_cliente' => __DIR__ . '/clientes/form_cliente.php',
+        'empresas' => __DIR__ . '/empresas/empresas.php',
+        'form_empresa' => __DIR__ . '/empresas/form_empresa.php',
+        'convenios' => __DIR__ . '/convenios/convenios.php',
+        'form_convenio' => __DIR__ . '/convenios/form_convenio.php',
+        'examenes' => __DIR__ . '/examenes/examenes.php',
+        'form_examen' => __DIR__ . '/examenes/form_examen.php',
+        'empresa' => __DIR__ . '/empresas/vistas/panel_empresa.php',
+        'recepcionista' => __DIR__ . '/usuarios/vistas/panel_recepcionista.php',
+        'laboratorista' => __DIR__ . '/usuarios/vistas/panel_laboratorista.php',
+        'cliente' => __DIR__ . '/clientes/vistas/panel_cliente.php',
+        'convenio' => __DIR__ . '/convenios/vistas/panel_convenio.php',
+        'cotizaciones' => __DIR__ . '/cotizaciones/cotizaciones.php',
+        'form_cotizacion' => __DIR__ . '/cotizaciones/form_cotizacion.php',
+        'detalle_cotizacion' => __DIR__ . '/cotizaciones/detalle_cotizacion.php',
+        'promociones' => __DIR__ . '/promociones/promociones.php',
+        'form_promocion' => __DIR__ . '/promociones/form_promocion.php'
+    ];
+
     // Obtener rol y vista
-    $rol = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
+    $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
     $vista = isset($_GET['vista']) ? strtolower(trim($_GET['vista'])) : '';
 
     // Validar acceso
-    if (!isset($acceso_por_rol[$rol]) || !in_array($vista, $acceso_por_rol[$rol])) {
-        echo '<div class="alert alert-warning">Acceso no permitido</div>';
-    } else {
-        switch ($vista) {
-            //admin vistas
-            case 'admin':
-                include __DIR__ . '/usuarios/vistas/panel_admin.php';
-                break;
+    if ($vista && isset($vistas[$vista])) {
+        if (isset($acceso_por_rol[$rol_actual]) && in_array($vista, $acceso_por_rol[$rol_actual])) {
+            include $vistas[$vista];
+            exit;
+        } else {
+            echo "<div class='alert alert-warning'>Acceso no permitido para el rol: $rol_actual en la acción: $vista</div>";
 
-            //usuarios vistas
-            case 'usuarios':
-                include __DIR__ . '/usuarios/usuarios.php';
-                break;
-            case 'form_usuario':
-                include __DIR__ . '/usuarios/form_usuario.php';
-                break;
-
-            //clientes vistas
-            case 'clientes':
-                include __DIR__ . '/clientes/clientes.php';
-                break;
-            case 'form_cliente':
-                include __DIR__ . '/clientes/form_cliente.php';
-                break;
-
-            //empresas vistas
-            case 'empresas':
-                include __DIR__ . '/empresas/empresas.php';
-                break;
-            case 'form_empresa':
-                include __DIR__ . '/empresas/form_empresa.php';
-                break;
-
-            //convenio CRUD vistas
-            case 'convenios':
-                include __DIR__ . '/convenios/convenios.php';
-                break;
-            case 'form_convenio':
-                include __DIR__ . '/convenios/form_convenio.php';
-                break;
-
-            //examenes vistas
-            case 'examenes':
-                include __DIR__ . '/examenes/examenes.php';
-                break;
-            case 'form_examen':
-                include __DIR__ . '/examenes/form_examen.php';
-                break;
-            //vista empresas
-            case 'empresa':
-                include __DIR__ . '/empresas/vistas/panel_empresa.php';
-                break;
-            //vista recepcionista
-            case 'recepcionista':
-                include __DIR__ . '/usuarios/vistas/panel_recepcionista.php';
-                break;
-            //vista laboratorista
-            case 'laboratorista':
-                include __DIR__ . '/usuarios/vistas/panel_laboratorista.php';
-                break;
-            //vista cliente
-            case 'cliente':
-                include __DIR__ . '/clientes/vistas/panel_cliente.php';
-                break;
-            //vista convenio
-            case 'convenio':
-                include __DIR__ . '/convenios/vistas/panel_convenio.php';
-                break;
-            //vista cotizaciones
-            case 'cotizaciones':
-                include __DIR__ . '/cotizaciones/cotizaciones.php';
-                break;
-            case 'form_cotizacion':
-                include __DIR__ . '/cotizaciones/form_cotizacion.php';
-                break;
-                 case 'detalle_cotizacion':
-                include __DIR__ . '/cotizaciones/detalle_cotizacion.php';
-                break;
-            //vista promociones
-            case 'promociones':
-                include __DIR__ . '/promociones/promociones.php';
-                break;
-            case 'form_promocion':
-                include __DIR__ . '/promociones/form_promocion.php';
-                break;
-
-
-
-            default:
-                echo '<div class="container mt-5"><div class="alert alert-warning">Vista no encontrada.</div></div>';
+            exit;
         }
     }
     ?>
