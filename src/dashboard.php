@@ -72,7 +72,7 @@ include __DIR__ . '/componentes/sidebar.php';
         'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion','boton_cotizar','form_cotizacion_recepcionista'],
 
         'laboratorista' => [],
-        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion_recepcionista','clientes', 'form_cliente','boton_cotizar'],
+        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion_recepcionista','clientes','cliente', 'form_cliente','boton_cotizar'],
         'empresa' => ['empresa'],
         'cliente' => ['cliente','cotizaciones', 'form_cotizacion'],
         'convenio' => ['convenio']
