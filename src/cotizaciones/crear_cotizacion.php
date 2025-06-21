@@ -5,6 +5,10 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../conexion/conexion.php';
 
+// Justo al principio, después de session_start() y require_once...
+$id_cliente = $_POST['id_cliente'] ?? null;
+
+
 // Validar sesión de usuario
 if (!isset($_SESSION['rol'])) {
     echo '<div class="alert alert-danger">Sesión expirada. Vuelve a iniciar sesión.</div>';
@@ -81,8 +85,9 @@ for ($i = 0; $i < count($examenes); $i++) {
 }
 // Preparar datos obligatorios para la tabla cotizaciones
 $codigo = 'COT-' . strtoupper(uniqid());
-$id_cliente = $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null;
+// $id_cliente = $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null;
 $estado_pago = 'pendiente';
+$rol_creador = $_SESSION['rol'] ?? 'cliente';
 $creado_por = $_SESSION['usuario_id'] ?? $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null; // Ajusta según tu lógica
 
 if (!$id_cliente || !$creado_por) {
@@ -91,8 +96,8 @@ if (!$id_cliente || !$creado_por) {
 }
 
 // Insertar cotización principal
-$stmt = $pdo->prepare("INSERT INTO cotizaciones (codigo, id_cliente, fecha, total, estado_pago, creado_por) VALUES (?, ?, ?, ?, ?, ?)");
-$stmt->execute([$codigo, $id_cliente, $fecha, $total, $estado_pago, $creado_por]);
+$stmt = $pdo->prepare("INSERT INTO cotizaciones (codigo, id_cliente, fecha, total, estado_pago, creado_por,rol_creador) VALUES (?, ?, ?, ?, ?, ?, ?)");
+$stmt->execute([$codigo, $id_cliente, $fecha, $total, $estado_pago, $creado_por,$rol_creador]);
 $id_cotizacion = $pdo->lastInsertId();
 
 // Insertar detalles
@@ -108,7 +113,15 @@ foreach ($detalles as $detalle) {
     ]);
 }
 
-header('Location: dashboard.php?vista=cotizaciones');
-exit;
+$rol = $_SESSION['rol'] ?? null;
+
+if ($rol === 'cliente') {
+    header('Location: dashboard.php?vista=cotizaciones_clientes');
+    exit;
+} elseif ($rol === 'recepcionista') {
+   header('Location: dashboard.php?vista=cotizaciones');
+    exit;
+} 
 
 exit;
+

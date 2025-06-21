@@ -107,7 +107,7 @@ foreach ($estados as $e) {
                 <h3 class="mb-2">¡Bienvenido, <?= htmlspecialchars($nombre_cliente) ?>!</h3>
                 <p class="mb-0">Desde aquí puedes gestionar tus cotizaciones y acceder a promociones exclusivas.</p>
             </div>
-            <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary btn-lg mt-3 mt-md-0">
+            <a href="dashboard.php?vista=cotizaciones_clientes" class="btn btn-primary btn-lg mt-3 mt-md-0">
                 <i class="bi bi-file-earmark-text"></i> Mis Cotizaciones
             </a>
         </div>

@@ -18,7 +18,7 @@ require_once __DIR__ . '/../../config/config.php';
                 <i class="bi bi-cash-coin"></i> Vista laboratorista
             </a>
         </div>
-         <div class="col-md-3 mb-3">
+        <div class="col-md-3 mb-3">
             <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-success w-100">
                 <i class="bi bi-cash-coin"></i> Vista recepcionista
             </a>
@@ -33,13 +33,19 @@ require_once __DIR__ . '/../../config/config.php';
                 <i class="bi bi-file-earmark-medical"></i> Vista Convenio
             </a>
         </div>
+        <div class="col-md-3 mb-3">
+            <a href="dashboard.php?vista=config_empresa_datos" class="btn btn-outline-primary mb-3">
+                <i class="bi bi-gear-fill"></i> Configuración de Empresa
+            </a>
+
+        </div>
         <!-- Agrega aquí más botones para otras funcionalidades administrativas -->
-         <a href="<?= BASE_URL ?>dashboard.php?vista=seleccionar_empresa" class="btn btn-outline-primary">Precios por Empresa</a>
-         <?php if ($_SESSION['rol'] === 'admin'): ?>
-    <a href="dashboard.php?vista=promociones" class="btn btn-warning mb-3">
-        <i class="bi bi-megaphone"></i> Gestionar Promociones
-    </a>
-<?php endif; ?>
+        <a href="<?= BASE_URL ?>dashboard.php?vista=seleccionar_empresa" class="btn btn-outline-primary">Precios por Empresa</a>
+        <?php if ($_SESSION['rol'] === 'admin'): ?>
+            <a href="dashboard.php?vista=promociones" class="btn btn-warning mb-3">
+                <i class="bi bi-megaphone"></i> Gestionar Promociones
+            </a>
+        <?php endif; ?>
 
 
     </div>

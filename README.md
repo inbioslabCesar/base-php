@@ -465,3 +465,65 @@ Este flujo garantiza que el cliente siempre vea el número correcto de cotizacio
 
 <button type="submit" class="btn btn-primary"><?= $esEdicion ? 'Actualizar' : 'Crear' ?> Cotización</button>
         <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Cancelar</a>
+
+
+        ----19/06/2025---
+        Proyecto modular en PHP para la gestión de usuarios y vistas con control de acceso basado en roles.
+
+Estructura del Proyecto
+BASE-PHP/
+│
+├── src/
+│   ├── autenticacion/
+│   ├── configuracion/
+│   ├── clientes/
+│   ├── componentes/
+│   ├── conexión/
+│   │   └── conexion.php
+│   ├── dashboard.php
+│   ├── index.php
+│   └── ...
+├── tmp/
+├── vendor/
+└── ...
+Principales características
+Gestión de sesiones:
+Las sesiones se inician solo si no están activas, previniendo errores de headers.
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+Control de acceso basado en roles:
+Los permisos y accesos a vistas están definidos en arrays asociativos, asignando acciones y vistas a cada rol de usuario.
+
+Carga dinámica de vistas y componentes:
+El archivo dashboard.php valida el rol y la vista solicitada antes de incluir los archivos correspondientes.
+Los componentes comunes (header.php, sidebar.php, footer.php) se incluyen dinámicamente para mantener consistencia y evitar errores de headers.
+
+Manejo centralizado de rutas:
+Se utiliza la constante BASE_URL para gestionar rutas, facilitando cambios y mantenimiento.
+
+Mensajes de sesión y manejo de errores:
+Los mensajes y alertas se muestran según la lógica de acceso y las acciones realizadas.
+
+Conexión a Base de Datos
+La conexión se encuentra en:
+src/conexión/conexion.php
+
+Ejecución local
+Clona el repositorio.
+Configura tu entorno local (por ejemplo, XAMPP, Laragon, etc.).
+Asegúrate de que tu base de datos esté configurada y la conexión en conexion.php sea correcta.
+Accede a index.php desde tu navegador.
+Recomendaciones
+Mantén actualizada la lógica de roles y vistas en los arrays para nuevos módulos.
+Centraliza rutas y configuraciones en archivos únicos para facilitar el mantenimiento.
+Si agregas nuevos componentes o vistas, sigue la misma estructura modular para asegurar compatibilidad.
+
+Aquí tienes una visión general de las tablas principales y cómo pueden relacionarse con tus módulos futuros:
+
+clientes: Almacena la información de los clientes, incluyendo datos personales, contacto y credenciales (contraseñas hash).
+config_empresa: Guarda la configuración de la empresa, útil para mostrar información corporativa o parametrizar módulos.
+cotizaciones: Registra las cotizaciones realizadas, incluyendo referencias a clientes, empresa, convenios y detalles de pago.
+promociones: Permite gestionar promociones activas, con campos para títulos, descripciones, imágenes, descuentos y vigencia.
+examenes: Contiene los datos de los exámenes disponibles, con información técnica y comercial relevante.
+Cada tabla puede servir como base para módulos específicos (clientes, cotizaciones, promociones, exámenes, etc.).

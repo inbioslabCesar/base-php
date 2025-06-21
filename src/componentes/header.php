@@ -90,7 +90,6 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
             <!-- Botón solo visible en móvil -->
             <button class="btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
                 <i class="bi bi-list fs-2"></i>
-            </button>
-
+            </button> 
         </div>
     </header>

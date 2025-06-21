@@ -2,86 +2,61 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+$id_cliente = $_SESSION['cliente_id'] ?? null;
+$rol = $_SESSION['rol'] ?? null;
+
+// Control de acceso seguro
+if (!$id_cliente || strtolower(trim($rol)) !== 'cliente') {
+    echo '<div class="container mt-4"><div class="alert alert-danger">Acceso no autorizado.</div></div>';
+    return;
+}
+
 require_once __DIR__ . '/../conexion/conexion.php';
 
-// Filtro por DNI (si se envía por GET o POST)
-$dniFiltro = trim($_GET['dni'] ?? '');
-
-// Consulta base
+// Consulta solo las cotizaciones del cliente logueado
 $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
         FROM cotizaciones c
-        JOIN clientes cl ON c.id_cliente = cl.id";
-
-// Si hay filtro, aplica WHERE por DNI
-$params = [];
-if ($dniFiltro !== '') {
-    $sql .= " WHERE cl.dni = ?";
-    $params[] = $dniFiltro;
-}
-$sql .= " ORDER BY c.id DESC";
-
+        JOIN clientes cl ON c.id_cliente = cl.id
+        WHERE c.id_cliente = ?
+        ORDER BY c.id DESC";
 $stmt = $pdo->prepare($sql);
-$stmt->execute($params);
+$stmt->execute([$id_cliente]);
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Botón según rol
-$rol = $_SESSION['rol'] ?? '';
-$botonTexto = '';
-$botonUrl   = '';
-if ($rol === 'cliente') {
-    $botonTexto = 'Nueva Cotización';
-    $botonUrl   = 'dashboard.php?vista=form_cotizacion';
-} elseif ($rol === 'recepcionista') {
-    $botonTexto = 'Nueva Cotización';
-    $botonUrl   = 'dashboard.php?vista=clientes';
-}
 ?>
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
-        <h4 class="mb-2 mb-md-0">Historial de Cotizaciones</h4>
-        <?php if ($botonTexto && $botonUrl): ?>
-            <a href="<?= $botonUrl ?>" class="btn btn-primary"><?= $botonTexto ?></a>
-        <?php endif; ?>
+        <h4 class="mb-2 mb-md-0">Mis Cotizaciones</h4>
+        <a href="dashboard.php?vista=form_cotizacion" class="btn btn-primary">Nueva Cotización</a>
     </div>
-
-    <!-- Filtro por DNI -->
-    <form method="get" class="mb-3 row g-2">
-        <div class="col-auto">
-            <input type="hidden" name="vista" value="cotizaciones">
-            <input type="text" name="dni" class="form-control" placeholder="Buscar por DNI" value="<?= htmlspecialchars($dniFiltro) ?>">
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-outline-secondary">Buscar</button>
-            <a href="dashboard.php?vista=cotizaciones" class="btn btn-outline-dark">Limpiar</a>
-        </div>
-    </form>
-
     <div class="table-responsive">
-        <table id="tablaCotizaciones" class="table table-striped table-bordered">
+        <table id="tablaCotizaciones" class="table table-striped table-bordered align-middle">
             <thead>
                 <tr>
                     <th>Código</th>
-                    <th>Cliente</th>
-                    <th>DNI</th>
+                    <th>Nombre y Apellido</th>
                     <th>Fecha</th>
                     <th>Total</th>
                     <th>Estado</th>
-                    <th>Rol Creador</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if ($cotizaciones): ?>
                     <?php foreach ($cotizaciones as $cotizacion): ?>
+                        <?php
+                        $estado = strtolower($cotizacion['estado_pago'] ?? '');
+                        $claseEstado = 'bg-secondary text-white';
+                        if ($estado === 'pagado') $claseEstado = 'bg-success text-white';
+                        elseif ($estado === 'anulado') $claseEstado = 'bg-danger text-white';
+                        elseif ($estado === 'pendiente') $claseEstado = 'bg-warning text-dark';
+                        ?>
                         <tr>
                             <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
                             <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
-                            <td><?= htmlspecialchars($cotizacion['dni'] ?? '') ?></td>
                             <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
                             <td>S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></td>
-                            <td><?= htmlspecialchars($cotizacion['estado_pago'] ?? '') ?></td>
-                            <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
+                            <td><span class="badge <?= $claseEstado ?>"><?= htmlspecialchars(ucfirst($cotizacion['estado_pago'] ?? '')) ?></span></td>
                             <td>
                                 <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm" title="Ver">
                                     <i class="bi bi-eye"></i>
@@ -93,7 +68,7 @@ if ($rol === 'cliente') {
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="8" class="text-center">No hay cotizaciones registradas.</td></tr>
+                    <tr><td colspan="6" class="text-center">No tienes cotizaciones registradas.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>

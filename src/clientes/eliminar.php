@@ -1,20 +1,24 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
-
-$id = $_GET['id'] ?? null;
-
-if ($id) {
-    try {
-        $stmt = $pdo->prepare("DELETE FROM clientes WHERE id = ?");
-        $stmt->execute([$id]);
-        $_SESSION['mensaje'] = "Cliente eliminado exitosamente.";
-    } catch (PDOException $e) {
-        $_SESSION['mensaje'] = "Error al eliminar el cliente: " . $e->getMessage();
-    }
-} else {
-    $_SESSION['mensaje'] = "ID de cliente no válido.";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-header('Location: dashboard.php?vista=clientes');
-exit;
-?>
+$id = $_GET['id'] ?? null;
+if (!$id) {
+    $_SESSION['msg'] = 'ID de cliente no proporcionado.';
+    header('Location: ../dashboard.php?vista=clientes');
+    exit;
+}
+
+try {
+    $stmt = $pdo->prepare("DELETE FROM clientes WHERE id = ?");
+    $stmt->execute([$id]);
+    $_SESSION['msg'] = 'Cliente eliminado correctamente.';
+    header('Location: ../dashboard.php?vista=clientes');
+    exit;
+} catch (Exception $e) {
+    $_SESSION['msg'] = 'Error al eliminar: ' . $e->getMessage();
+    header('Location: ../dashboard.php?vista=clientes');
+    exit;
+}

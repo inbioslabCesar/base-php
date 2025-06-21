@@ -4,6 +4,32 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 
+
+$rol = $_SESSION['rol'] ?? null;
+
+if ($rol === 'cliente') {
+    $id_cliente = $_SESSION['cliente_id'] ?? null;
+} else {
+    $id_cliente = isset($_GET['id']) ? intval($_GET['id']) : null;
+}
+
+// Validar que el id_cliente es válido y existe en la base de datos
+$clienteExiste = false;
+if ($id_cliente) {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM clientes WHERE id = ?");
+    $stmt->execute([$id_cliente]);
+    $clienteExiste = $stmt->fetchColumn() > 0;
+}
+
+if (!$clienteExiste) {
+    // Puedes mostrar un mensaje y detener la ejecución
+    echo "<div class='alert alert-danger'>El cliente seleccionado no existe.</div>";
+    exit;
+}
+
+echo "<div>ID Cliente: " . htmlspecialchars($id_cliente) . "</div>";
+
+
 // 1. Promociones activas (todas, sin importar asociación)
 $hoy = date('Y-m-d');
 $stmt = $pdo->prepare("
@@ -87,6 +113,8 @@ $promo_map_json = json_encode($promo_map);
 
     <!-- Formulario de cotización -->
     <form action="dashboard.php?action=crear_cotizacion" method="POST" id="formCotizacion">
+        <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
+
         <div class="mb-3">
             <label for="buscadorExamen">Buscar examen</label>
             <select id="buscadorExamen" class="form-select" style="width:100%;">

@@ -1,8 +1,12 @@
 <?php
-require_once __DIR__ . '/../conexion/conexion.php';
+file_put_contents('debug_detalle.txt', print_r($_GET, true)); // Esto crea un archivo con los datos recibidos
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+file_put_contents('debug_detalle.txt', print_r($_GET, true)); // Esto crea un archivo con los datos recibidos
+
+require_once __DIR__ . '/../conexion/conexion.php';
 
 $id_cotizacion = $_GET['id'] ?? null;
 $id_cliente = $_SESSION['id_cliente'] ?? null;

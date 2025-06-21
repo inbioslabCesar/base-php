@@ -1,124 +1,115 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$esEdicion = isset($_GET['id']);
+$id = $_GET['id'] ?? null;
+$esEdicion = !empty($id);
 $cliente = [
+    'codigo_cliente' => '',
     'nombre' => '',
     'apellido' => '',
+    'dni' => '',
+    'edad' => '',
     'email' => '',
-    'sexo' => '',
-    'codigo_cliente' => '',
     'telefono' => '',
     'direccion' => '',
+    'sexo' => '',
     'fecha_nacimiento' => '',
     'estado' => 'activo',
     'descuento' => ''
 ];
 
 if ($esEdicion) {
-    $id = $_GET['id'];
     $stmt = $pdo->prepare("SELECT * FROM clientes WHERE id = ?");
     $stmt->execute([$id]);
-    $cliente = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$cliente) {
-        $_SESSION['mensaje'] = "Cliente no encontrado.";
-        header('Location: dashboard.php?vista=clientes');
-        exit;
-    }
+    $cli = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($cli) $cliente = $cli;
+    else header('Location: dashboard.php?vista=clientes&msg=sin_id');
 }
 
-function capitalizar($texto) {
-    return $texto ? mb_convert_case($texto, MB_CASE_TITLE, "UTF-8") : '';
+function capitalize($string) {
+    return mb_convert_case(strtolower(trim((string)$string)), MB_CASE_TITLE, "UTF-8");
 }
 ?>
 
 <div class="container mt-4">
-    <h2><?= $esEdicion ? 'Editar Cliente' : 'Agregar Cliente' ?></h2>
-    <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_cliente&id=' . $_GET['id'] : 'crear_cliente' ?>">
+    <h4><?= $esEdicion ? 'Editar Cliente' : 'Nuevo Cliente' ?></h4>
+    <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>">
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label for="codigo_cliente" class="form-label">Código Cliente</label>
+                <label for="codigo_cliente" class="form-label">Código Cliente *</label>
                 <div class="input-group">
-                    <input type="text" class="form-control" id="codigo_cliente" name="codigo_cliente"
-                        value="<?= htmlspecialchars($cliente['codigo_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
-                    <button type="button" class="btn btn-outline-secondary"
-                        onclick="generarCodigo()">Generar Código</button>
+                    <input type="text" class="form-control" name="codigo_cliente" id="codigo_cliente" value="<?= htmlspecialchars($cliente['codigo_cliente']) ?>" required readonly>
+                    <button class="btn btn-secondary" type="button" onclick="generarCodigo()">Generar</button>
                 </div>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="nombre" class="form-label">Nombre *</label>
-                <input type="text" class="form-control" id="nombre" name="nombre" required
-                    value="<?= htmlspecialchars(capitalizar($cliente['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="text" class="form-control" name="nombre" id="nombre" value="<?= capitalize($cliente['nombre']) ?>" required>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="apellido" class="form-label">Apellido *</label>
-                <input type="text" class="form-control" id="apellido" name="apellido" required
-                    value="<?= htmlspecialchars(capitalizar($cliente['apellido'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="text" class="form-control" name="apellido" id="apellido" value="<?= capitalize($cliente['apellido']) ?>" required>
             </div>
-        </div>
-        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="dni" class="form-label">DNI *</label>
+                <input type="text" class="form-control" name="dni" id="dni" value="<?= htmlspecialchars($cliente['dni']??'') ?>" required>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="edad" class="form-label">Edad *</label>
+                <input type="number" class="form-control" name="edad" id="edad" value="<?= htmlspecialchars($cliente['edad']) ?>" required min="0">
+            </div>
             <div class="col-md-4 mb-3">
                 <label for="email" class="form-label">Email *</label>
-                <input type="email" class="form-control" id="email" name="email" required
-                    value="<?= htmlspecialchars($cliente['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="email" class="form-control" name="email" id="email" value="<?= htmlspecialchars($cliente['email']) ?>" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="password" class="form-label"><?= $esEdicion ? 'Nueva Contraseña' : 'Contraseña *' ?></label>
-                <input type="password" class="form-control" id="password" name="password" <?= $esEdicion ? '' : 'required' ?>>
-                <?php if ($esEdicion): ?>
-                    <small class="text-muted">Deja en blanco si no deseas cambiar la contraseña.</small>
-                <?php endif; ?>
+                <label for="password" class="form-label"><?= $esEdicion ? 'Nueva contraseña' : 'Contraseña *' ?></label>
+                <input type="password" class="form-control" name="password" id="password" <?= $esEdicion ? '' : 'required' ?>>
             </div>
-            <div class="col-md-4 mb-3">
-                <label for="sexo" class="form-label">Sexo</label>
-                <select class="form-select" id="sexo" name="sexo" required>
-                    <option value="">Seleccionar</option>
-                    <option value="masculino" <?= (isset($cliente['sexo']) && $cliente['sexo'] == 'masculino') ? 'selected' : '' ?>>Masculino</option>
-                    <option value="femenino" <?= (isset($cliente['sexo']) && $cliente['sexo'] == 'femenino') ? 'selected' : '' ?>>Femenino</option>
-                    <option value="otro" <?= (isset($cliente['sexo']) && $cliente['sexo'] == 'otro') ? 'selected' : '' ?>>Otro</option>
-                </select>
-            </div>
-        </div>
-        <div class="row">
             <div class="col-md-4 mb-3">
                 <label for="telefono" class="form-label">Teléfono</label>
-                <input type="text" class="form-control" id="telefono" name="telefono"
-                    value="<?= htmlspecialchars($cliente['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="text" class="form-control" name="telefono" id="telefono" value="<?= htmlspecialchars($cliente['telefono']) ?>">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="direccion" class="form-label">Dirección</label>
-                <input type="text" class="form-control" id="direccion" name="direccion"
-                    value="<?= htmlspecialchars($cliente['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($cliente['direccion']) ?>">
             </div>
             <div class="col-md-4 mb-3">
-                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
-                <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
-                    value="<?= htmlspecialchars($cliente['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                <label for="sexo" class="form-label">Sexo</label>
+                <select class="form-select" name="sexo" id="sexo">
+                    <option value="">Seleccionar</option>
+                    <option value="masculino" <?= ($cliente['sexo'] === 'masculino') ? 'selected' : '' ?>>Masculino</option>
+                    <option value="femenino" <?= ($cliente['sexo'] === 'femenino') ? 'selected' : '' ?>>Femenino</option>
+                    <option value="otro" <?= ($cliente['sexo'] === 'otro') ? 'selected' : '' ?>>Otro</option>
+                </select>
             </div>
-        </div>
-        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="fecha_nacimiento" class="form-label">Fecha Nacimiento</label>
+                <input type="date" class="form-control" name="fecha_nacimiento" id="fecha_nacimiento" value="<?= htmlspecialchars($cliente['fecha_nacimiento']) ?>">
+            </div>
             <div class="col-md-4 mb-3">
                 <label for="estado" class="form-label">Estado</label>
-                <select class="form-select" id="estado" name="estado">
-                    <option value="activo" <?= (isset($cliente['estado']) && $cliente['estado'] == 'activo') ? 'selected' : '' ?>>Activo</option>
-                    <option value="inactivo" <?= (isset($cliente['estado']) && $cliente['estado'] == 'inactivo') ? 'selected' : '' ?>>Inactivo</option>
+                <select class="form-select" name="estado" id="estado">
+                    <option value="activo" <?= ($cliente['estado'] === 'activo') ? 'selected' : '' ?>>Activo</option>
+                    <option value="inactivo" <?= ($cliente['estado'] === 'inactivo') ? 'selected' : '' ?>>Inactivo</option>
                 </select>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="descuento" class="form-label">Descuento (%)</label>
-                <input type="number" step="0.01" min="0" max="100" class="form-control" id="descuento" name="descuento"
-                    value="<?= htmlspecialchars($cliente['descuento'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
+                <input type="number" class="form-control" name="descuento" id="descuento" value="<?= htmlspecialchars($cliente['descuento']) ?>" min="0" max="100">
             </div>
         </div>
-        <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Crear' ?></button>
+        <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Registrar' ?></button>
         <a href="dashboard.php?vista=clientes" class="btn btn-secondary">Cancelar</a>
     </form>
 </div>
 
 <script>
 function generarCodigo() {
-    const random = Math.floor(100000 + Math.random() * 900000);
-    document.getElementById('codigo_cliente').value = 'LAB-' + random;
+    let codigo = 'CLI-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+    document.getElementById('codigo_cliente').value = codigo;
 }
 </script>

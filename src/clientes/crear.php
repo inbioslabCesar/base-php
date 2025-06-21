@@ -1,47 +1,63 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
-
-$nombre = $_POST['nombre'] ?? '';
-$apellido = $_POST['apellido'] ?? '';
-$email = $_POST['email'] ?? '';
-$password = $_POST['password'] ?? '';
-$codigo_cliente = $_POST['codigo_cliente'] ?? '';
-$sexo = $_POST['sexo'] ?? null;
-$telefono = $_POST['telefono'] ?? null;
-$direccion = $_POST['direccion'] ?? null;
-$fecha_nacimiento = $_POST['fecha_nacimiento'] ?? null;
-$estado = $_POST['estado'] ?? 'activo';
-$descuento = $_POST['descuento'] ?? null;
-
-if ($nombre && $apellido && $email && $password) {
-    try {
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-
-        $stmt = $pdo->prepare("INSERT INTO clientes (codigo_cliente, nombre, apellido, email, password, sexo, telefono, direccion, fecha_nacimiento, estado, descuento, fecha_registro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->execute([
-            $codigo_cliente,
-            mb_convert_case($nombre, MB_CASE_TITLE, "UTF-8"),
-            mb_convert_case($apellido, MB_CASE_TITLE, "UTF-8"),
-            $email,
-            $hash,
-            $sexo,
-            $telefono,
-            $direccion,
-            $fecha_nacimiento,
-            $estado,
-            $descuento
-        ]);
-        
-        $_SESSION['cliente_id'] = $pdo->lastInsertId();
-
-        $_SESSION['mensaje'] = "Cliente creado exitosamente.";
-    } catch (PDOException $e) {
-        $_SESSION['mensaje'] = "Error al crear el cliente: " . $e->getMessage();
-    }
-} else {
-    $_SESSION['mensaje'] = "Faltan datos obligatorios.";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-header('Location: dashboard.php?vista=clientes');
-exit;
-?>
+
+// Solo los campos obligatorios
+$codigo_cliente = trim($_POST['codigo_cliente'] ?? '');
+$nombre         = trim($_POST['nombre'] ?? '');
+$apellido       = trim($_POST['apellido'] ?? '');
+$dni            = trim($_POST['dni'] ?? '');
+$edad           = trim($_POST['edad'] ?? '');
+$email          = trim($_POST['email'] ?? '');
+$password       = $_POST['password'] ?? '';
+$telefono       = trim($_POST['telefono'] ?? '');
+$direccion      = trim($_POST['direccion'] ?? '');
+$sexo           = $_POST['sexo'] ?? '';
+$fecha_nacimiento = $_POST['fecha_nacimiento'] ?? null;
+$estado         = $_POST['estado'] ?? 'activo';
+$descuento      = $_POST['descuento'] ?? null;
+
+// Validación de requeridos
+if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$edad || !$email || !$password) {
+    $_SESSION['msg'] = 'Por favor, complete todos los campos obligatorios.';
+    header('Location: ../dashboard.php?vista=form_cliente');
+    exit;
+}
+
+// Capitaliza nombre y apellido
+function capitalize($string) {
+    return mb_convert_case(strtolower(trim($string)), MB_CASE_TITLE, "UTF-8");
+}
+
+try {
+    $stmt = $pdo->prepare(
+        "INSERT INTO clientes 
+        (codigo_cliente, nombre, apellido, dni, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    $stmt->execute([
+        $codigo_cliente,
+        capitalize($nombre),
+        capitalize($apellido),
+        $dni,
+        $edad,
+        $email,
+        password_hash($password, PASSWORD_DEFAULT),
+        $telefono ?: null,
+        $direccion ?: null,
+        $sexo ?: null,
+        $fecha_nacimiento ?: null,
+        $estado,
+        $descuento !== '' ? $descuento : null
+    ]);
+    $_SESSION['msg'] = 'Cliente registrado correctamente.';
+    header('Location: ../dashboard.php?vista=clientes');
+    exit;
+} catch (Exception $e) {
+    $_SESSION['msg'] = 'Error al registrar: ' . $e->getMessage();
+    header('Location: ../dashboard.php?vista=form_cliente');
+    exit;
+}
