@@ -18,12 +18,12 @@ if (!isset($_SESSION['rol'])) {
 }
 
 $acciones_por_rol = [
-    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','config_empresa_guardar','buscar_examenes_recepcionista','guardar_cotizacion_recepcionista'],
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','config_empresa_guardar','buscar_examenes_recepcionista','guardar_cotizacion_recepcionista','procesar_agenda'],
 
     'laboratorista' => [],
-    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente','buscar_examenes_recepcionista','guardar_cotizacion_recepcionista'],
+    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente','buscar_examenes_recepcionista','guardar_cotizacion_recepcionista','procesar_agenda'],
     'empresa' => ['crear_cotizacion'],
-    'cliente' => ['crear_cotizacion'],
+    'cliente' => ['crear_cotizacion' ,'procesar_agenda'],
     'convenio' => ['crear_cotizacion']
 ];
 
@@ -50,7 +50,8 @@ $acciones = [
     'crear_cotizacion_recepcionista' => __DIR__ . '/cotizaciones/crear_cotizacion_recepcionista.php',
     'guardar_cotizacion_recepcionista' => __DIR__ . '/cotizaciones/guardar_cotizacion_recepcionista.php',
     'buscar_examenes_recepcionista' => __DIR__ . '/examenes/buscar_examenes_recepcionista.php',
-    'config_empresa_guardar' => __DIR__ . '/config/config_empresa_guardar.php'
+    'config_empresa_guardar' => __DIR__ . '/config/config_empresa_guardar.php',
+    'procesar_agenda' => __DIR__ . '/cotizaciones/procesar_agenda.php'
 ];
 
 $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
@@ -80,12 +81,12 @@ include __DIR__ . '/componentes/sidebar.php';
     }
     // Lista de vistas permitidas por rol
     $acceso_por_rol = [
-        'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion','config_empresa_datos'],
+        'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion','config_empresa_datos','agendar_cita'],
 
         'laboratorista' => [],
-        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion'],
+        'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'agendar_cita'],
         'empresa' => ['empresa'],
-        'cliente' => ['clientes', 'cliente', 'cotizaciones', 'form_cotizacion', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion','cotizaciones_clientes'],
+        'cliente' => ['clientes', 'cliente', 'cotizaciones', 'form_cotizacion', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion','cotizaciones_clientes', 'agendar_cita'],
         'convenio' => ['convenio']
     ];
 
@@ -116,6 +117,8 @@ include __DIR__ . '/componentes/sidebar.php';
         'descargar_cotizacion' => __DIR__ . '/cotizaciones/descargar_cotizacion.php',
          'config_empresa_datos' => __DIR__ . '/config/config_empresa_datos.php',
          'cotizaciones_clientes' => __DIR__ . '/cotizaciones/cotizaciones_clientes.php',
+         'agendar_cita' => __DIR__ . '/cotizaciones/agendar_cita.php',
+         'ver_cotizacion' => __DIR__ . '/cotizaciones/ver_cotizacion.php'
     ];
 
     // Obtener rol y vista

@@ -8,6 +8,14 @@ date_default_timezone_set('America/Lima');
 if (!isset($_GET['id'])) {
     die('ID de cotización no proporcionado.');
 }
+$id_cotizacion = $_GET['id'] ?? null;
+if (!$id_cotizacion) {
+    die("No se recibió el ID de la cotización.");
+}
+
+function mayus($texto) {
+    return ucwords(strtolower($texto));
+}
 
 $id = intval($_GET['id']);
 
@@ -24,14 +32,14 @@ if (!$cotizacion) {
 }
 
 // Traer detalle de exámenes con condiciones del paciente
-$stmt_detalle = $pdo->prepare(
-    "SELECT d.*, e.preanalitica_cliente
-     FROM cotizaciones_detalle d
-     LEFT JOIN examenes e ON d.id_examen = e.id
-     WHERE d.id_cotizacion = :id_cotizacion"
-);
-$stmt_detalle->execute([':id_cotizacion' => $id]);
-$examenes = $stmt_detalle->fetchAll(PDO::FETCH_ASSOC);
+$stmt = $pdo->prepare("
+    SELECT cd.*, e.preanalitica_cliente, e.nombre AS nombre_examen
+    FROM cotizaciones_detalle cd
+    LEFT JOIN examenes e ON cd.id_examen = e.id
+    WHERE cd.id_cotizacion = ?
+");
+$stmt->execute([$id_cotizacion]);
+$examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Traer datos de la empresa
 $stmtEmpresa = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
@@ -41,73 +49,96 @@ $logo = '../images/empresa/logo_empresa.png'; // Ruta relativa
 $html = '
 <html>
 <head>
-    <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; }
-        .header-table { width: 100%; margin-bottom: 10px; }
-        .header-table td { vertical-align: top; }
-        .logo-cell { width: 110px; }
-        .empresa-datos { text-align: right; font-size: 11px; }
-        .tabla { border-collapse: collapse; width: 100%; }
-        .tabla th, .tabla td { border: 1px solid #ccc; padding: 5px; }
-        .tabla th { background: #f5f5f5; }
-        .total { text-align:right; font-weight:bold; }
-    </style>
+<style>
+    body { font-family: Arial, sans-serif; font-size: 11pt; }
+    .datos-empresa { margin-bottom: 10px; }
+    .datos-cliente, .datos-cotizacion { margin-bottom: 8px; }
+    .tabla-campos { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .tabla-campos td { padding: 2px 6px; }
+    .tabla-examenes { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .tabla-examenes th, .tabla-examenes td { border: 1px solid #ccc; padding: 4px; }
+    .tabla-examenes th { background: #f4f4f4; }
+</style>
 </head>
 <body>
-<table class="header-table">
+    <table width="100%" style="margin-bottom:12px;">
     <tr>
-        <td class="logo-cell">
+        <td width="40%" valign="top">
             <img src="' . $logo . '" width="100" alt="Logo Empresa">
         </td>
-        <td class="empresa-datos">
-            <strong>' . htmlspecialchars($empresa['nombre'] ?? '') . '</strong><br>
-            RUC: ' . htmlspecialchars($empresa['ruc'] ?? '') . '<br>
-            Dirección: ' . htmlspecialchars($empresa['direccion'] ?? '') . '<br>
-            Teléfono: ' . htmlspecialchars($empresa['telefono'] ?? '') . '<br>
-            Celular: ' . htmlspecialchars($empresa['celular'] ?? '') . '<br>
-            Email: ' . htmlspecialchars($empresa['email'] ?? '') . '
+        <td width="60%" valign="top" align="right" style="font-size:11pt;">
+            <strong>' . ($empresa['nombre']) . '</strong><br>
+            ' . mayus($empresa['direccion']) . '<br>
+            RUC: ' . $empresa['ruc'] . '<br>
+            Tel: ' . $empresa['telefono'] . '<br>
+            Celular: ' . $empresa['celular'] . '<br>
+            Email: ' . $empresa['email'] . '
         </td>
     </tr>
 </table>
-<h2 style="text-align:center;">Cotización de Exámenes</h2>
-<div class="datos">
-    <strong>Código:</strong> ' . htmlspecialchars($cotizacion['codigo'] ?? '') . '<br>
-    <strong>Cliente:</strong> ' . htmlspecialchars(($cotizacion['nombre_cliente'] ?? '') . ' ' . ($cotizacion['apellido_cliente'] ?? '')). '<br>
-    <strong>DNI:</strong> ' . htmlspecialchars($cotizacion['dni_cliente'] ?? '') . '<br>
-    <strong>Fecha y hora:</strong> ' . htmlspecialchars(date('d/m/Y H:i', strtotime($cotizacion['fecha'] ?? ''))) . '<br>
-    <strong>Estado:</strong> ' . htmlspecialchars($cotizacion['estado_pago'] ?? '') . '<br>
-    <strong>Rol Creador:</strong> ' . htmlspecialchars($cotizacion['rol_creador'] ?? '') . '
-</div>
-<h4>Exámenes Cotizados</h4>
-<table class="tabla">
-    <thead>
+
+    <div class="datos-cliente">
+        <strong>Cliente:</strong> ' . mayus($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) . '<br>
+        <strong>DNI :</strong> ' . htmlspecialchars($cotizacion['dni_cliente']) . '<br>
+        <strong>Cotización:</strong> ' . htmlspecialchars($cotizacion['codigo']) . '<br>
+        <strong>Fecha:</strong> ' . htmlspecialchars($cotizacion['fecha']) . '
+    </div>
+
+    <table class="tabla-campos">
         <tr>
-            <th>Nombre del Examen</th>
-            <th>Condiciones del paciente</th>
-            <th>Precio Unitario</th>
-            <th>Cantidad</th>
-            <th>Subtotal</th>
+            <td><strong>Lugar de toma:</strong></td>
+            <td>' . mayus($cotizacion['tipo_toma'] ?? 'No asignado') . '</td>
+            <td><strong>Dirección de toma:</strong></td>
+            <td>' . mayus($cotizacion['direccion_toma'] ?? 'No asignada') . '</td>
         </tr>
-    </thead>
-    <tbody>';
-foreach ($examenes as $examen) {
-    $html .= '
         <tr>
-            <td>' . htmlspecialchars($examen['nombre_examen'] ?? '') . '</td>
-            <td>' . htmlspecialchars($examen['preanalitica_cliente'] ?? '') . '</td>
-            <td>S/ ' . number_format($examen['precio_unitario'] ?? 0, 2) . '</td>
-            <td>' . htmlspecialchars($examen['cantidad'] ?? '') . '</td>
-            <td>S/ ' . number_format($examen['subtotal'] ?? 0, 2) . '</td>
-        </tr>';
-}
-$html .= '
-    </tbody>
-</table>
-<p class="total">Total: S/ ' . number_format($cotizacion['total'] ?? 0, 2) . '</p>
-</body>
-</html>
+            <td><strong>Fecha de toma:</strong></td>
+            <td>' . htmlspecialchars($cotizacion['fecha_toma'] ?? 'No asignada') . '</td>
+            <td><strong>Hora de toma:</strong></td>
+            <td>' . htmlspecialchars($cotizacion['hora_toma'] ?? 'No asignada') . '</td>
+        </tr>
+        <tr>
+            <td><strong>Rol creador:</strong></td>
+            <td>' . mayus($cotizacion['rol_creador'] ?? 'No asignado') . '</td>
+            <td><strong>Observaciones:</strong></td>
+            <td>' . mayus($cotizacion['observaciones'] ?? 'No asignadas') . '</td>
+        </tr>
+    </table>
 ';
 
-$mpdf = new \Mpdf\Mpdf(['tempDir' => __DIR__ . '/../../tmp']);
+// ... (tabla de exámenes cotizados)
+$html .= '
+    <table class="tabla-examenes">
+        <thead>
+            <tr>
+                <th>Examen</th>
+                <th>Condición Cliente</th>
+                <th>P. Unit. (S/.)</th>
+                <th>Cant.</th>
+                <th>Subtotal (S/.)</th>
+            </tr>
+        </thead>
+        <tbody>';
+foreach ($examenes as $examen) {
+    $html .= '<tr>
+        <td align="center">' . mayus($examen['nombre_examen']) . '</td>
+        <td align="center">' . mayus($examen['preanalitica_cliente']) . '</td>
+        <td align="center">' . number_format($examen['precio_unitario'], 2) . '</td>
+        <td align="center">' . $examen['cantidad'] . '</td>
+        <td align="center">' . number_format($examen['subtotal'], 2) . '</td>
+    </tr>';
+}
+$html .= '
+        </tbody>
+    </table>
+    <br>
+    <strong >Total: S/. ' . number_format($cotizacion['total'], 2) . '</strong>
+</body>
+</html>';
+
+// ... (código para generar el PDF con mPDF)
+$mpdf = new \Mpdf\Mpdf();
 $mpdf->WriteHTML($html);
-$mpdf->Output('cotizacion_' . ($cotizacion['codigo'] ?? 'descarga') . '.pdf', 'D');
+$mpdf->Output('cotizacion_' . $cotizacion['codigo'] . '.pdf', 'D');
+exit;
+?>

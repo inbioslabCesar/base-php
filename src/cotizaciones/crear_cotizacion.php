@@ -85,7 +85,6 @@ for ($i = 0; $i < count($examenes); $i++) {
 }
 // Preparar datos obligatorios para la tabla cotizaciones
 $codigo = 'COT-' . strtoupper(uniqid());
-// $id_cliente = $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null;
 $estado_pago = 'pendiente';
 $rol_creador = $_SESSION['rol'] ?? 'cliente';
 $creado_por = $_SESSION['usuario_id'] ?? $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null; // Ajusta según tu lógica
@@ -96,8 +95,25 @@ if (!$id_cliente || !$creado_por) {
 }
 
 // Insertar cotización principal
-$stmt = $pdo->prepare("INSERT INTO cotizaciones (codigo, id_cliente, fecha, total, estado_pago, creado_por,rol_creador) VALUES (?, ?, ?, ?, ?, ?, ?)");
-$stmt->execute([$codigo, $id_cliente, $fecha, $total, $estado_pago, $creado_por,$rol_creador]);
+$stmt = $pdo->prepare("INSERT INTO cotizaciones 
+    (codigo, id_cliente, fecha, total, estado_pago, creado_por, rol_creador, tipo_toma, fecha_toma, hora_toma, direccion_toma)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+$stmt->execute([
+    $codigo, 
+    $id_cliente, 
+    $fecha, 
+    $total, 
+    $estado_pago, 
+    $creado_por, 
+    $rol_creador,
+    $_POST['tipo_toma'] ?? null,
+    $_POST['fecha_toma'] ?? null,
+    $_POST['hora_toma'] ?? null,
+    $_POST['direccion_toma'] ?? null
+]);
+
+
 $id_cotizacion = $pdo->lastInsertId();
 
 // Insertar detalles
@@ -115,11 +131,11 @@ foreach ($detalles as $detalle) {
 
 $rol = $_SESSION['rol'] ?? null;
 
-if ($rol === 'cliente') {
-    header('Location: dashboard.php?vista=cotizaciones_clientes');
+if ($_SESSION['rol'] == 'cliente') {
+    header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
     exit;
-} elseif ($rol === 'recepcionista') {
-   header('Location: dashboard.php?vista=cotizaciones');
+} elseif ($_SESSION['rol'] == 'recepcionista') {
+    header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
     exit;
 } 
 

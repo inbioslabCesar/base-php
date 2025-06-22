@@ -1,86 +1,86 @@
 <?php
-file_put_contents('debug_detalle.txt', print_r($_GET, true)); // Esto crea un archivo con los datos recibidos
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-file_put_contents('debug_detalle.txt', print_r($_GET, true)); // Esto crea un archivo con los datos recibidos
-
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$id_cotizacion = $_GET['id'] ?? null;
-$id_cliente = $_SESSION['id_cliente'] ?? null;
+// Recibe id de cotización y rol del usuario
+$id_cotizacion = $_GET['id'] ?? $_POST['id'] ?? null;
+$rol = $_GET['rol'] ?? $_POST['rol'] ?? '';
 
-if (!$id_cotizacion || !$id_cliente) {
-    echo "<div class='alert alert-danger'>Cotización o cliente no válido.</div>";
+// Validación básica
+if (!$id_cotizacion) {
+    echo "No se recibió el ID de la cotización.";
     exit;
 }
 
-// Obtener cabecera
-$stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ? AND id_cliente = ?");
-$stmt->execute([$id_cotizacion, $id_cliente]);
-$cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$cotizacion) {
-    echo "<div class='alert alert-danger'>Cotización no encontrada.</div>";
-    exit;
-}
-
-// Obtener detalles
-$stmt = $pdo->prepare("SELECT * FROM cotizaciones_detalle WHERE id_cotizacion = ?");
+// Trae los detalles de la cotización
+$stmt = $pdo->prepare("
+    SELECT cd.*, e.nombre AS nombre_examen, e.preanalitica_cliente
+    FROM cotizaciones_detalle cd
+    LEFT JOIN examenes e ON cd.id_examen = e.id
+    WHERE cd.id_cotizacion = ?
+");
 $stmt->execute([$id_cotizacion]);
-$detalles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Opcional: puedes traer aquí datos de la cotización principal o cliente si lo deseas
+
+$total = 0;
 ?>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resumen de Cotización</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        th { background: #f5f5f5; }
+        .total { font-weight: bold; text-align: right; }
+    </style>
+</head>
+<body>
+<h2>Resumen de Cotización</h2>
+<p><strong>ID de Cotización:</strong> <?php echo htmlspecialchars($id_cotizacion); ?></p>
+<p><strong>Rol del usuario:</strong> <?php echo htmlspecialchars($rol); ?></p>
 
-<div class="container mt-4">
-    <h2>Detalle de Cotización</h2>
-    <div class="mb-3">
-        <strong>Código:</strong> <?= htmlspecialchars($cotizacion['codigo']) ?><br>
-        <strong>Fecha:</strong> <?= htmlspecialchars(date('d/m/Y H:i', strtotime($cotizacion['fecha']))) ?><br>
-        <strong>Observaciones:</strong> <?= nl2br(htmlspecialchars($cotizacion['observaciones'] ?? '')) ?><br>
-        <strong>Estado de pago:</strong>
-        <?php if ($cotizacion['estado_pago'] === 'pagado'): ?>
-            <span class="badge bg-success">Pagado</span>
-        <?php else: ?>
-            <span class="badge bg-warning text-dark">Pendiente</span>
-        <?php endif; ?>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Examen</th>
-                    <th>Precio Unitario</th>
-                    <th>Cantidad</th>
-                    <th>Subtotal</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($detalles as $det): ?>
-                <tr>
-                    <td><?= htmlspecialchars($det['nombre_examen']) ?></td>
-                    <td>S/ <?= number_format($det['precio_unitario'], 2) ?></td>
-                    <td><?= htmlspecialchars($det['cantidad']) ?></td>
-                    <td>S/ <?= number_format($det['subtotal'], 2) ?></td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="3" class="text-end"><strong>Total</strong></td>
-                    <td><strong>S/ <?= number_format($cotizacion['total'], 2) ?></strong></td>
-                </tr>
-            </tfoot>
-        </table>
-    </div>
-    <div class="mb-3">
-        <a href="cotizaciones.php" class="btn btn-secondary">Volver al Historial</a>
-        <?php if ($cotizacion['estado_pago'] === 'pagado'): ?>
-            <a href="descargar_pdf.php?id=<?= $cotizacion['id'] ?>" class="btn btn-success">Descargar PDF</a>
-        <?php else: ?>
-            <button class="btn btn-secondary" disabled title="Debe estar pagada">Descargar PDF</button>
-        <?php endif; ?>
-    </div>
-</div>
+<table>
+    <tr>
+        <th>Examen</th>
+        <th>Condiciones</th>
+        <th>Precio Unit</th>
+        <th>Cantidad</th>
+        <th>Subtotal</th>
+    </tr>
+    <?php foreach ($examenes as $examen): 
+        $precio = isset($examen['precio_unitario']) ? floatval($examen['precio_unitario']) : 0;
+        $cantidad = isset($examen['cantidad']) ? intval($examen['cantidad']) : 0;
+        $subtotal = $precio * $cantidad;
+        $total += $subtotal;
+    ?>
+    <tr>
+        <td><?php echo htmlspecialchars($examen['nombre_examen']); ?></td>
+        <td><?php echo nl2br(htmlspecialchars($examen['preanalitica_cliente'])); ?></td>
+        <td><?php echo number_format($precio, 2); ?></td>
+        <td><?php echo $cantidad; ?></td>
+        <td><?php echo number_format($subtotal, 2); ?></td>
+    </tr>
+    <?php endforeach; ?>
+    <tr>
+        <td colspan="4" class="total">Total</td>
+        <td class="total"><?php echo number_format($total, 2); ?></td>
+    </tr>
+</table>
+
+<!-- Opcional: puedes mostrar botones o enlaces según el rol -->
+ <?php
+$rol = strtolower(trim($rol)); // Normaliza el rol
+if ($rol == 'cliente'): ?>
+    <a href="dashboard.php?vista=cotizaciones_clientes" class="btn btn-secondary">Volver</a>
+<?php elseif ($rol == 'recepcionista'): ?>
+    <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Volver</a>
+<?php else: ?>
+    <a href="dashboard.php" class="btn btn-secondary">Volver</a>
+<?php endif; ?>
+
+</body>
+</html>
