@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../conexion/conexion.php';
 $id_cliente = $_SESSION['cliente_id'] ?? null;
 $rol = $_SESSION['rol'] ?? null;
 
@@ -11,7 +12,6 @@ if (!$id_cliente || strtolower(trim($rol)) !== 'cliente') {
     return;
 }
 
-require_once __DIR__ . '/../conexion/conexion.php';
 
 // Consulta solo las cotizaciones del cliente logueado
 $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 

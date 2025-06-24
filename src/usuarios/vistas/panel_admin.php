@@ -40,7 +40,7 @@ require_once __DIR__ . '/../../config/config.php';
 
         </div>
         <!-- Agrega aquí más botones para otras funcionalidades administrativas -->
-        <a href="<?= BASE_URL ?>dashboard.php?vista=seleccionar_empresa" class="btn btn-outline-primary">Precios por Empresa</a>
+        <a href="<?= BASE_URL ?>dashboard.php?vista=constructor" class="btn btn-outline-primary">Crear pruebas y perfiles</a>
         <?php if ($_SESSION['rol'] === 'admin'): ?>
             <a href="dashboard.php?vista=promociones" class="btn btn-warning mb-3">
                 <i class="bi bi-megaphone"></i> Gestionar Promociones
