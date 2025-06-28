@@ -75,6 +75,53 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
             }
 
         }
+
+        .color-input {
+            width: 32px;
+            height: 32px;
+            border: none;
+        }
+
+        .valores-ref-group {
+            margin-bottom: 0.25rem;
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+
+        .valores-ref-group input[type="text"] {
+            width: 100px;
+        }
+
+        .valores-ref-group input[type="text"].desc {
+            width: 120px;
+        }
+
+        textarea.form-control {
+            min-width: 180px;
+            min-height: 32px;
+        }
+
+        .opciones-input {
+            min-width: 180px;
+        }
+
+        #formula-panel {
+            min-width: 220px;
+            min-height: 40px;
+            position: absolute;
+            z-index: 1000;
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 7px;
+            border-radius: 7px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            max-width: 340px;
+        }
+        
     </style>
 </head>
 
@@ -90,6 +137,6 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
             <!-- Botón solo visible en móvil -->
             <button class="btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
                 <i class="bi bi-list fs-2"></i>
-            </button> 
+            </button>
         </div>
     </header>

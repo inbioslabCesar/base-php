@@ -39,6 +39,12 @@ require_once __DIR__ . '/../../config/config.php';
             </a>
 
         </div>
+        <div class="col-md-3 mb-3">
+            <a href="dashboard.php?vista=format" class="btn btn-outline-primary mb-3">
+                <i class="bi bi-gear-fill"></i> Constructor
+            </a>
+
+        </div>
         <!-- Agrega aquí más botones para otras funcionalidades administrativas -->
         <a href="<?= BASE_URL ?>dashboard.php?vista=constructor" class="btn btn-outline-primary">Crear pruebas y perfiles</a>
         <?php if ($_SESSION['rol'] === 'admin'): ?>

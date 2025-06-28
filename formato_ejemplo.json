@@ -1,0 +1,45 @@
+[
+  {
+    "tipo": "titulo",
+    "texto": "EXAMEN FÍSICO"
+  },
+  {
+    "tipo": "parametro",
+    "texto": "Color",
+    "metodologia": "Visual",
+    "unidad": "",
+    "valores_referencia": ["Amarillo", "Pajizo"]
+  },
+  {
+    "tipo": "parametro",
+    "texto": "Aspecto",
+    "metodologia": "Visual",
+    "unidad": "",
+    "valores_referencia": ["Claro", "Turbio"]
+  },
+  {
+    "tipo": "titulo",
+    "texto": "EXAMEN QUÍMICO"
+  },
+  {
+    "tipo": "parametro",
+    "texto": "pH",
+    "metodologia": "Tira reactiva",
+    "unidad": "",
+    "valores_referencia": ["acido", "Neutro", "Alcalino"]
+  },
+  {
+    "tipo": "parametro",
+    "texto": "Proteínas",
+    "metodologia": "Tira reactiva",
+    "unidad": "mg/dl",
+    "valores_referencia": ["Negativo", "Traces"]
+  },
+  {
+    "tipo": "formula",
+    "texto": "Glucosa",
+    "metodologia": "Tira reactiva",
+    "unidad": "",
+    "valores_referencia": ["Negativo", "Traces"]
+  }
+]

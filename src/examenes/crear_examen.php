@@ -21,23 +21,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipo_tubo = capitalizar($_POST['tipo_tubo'] ?? '');
     $observaciones = trim($_POST['observaciones'] ?? '');
     $precio_publico = floatval($_POST['precio_publico'] ?? 0);
-    $vigente = isset($_POST['vigente']) ? 1 : 0;
-    // Procesar los parámetros del examen y guardar en el JSON 'adicional'
-    $parametros = [];
-    if (!empty($_POST['parametro_nombre'])) {
-        foreach ($_POST['parametro_nombre'] as $i => $parametro) {
-            $parametros[] = [
-                'parametro' => trim($parametro), // ← Aquí el cambio clave
-                'valor' => trim($_POST['parametro_valor'][$i]),
-                'unidad' => trim($_POST['parametro_unidad'][$i] ?? ''),
-                'calculado' => trim($_POST['parametro_tipo'][$i] ?? 'Procesado'),
-                'formula' => trim($_POST['parametro_formula'][$i] ?? '')
-            ];
-        }
-    }
-    $adicional = !empty($parametros) ? json_encode($parametros) : null;
+    $adicional = $_POST['adicional'] ?? '';
+    $vigente = isset($_POST['vigente']) ? 1 : 0; 
 
-    // Ahora usa $adicional en tu consulta INSERT o UPDATE
+
+    if (empty($nombre) || empty($adicional)) {
+    $_SESSION['error'] = 'Faltan datos obligatorios';
+    header('Location: dashboard.php?vista=format'); // Cambia por la ruta correcta
+    exit;
+}
+
+if (json_decode($adicional) === null && json_last_error() !== JSON_ERROR_NONE) {
+    $_SESSION['error'] = 'El campo adicional no contiene un JSON válido';
+    header('Location: dashboard.php?vista=format'); // Cambia por la ruta correcta
+    exit;
+}
 
     try {
         $stmt = $pdo->prepare("INSERT INTO examenes 

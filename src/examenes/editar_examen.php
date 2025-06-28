@@ -22,24 +22,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipo_tubo = capitalizar($_POST['tipo_tubo'] ?? '');
     $observaciones = trim($_POST['observaciones'] ?? '');
     $precio_publico = floatval($_POST['precio_publico'] ?? 0);
-    $vigente = isset($_POST['vigente']) ? 1 : 0;
-    // Procesar parámetros si existen
-    // ...recoges otros campos con $_POST...
-$parametros = [];
-if (!empty($_POST['parametro_nombre'])) {
-    foreach ($_POST['parametro_nombre'] as $i => $parametro) {
-        $parametros[] = [
-            'parametro' => trim($parametro), // ← Aquí el cambio clave
-            'valor' => trim($_POST['parametro_valor'][$i]),
-            'unidad' => trim($_POST['parametro_unidad'][$i] ?? ''),
-            'calculado' => trim($_POST['parametro_tipo'][$i] ?? 'Procesado'),
-            'formula' => trim($_POST['parametro_formula'][$i] ?? '')
-        ];
-    }
-}
-$adicional = !empty($parametros) ? json_encode($parametros) : null;
 
-// Ahora usas $adicional en tu consulta INSERT o UPDATE
+    $adicional = $_POST['adicional'] ?? '';
+
+    $vigente = isset($_POST['vigente']) ? 1 : 0;
+
+    if ($adicional !== null) {
+        json_decode($adicional);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $_SESSION['error'] = 'El formato de parámetros adicionales no es válido.';
+            header('Location: tu_formulario_edicion.php?id=' . $id);
+            exit;
+        }
+    }
+
+
     try {
         $stmt = $pdo->prepare("UPDATE examenes SET 
             codigo = ?, nombre = ?, descripcion = ?, area = ?, metodologia = ?, tiempo_respuesta = ?, 
