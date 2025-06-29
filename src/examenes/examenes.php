@@ -75,12 +75,7 @@ function capitalizar($texto)
                             </td>
                             <td>
                                 <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                                <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este examen?');">Eliminar</a>
-                                <a href="dashboard.php?vista=vista_editar_formato&id=<?= $examen['id'] ?>" class="btn btn-outline-primary btn-sm">
-                                    <i class="bi bi-pencil-square"></i> Editar formato
-                                </a>
-
-
+                                <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este examen?');">Eliminar</a>                                
                             </td>
                         </tr>
                     <?php endforeach; ?>

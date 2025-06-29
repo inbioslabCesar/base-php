@@ -40,8 +40,8 @@ require_once __DIR__ . '/../../config/config.php';
 
         </div>
         <div class="col-md-3 mb-3">
-            <a href="dashboard.php?vista=format" class="btn btn-outline-primary mb-3">
-                <i class="bi bi-gear-fill"></i> Constructor
+            <a href="dashboard.php?vista=listado" class="btn btn-primary mb-3">
+                Gestionar resultados
             </a>
 
         </div>

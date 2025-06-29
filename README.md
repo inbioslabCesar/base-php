@@ -527,3 +527,82 @@ cotizaciones: Registra las cotizaciones realizadas, incluyendo referencias a cli
 promociones: Permite gestionar promociones activas, con campos para títulos, descripciones, imágenes, descuentos y vigencia.
 examenes: Contiene los datos de los exámenes disponibles, con información técnica y comercial relevante.
 Cada tabla puede servir como base para módulos específicos (clientes, cotizaciones, promociones, exámenes, etc.).
+
+
+
+
+
+
+----modulo reporte resultados----
+Flujo recomendado para el módulo de resultados
+Cotización: El cliente/recepcionista cotiza uno o más exámenes.
+Asignación: Cada examen cotizado queda pendiente de resultado en una nueva tabla (ej. resultados_examenes).
+Laboratorista: Desde su panel, ve una lista de exámenes pendientes (usando DataTable) y puede ingresar resultados.
+Guardado: El laboratorista guarda los resultados (vía AJAX) en la tabla resultados_examenes.
+Visualización: Cliente y recepcionista pueden ver los resultados completados en sus respectivos paneles.
+Archivos sugeridos en /src/resultados/
+listado.php
+Vista principal con DataTable para mostrar exámenes pendientes/completados según el rol.
+
+formulario.php
+Formulario para que el laboratorista ingrese o edite resultados de un examen específico.
+
+guardar.php
+Script PHP que recibe los datos (vía AJAX) y guarda los resultados en la base de datos.
+
+ver.php
+Vista para mostrar los resultados a cliente/recepcionista, en formato tabla agradable.
+
+api_listado.php
+Endpoint PHP que devuelve los exámenes/resultados en formato JSON para DataTable (AJAX).
+
+js/resultados.js
+Archivo JavaScript para manejar AJAX, inicializar DataTables, validaciones y acciones dinámicas.
+
+Estructura de archivos sugerida
+/src/resultados/
+    listado.php
+    formulario.php
+    guardar.php
+    ver.php
+    api_listado.php
+    js/
+        resultados.js
+
+Recomendaciones adicionales
+Usa Bootstrap 5 en todas las vistas para asegurar el diseño responsive.
+Implementa DataTable para la visualización y filtrado eficiente de exámenes/resultados.
+Utiliza AJAX para guardar y consultar resultados sin recargar la página.
+Separa la lógica PHP (backend) de la presentación (frontend) y los scripts JS.
+Aplica validaciones tanto en el frontend (JS) como en el backend (PHP).
+Prueba en móvil y tablet para asegurar la experiencia responsive.
+
+
+Usa includes o templates para la cabecera y pie en las vistas PHP, centralizando el HTML común.
+Realiza las validaciones de datos en JS antes de enviar el formulario y, nuevamente, en PHP al recibir los datos.
+Aprovecha las herramientas de desarrollo del navegador para probar el diseño en diferentes dispositivos.
+Considera utilizar clases o funciones reutilizables para manejar respuestas y errores en el backend.
+Documenta cada archivo y función para facilitar el mantenimiento futuro.
+
+dashboard.php análisis de tu enfoque:
+
+Usas control de sesiones y roles desde el inicio, asegurando que solo usuarios autenticados y con el rol correcto accedan al dashboard.
+La lógica de permisos está bien organizada en arrays asociativos, tanto para acciones como para vistas, lo que facilita la gestión y escalabilidad.
+Implementas includes para componentes comunes (header, sidebar, footer), separando la presentación del contenido dinámico.
+Los mensajes de éxito o error se gestionan mediante variables de sesión, mostrando alertas limpias y eliminando los mensajes después de mostrarlos.
+Todo el flujo está orientado a la seguridad y claridad, mostrando alertas cuando se intenta acceder a acciones o vistas no autorizadas.
+En resumen, tu código es modular, seguro y fácil de mantener, siguiendo buenas prácticas de control de acceso y reutilización de componentes.
+
+Analizando tu tabla examenes:
+
+Tienes una estructura muy completa, cubriendo datos clave como código, nombre, área, metodología, tiempos y precios.
+El campo adicional de tipo JSON es un gran acierto: te permite almacenar información flexible y personalizada para cada examen, como parámetros específicos, rangos de referencia, instrucciones extra, etc.
+Usar JSON facilita futuras ampliaciones sin modificar la estructura de la tabla, ideal para laboratorios donde los exámenes pueden variar mucho.
+El resto de los campos cubre tanto la parte técnica como la operativa y comercial del examen.
+Los tipos de datos elegidos (int, varchar, text, decimal, json) son apropiados para cada campo.
+
+sql para traer solo los nombres de la coumnas de una tablas
+SELECT COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'laboratorio'
+  AND TABLE_NAME = 'examenes';

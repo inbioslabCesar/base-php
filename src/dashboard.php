@@ -1,16 +1,13 @@
 <?php
-
-if (isset($_GET['action']) && $_GET['action'] === 'guardar_cotizacion_recepcionista') {
-    echo '<pre>';
-    var_dump($_POST);
-    echo '</pre>';
-    // ... resto del código ...
-}
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/config/config.php';
+
+if (isset($_GET['action']) && $_GET['action'] === 'guardar_cotizacion_recepcionista') {
+   }
+
+
 date_default_timezone_set('America/Lima');
 
 if (!isset($_SESSION['rol'])) {
@@ -19,10 +16,10 @@ if (!isset($_SESSION['rol'])) {
 }
 
 $acciones_por_rol = [
-    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'guardar_constructor', 'guardar_edicion_parametros', 'editar_formato'],
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado'],
 
-    'laboratorista' => [],
-    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda'],
+    'laboratorista' => ['api_listado'],
+    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado'],
     'empresa' => ['crear_cotizacion'],
     'cliente' => ['crear_cotizacion', 'procesar_agenda'],
     'convenio' => ['crear_cotizacion']
@@ -53,9 +50,10 @@ $acciones = [
     'buscar_examenes_recepcionista' => __DIR__ . '/examenes/buscar_examenes_recepcionista.php',
     'config_empresa_guardar' => __DIR__ . '/config/config_empresa_guardar.php',
     'procesar_agenda' => __DIR__ . '/cotizaciones/procesar_agenda.php',
-    'guardar_constructor' => __DIR__ . '/examenes/guardar_constructor.php',
-    'guardar_edicion_parametros' => __DIR__ . '/examenes/guardar_edicion_parametros.php',
-    'editar_formato' => __DIR__ . '/examenes/editar_formato.php'
+    'api_listado' => __DIR__ . '/resultados/api_listado.php',
+    'formulario' => __DIR__ . '/resultados/formulario.php',
+    'guardar' => __DIR__ . '/resultados/guardar.php',
+    'ver' => __DIR__ . '/resultados/ver.php'
 ];
 
 $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
@@ -83,10 +81,10 @@ if (isset($_SESSION['mensaje'])) {
 }
 // Lista de vistas permitidas por rol
 $acceso_por_rol = [
-    'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'config_empresa_datos', 'agendar_cita', 'constructor', 'editar_parametros', 'format','vista_editar_formato'],
+    'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'config_empresa_datos', 'agendar_cita', 'listado'],
 
-    'laboratorista' => [],
-    'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'agendar_cita'],
+    'laboratorista' => ['listado'],
+    'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'agendar_cita', 'listado'],
     'empresa' => ['empresa'],
     'cliente' => ['clientes', 'cliente', 'cotizaciones', 'form_cotizacion', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'cotizaciones_clientes', 'agendar_cita'],
     'convenio' => ['convenio']
@@ -121,10 +119,7 @@ $vistas = [
     'cotizaciones_clientes' => __DIR__ . '/cotizaciones/cotizaciones_clientes.php',
     'agendar_cita' => __DIR__ . '/cotizaciones/agendar_cita.php',
     'ver_cotizacion' => __DIR__ . '/cotizaciones/ver_cotizacion.php',
-    'constructor' => __DIR__ . '/examenes/constructor.php',
-    'editar_parametros' => __DIR__ . '/examenes/editar_parametros.php',
-    'format' => __DIR__ . '/examenes/format.php',
-    'vista_editar_formato' => __DIR__ . '/examenes/vista_editar_formato.php'
+    'listado' => __DIR__ . '/resultados/listado.php',
 ];
 
 // Obtener rol y vista

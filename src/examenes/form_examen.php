@@ -1,4 +1,7 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../conexion/conexion.php';
 
 function capitalizar($texto)
@@ -24,6 +27,7 @@ $examen = [
     'vigente' => 1
 ];
 
+$adicional_array = [];
 if ($esEdicion) {
     $stmt = $pdo->prepare("SELECT * FROM examenes WHERE id = ?");
     $stmt->execute([$_GET['id']]);
@@ -34,7 +38,6 @@ if ($esEdicion) {
         header('Location: dashboard.php?vista=examenes');
         exit;
     }
-    // Supón que ya tienes $row con los datos del examen
     $adicional = $examen['adicional'] ?? '';
     $adicional_array = $adicional ? json_decode($adicional, true) : [];
 }
@@ -42,7 +45,8 @@ if ($esEdicion) {
 
 <div class="container mt-4">
     <h2><?= $esEdicion ? 'Editar Examen' : 'Agregar Examen' ?></h2>
-    <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_examen&id=' . htmlspecialchars($_GET['id']) : 'crear_examen' ?>">
+    <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_examen&id=' . htmlspecialchars($_GET['id']) : 'crear_examen' ?>" id="form-examen">
+        <!-- Campos básicos -->
         <div class="mb-3">
             <label for="codigo" class="form-label">Código *</label>
             <input type="text" class="form-control" id="codigo" name="codigo" required
@@ -103,22 +107,50 @@ if ($esEdicion) {
             <input class="form-check-input" type="checkbox" id="vigente" name="vigente" value="1" <?= ($examen['vigente'] ?? 1) ? 'checked' : '' ?>>
             <label class="form-check-label" for="vigente">Examen Vigente</label>
         </div>
-        <div id="builder"></div>
-        <input type="hidden" name="adicional" id="adicional">
-        <button type="submit" class="btn btn-primary"><?= $esEdicion ? 'Actualizar' : 'Agregar' ?></button>
+
+        <!-- Builder visual para parámetros adicionales -->
+        <h4>Parámetros del Examen</h4>
+        <table class="table table-bordered table-editable" id="formatTable">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Metodología</th>
+                    <th>Unidad</th>
+                    <th>Opciones</th>
+                    <th>Valor(es) Referencia</th>
+                    <th>Fórmula</th>
+                    <th>Negrita</th>
+                    <th>Color texto</th>
+                    <th>Color fondo</th>
+                    <th>Orden</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Filas dinámicas -->
+            </tbody>
+        </table>
+        <input type="hidden" id="adicional" name="adicional">
+        <button id="addRow" class="btn btn-success mb-2" type="button">Agregar Fila</button>
+        <h4>Vista Previa en Tiempo Real</h4>
+        <div id="preview" class="border p-3"></div>
+
+        <!-- Acciones -->
+        <button class="btn btn-primary mt-3" type="submit" id="saveFormat"><?= $esEdicion ? 'Actualizar' : 'Agregar' ?></button>
         <a href="dashboard.php?vista=examenes" class="btn btn-secondary">Cancelar</a>
     </form>
-    
 </div>
+
+<script src="/base-php/src/examenes/format-builder.js"></script>
 <script>
+    // Cargar datos al editar
     var datosAdicionales = <?php echo json_encode($adicional_array, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-   document.addEventListener("DOMContentLoaded", function() {
-    if (typeof datosAdicionales !== "undefined" && Array.isArray(datosAdicionales)) {
-        datosAdicionales.forEach(function(parametro) {
-            addRow(parametro);
-        });
-    }
-});
-
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof datosAdicionales !== "undefined" && Array.isArray(datosAdicionales) && datosAdicionales.length > 0) {
+            datosAdicionales.forEach(function(parametro) {
+                addRow(parametro);
+            });
+        }
+    });
 </script>
-

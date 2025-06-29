@@ -1,5 +1,0 @@
-Array
-(
-    [vista] => ver_cotizacion
-    [id] => 111
-)
