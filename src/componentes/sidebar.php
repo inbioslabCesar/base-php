@@ -1,3 +1,7 @@
+<?php
+require_once __DIR__ . '/../auth/empresa_config.php';
+?>
+
 <!-- Sidebar fijo en md+ y offcanvas en móvil -->
 <aside>
     <div class="d-none d-md-block bg-light shadow h-100 position-fixed" style="width:250px; min-height:100vh; z-index:1030;">
@@ -22,7 +26,7 @@
             <?php endif; ?>
             <a class="nav-link mt-3" href="<?= BASE_URL ?>auth/logout.php"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a>
         </nav>
-        <div class="text-center text-muted small py-2">© <?= date('Y') ?> inbioslab</div>
+        <div class="text-center text-muted small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
     </div>
     <!-- Offcanvas para móvil -->
     <div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebarToggle" aria-labelledby="sidebarToggleLabel">
@@ -53,7 +57,7 @@
                 <?php endif; ?>
                 <a class="nav-link mt-3" href="<?= BASE_URL ?>auth/logout.php"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a>
             </nav>
-            <div class="text-center text-muted small py-2">© <?= date('Y') ?> inbioslab</div>
+            <div class="text-center text-muted small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
         </div>
     </div>
 

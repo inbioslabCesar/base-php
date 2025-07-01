@@ -57,6 +57,18 @@ $logo = !empty($empresa['logo']) ? $empresa['logo'] : 'images/inbioslab-logo.png
                 <label for="logo" class="form-label">Actualizar logo (PNG):</label>
                 <input type="file" class="form-control" id="logo" name="logo" accept="image/png">
             </div>
+            <div class="col-md-12 mb-3 text-center">
+                <label class="form-label fw-bold">Firma actual:</label><br>
+                <img id="firma-actual"
+                    src="<?= htmlspecialchars($empresa['firma'] ?? 'images/empresa/firma.png') ?>?v=<?= time() ?>"
+                    alt="Firma de la empresa"
+                    style="max-height: 80px;">
+            </div>
+            <div class="col-md-12 mb-3">
+                <label for="firma" class="form-label">Actualizar firma (PNG):</label>
+                <input type="file" class="form-control" id="firma" name="firma" accept="image/png">
+            </div>
+
         </div>
         <button type="submit" class="btn btn-success">Guardar</button>
     </form>

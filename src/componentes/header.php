@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../auth/empresa_config.php';
+
 $nombreUsuario = $_SESSION['usuario'] ?? 'Usuario';
 
 // Convierte solo la primera letra en mayúscula, el resto en minúscula
@@ -9,7 +12,7 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 
 <head>
     <meta charset="UTF-8">
-    <title>Panel de Administración - Inbioslab</title>
+    <title>Panel de Administración - <?= htmlspecialchars($config['nombre']) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -17,6 +20,9 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
     <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <style>
         .sidebar-custom {
             background: #143a51;
@@ -129,7 +135,8 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
     <header class="bg-white shadow-sm mb-3 position-relative" style="z-index: 1050;">
         <div class="container-fluid d-flex align-items-center justify-content-between py-2">
             <div class="d-flex align-items-center">
-                <img src="<?= BASE_URL ?>images/inbioslab-logo.png" alt="Inbioslab Logo" style="height:74px; margin-right:24px;">
+                <img src="../src/<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:74px; margin-right:24px;">
+                
                 <span class="fw-bold" style="font-size:1.3rem;">
                     Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!
                 </span>

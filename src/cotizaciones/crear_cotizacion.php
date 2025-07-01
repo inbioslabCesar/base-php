@@ -5,10 +5,6 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../conexion/conexion.php';
 
-// Justo al principio, después de session_start() y require_once...
-$id_cliente = $_POST['id_cliente'] ?? null;
-
-
 // Validar sesión de usuario
 if (!isset($_SESSION['rol'])) {
     echo '<div class="alert alert-danger">Sesión expirada. Vuelve a iniciar sesión.</div>';
@@ -16,6 +12,7 @@ if (!isset($_SESSION['rol'])) {
 }
 
 // Recibir datos del formulario
+$id_cliente = $_POST['id_cliente'] ?? null;
 $examenes = $_POST['examenes'] ?? [];
 $cantidades = $_POST['cantidades'] ?? [];
 $fecha = date('Y-m-d H:i:s');
@@ -47,7 +44,7 @@ foreach ($promos as $promo) {
     $promo_map[$promo['examen_id']] = $promo;
 }
 
-// Procesar cada examen
+// Procesar cada examen y calcular totales
 for ($i = 0; $i < count($examenes); $i++) {
     $examen_id = (int)$examenes[$i];
     $cantidad = (int)$cantidades[$i];
@@ -113,10 +110,9 @@ $stmt->execute([
     $_POST['direccion_toma'] ?? null
 ]);
 
-
 $id_cotizacion = $pdo->lastInsertId();
 
-// Insertar detalles
+// Insertar detalles de la cotización
 $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
 foreach ($detalles as $detalle) {
     $stmt->execute([
@@ -129,15 +125,21 @@ foreach ($detalles as $detalle) {
     ]);
 }
 
+// Insertar en resultados_examenes para cada examen cotizado
+foreach ($detalles as $detalle) {
+    $id_examen = $detalle['id_examen'];
+    $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
+    $stmtRes = $pdo->prepare($sql);
+    $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+}
 $rol = $_SESSION['rol'] ?? null;
 
-if ($_SESSION['rol'] == 'cliente') {
+// Redirigir según el rol
+if ($rol == 'cliente' || $rol == 'recepcionista') {
     header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
     exit;
-} elseif ($_SESSION['rol'] == 'recepcionista') {
-    header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
-    exit;
-} 
+}
 
+// Puedes agregar otros roles o una redirección por defecto si es necesario
+header("Location: dashboard.php?vista=cotizaciones");
 exit;
-

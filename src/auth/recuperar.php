@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/empresa_config.php';
 
 $mensaje = '';
 $alerta_tipo = 'info';
@@ -43,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Recuperar Contraseña - INBIOSLAB LABORATORIO CLÍNICO</title>
+    <title>Recuperar Contraseña - <?= htmlspecialchars($config['nombre']) ?> LABORATORIO CLÍNICO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -65,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endfor; ?>
     </div>
     <div class="login-box mt-5 shadow">
-        <img src="../images/inbioslab-logo.png" alt="INBIOSLAB" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Recuperar Contraseña</h4>
         <?php if (!empty($mensaje)): ?>
             <div class="alert alert-<?= $alerta_tipo ?>"><?= $mensaje ?></div>

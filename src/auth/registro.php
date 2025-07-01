@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/empresa_config.php';
 
 $mensaje_error = '';
 $mensaje_exito = '';
@@ -39,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Registro - INBIOSLAB LABORATORIO CLÍNICO</title>
+    <title>Registro - <?= htmlspecialchars($config['nombre']) ?> LABORATORIO CLÍNICO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -63,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <!-- Formulario de registro -->
     <div class="login-box mt-5 shadow">
-        <img src="../images/inbioslab-logo.png" alt="INBIOSLAB" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Registro de Cliente</h4>
         <?php if (!empty($mensaje_error)): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($mensaje_error) ?></div>

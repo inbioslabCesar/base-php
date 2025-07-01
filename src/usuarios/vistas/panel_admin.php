@@ -40,7 +40,7 @@ require_once __DIR__ . '/../../config/config.php';
 
         </div>
         <div class="col-md-3 mb-3">
-            <a href="dashboard.php?vista=listado" class="btn btn-primary mb-3">
+            <a href="dashboard.php?vista=formulario" class="btn btn-primary mb-3">
                 Gestionar resultados
             </a>
 

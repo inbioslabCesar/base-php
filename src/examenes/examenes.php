@@ -63,7 +63,7 @@ function capitalizar($texto)
                                                 <strong>Tipo de Muestra:</strong> <?= htmlspecialchars($examen['tipo_muestra'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
                                                 <strong>Tipo de Tubo:</strong> <?= htmlspecialchars($examen['tipo_tubo'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
                                                 <strong>Observaciones:</strong> <?= nl2br(htmlspecialchars($examen['observaciones'] ?? '', ENT_QUOTES, 'UTF-8')) ?><br>
-                                                <strong>Adicional:</strong> <?= nl2br(htmlspecialchars($examen['adicional'] ?? '', ENT_QUOTES, 'UTF-8')) ?><br>
+                                                <!-- Aqui iba el campo adicional -->
                                                 <strong>Vigente:</strong> <?= isset($examen['vigente']) && $examen['vigente'] ? 'Sí' : 'No' ?><br>
                                             </div>
                                             <div class="modal-footer">

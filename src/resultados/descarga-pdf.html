@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Reporte de Resultados</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <style>
+      body {
+        background: #fff;
+        color: #222;
+        font-family: Arial, sans-serif;
+        padding: 40px 0;
+        font-size: 13px;
+      }
+      .reporte-box {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 950px; /* Ajusta el alto según tu necesidad */
+        background: #fff;
+        border-radius: 12px;
+        max-width: 900px;
+        margin: auto;
+        padding: 16px 40px 32px 40px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+        font-size: 13px;
+      }
+      .logo {
+        height: 120px;
+        margin-bottom: 0;
+        margin-top: -10px;
+      }
+      .datos-cliente {
+        font-size: 0.95rem;
+        color: #444;
+        margin-bottom: 12px;
+      }
+      .titulo-reporte {
+        font-size: 1.3rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 26px;
+        color: #1a237e;
+        background: none;
+      }
+      .table.no-borders,
+      .table.no-borders th,
+      .table.no-borders td {
+        border: none !important;
+      }
+      .table th {
+        background: #f4f6fa;
+        color: #333;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .table td {
+        font-size: 12px;
+      }
+      .referencia-list {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 0.97em;
+        color: #222;
+      }
+      .fuera-rango {
+        color: #d32f2f;
+        font-weight: bold;
+      }
+      .empresa-info {
+        font-size: 12px;
+        text-align: right;
+        color: #444;
+        line-height: 1.4;
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background: #fff;
+          padding: 0;
+          font-size: 11px;
+        }
+        .reporte-box {
+          box-shadow: none;
+          border: none;
+          margin: 0;
+          padding: 0;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reporte-box" id="reporte-pdf">
+      <!-- Contenido principal superior -->
+      <div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <img
+            id="logo-empresa"
+            src="../images/empresa/logo_empresa.png"
+            alt="Logo Empresa"
+            class="logo"
+          />
+          <div class="empresa-info" id="empresa-info"></div>
+        </div>
+
+        <!-- Espacio entre logo/empresa y datos del paciente -->
+        <div class="row mb-2 mt-4 datos-cliente" id="datos-cliente"></div>
+
+        <!-- Título entre datos del paciente y la tabla -->
+        <div class="titulo-reporte">Reporte de Resultados</div>
+
+        <!-- Tabla de resultados -->
+        <table class="table no-borders" style="margin-top: 10px">
+          <thead>
+            <tr>
+              <th>Prueba</th>
+              <th>Metodología</th>
+              <th>Resultado</th>
+              <th>Unidades</th>
+              <th>Valores de Referencia</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-resultados">
+            <!-- Los resultados se cargarán aquí vía JS -->
+          </tbody>
+        </table>
+
+        <button id="btn-descargar-pdf" class="btn btn-primary mt-4 no-print">
+          <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
+        </button>
+      </div>
+      <!-- Pie de página siempre abajo -->
+      <div>
+        <div class="d-flex justify-content-end align-items-end mt-4">
+          <img
+            id="firma-empresa"
+            src="../images/empresa/firma.png"
+            alt="Firma y sello"
+            style="height: 80px"
+          />
+        </div>
+        <hr class="my-3" />
+        <div style="font-size: 12px; color: #444">
+          <div>(L) Laboratorio de Referencia</div>
+          <div>* Resultados fuera de los rangos referenciales</div>
+          <div>** Muestra remitida por un laboratorio externo con convenio</div>
+        </div>
+      </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script>
+  // Capitaliza la primera letra
+  function capitalizarPrimeraLetra(texto) {
+    if (!texto) return "";
+    return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+  }
+
+  // Función de validación por contexto (sexo, edad, semana, ciclo, etc.)
+  function resultadoFueraDeRango(valor, referencias, contexto = {}) {
+    if (!valor || !referencias || !Array.isArray(referencias) || referencias.length === 0)
+      return false;
+    let num = parseFloat(valor);
+
+    // Filtra referencias según contexto
+    let referenciasFiltradas = referencias.filter(ref => {
+      if (typeof ref !== "object" || !ref.desc) return false;
+      let desc = ref.desc.toLowerCase();
+
+      if (contexto.sexo && desc.includes(contexto.sexo.toLowerCase())) return true;
+      if (contexto.ciclo && desc.includes(contexto.ciclo.toLowerCase())) return true;
+      if (contexto.semana && desc.includes(contexto.semana.toLowerCase())) return true;
+      if (contexto.etapa && desc.includes(contexto.etapa.toLowerCase())) return true;
+      if (contexto.edad && /\d+\s*-\s*\d+/.test(desc)) {
+        let match = desc.match(/(\d+)\s*-\s*(\d+)/);
+        if (match) {
+          let min = parseInt(match[1]);
+          let max = parseInt(match[2]);
+          if (contexto.edad >= min && contexto.edad <= max) return true;
+        }
+      }
+      return false;
+    });
+
+    // Si hay referencias filtradas, solo valida contra ellas
+    if (referenciasFiltradas.length > 0) {
+      for (let ref of referenciasFiltradas) {
+        let val = ref.valor.replace(/[()]/g, "").trim();
+        if (val.includes("-")) {
+          let [min, max] = val.split("-").map((x) => parseFloat(x));
+          if (!isNaN(min) && !isNaN(max) && num >= min && num <= max) return false;
+        } else if (val.includes("<")) {
+          let max = parseFloat(val.replace("<", ""));
+          if (!isNaN(max) && num < max) return false;
+        } else if (val.includes(">")) {
+          let min = parseFloat(val.replace(">", ""));
+          if (!isNaN(min) && num > min) return false;
+        }
+      }
+      return true; // Si no entra en ningún rango válido, está fuera de rango
+    }
+
+    // Si no hay referencias filtradas (por contexto), no se marca como fuera de rango
+    return false;
+  }
+
+  // Obtener parámetros de la URL
+  function getParameterByName(name) {
+    const url = window.location.href;
+    name = name.replace(/[\[\]]/g, "\\$&");
+    const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+    const results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return "";
+    return decodeURIComponent(results[2].replace(/\+/g, " "));
+  }
+  const id = getParameterByName("id");
+  // Datos por defecto de la empresa (se pueden sobrescribir si el backend los envía)
+  const empresa = {
+    direccion: "Av. Siempre Viva 123, Ciudad",
+    telefono: "123-456789",
+    celular: "987-654321"
+  };
+
+  $(document).ready(function () {
+    // Mostrar info de la empresa
+    $("#empresa-info").html(
+      `<strong>Dirección:</strong> ${empresa.direccion}<br>
+       <strong>Teléfono:</strong> ${empresa.telefono}<br>
+       <strong>Celular:</strong> ${empresa.celular}`
+    );
+
+    // AJAX para obtener los datos del reporte
+    $.ajax({
+      url: "descarga-pdf.php",
+      method: "GET",
+      data: { id: id },
+      dataType: "json",
+      success: function (data) {
+        // Actualizar logo, firma y empresa si el backend los envía
+        if (data.empresa) {
+          if (data.empresa.logo)
+            $("#logo-empresa").attr("src", data.empresa.logo);
+          if (data.empresa.firma)
+            $("#firma-empresa").attr("src", data.empresa.firma);
+          if (data.empresa.direccion)
+            empresa.direccion = data.empresa.direccion;
+          if (data.empresa.telefono)
+            empresa.telefono = data.empresa.telefono;
+          if (data.empresa.celular)
+            empresa.celular = data.empresa.celular;
+          $("#empresa-info").html(
+            `<strong>Dirección:</strong> ${empresa.direccion}<br>
+             <strong>Teléfono:</strong> ${empresa.telefono}<br>
+             <strong>Celular:</strong> ${empresa.celular}`
+          );
+        }
+
+        // Mostrar datos del paciente
+        $("#datos-cliente").html(`
+          <div class="col-6">
+            <strong>Paciente:</strong> ${data.paciente.nombre || ""} <br>
+            <strong>Código Cliente:</strong> ${data.paciente.codigo_cliente || ""} <br>
+            <strong>DNI:</strong> ${data.paciente.dni || ""} <br>
+          </div>
+          <div class="col-6">
+            <strong>Edad:</strong> ${data.paciente.edad || ""} <br>
+            <strong>Sexo:</strong> ${capitalizarPrimeraLetra(data.paciente.sexo || "")} <br>
+            <strong>Fecha:</strong> ${data.paciente.fecha || ""}
+          </div>
+        `);
+
+        // Llenar la tabla de resultados
+        let filas = "";
+        data.resultados.forEach(function (r) {
+          let refHTML = "";
+          let referencias = [];
+          // Si referencias es un array de objetos {desc, valor}
+          if (Array.isArray(r.referencia)) {
+            referencias = r.referencia;
+            refHTML = '<ul class="referencia-list">';
+            r.referencia.forEach(function (ref) {
+              if (typeof ref === "object" && ref.desc)
+                refHTML += `<li><strong>${ref.desc}:</strong> ${ref.valor}</li>`;
+              else
+                refHTML += `<li>${ref.valor || ref}</li>`;
+            });
+            refHTML += "</ul>";
+          } else {
+            // Si es un solo valor
+            if (r.referencia) referencias = [r.referencia];
+            refHTML = r.referencia;
+          }
+
+          // Prepara el contexto para cada resultado (puedes agregar más campos según tu necesidad)
+          let contexto = {
+            sexo: data.paciente.sexo,
+            edad: data.paciente.edad,
+            // semana: r.semanaSeleccionada, // Descomenta si tienes este dato
+            // ciclo: r.cicloSeleccionado,   // Descomenta si tienes este dato
+            // etapa: r.etapaSeleccionada    // Descomenta si tienes este dato
+          };
+
+          // Verifica si el resultado es numérico
+          let esNumerico = !isNaN(parseFloat(r.resultado)) && isFinite(r.resultado);
+
+          // Solo aplica fuera de rango si es numérico
+          let fueraRango = false;
+          if (esNumerico) {
+            fueraRango = resultadoFueraDeRango(r.resultado, referencias, contexto);
+          }
+
+          filas += `<tr>
+            <td>${r.prueba}</td>
+            <td>${r.metodologia}</td>
+            <td${fueraRango ? ' class="fuera-rango"' : ""}>${r.resultado}${fueraRango ? " *" : ""}</td>
+            <td>${r.unidades}</td>
+            <td>${refHTML}</td>
+          </tr>`;
+        });
+
+        $("#tabla-resultados").html(filas);
+      },
+      error: function () {
+        alert("No se pudo cargar el reporte. Intenta nuevamente.");
+      },
+    });
+
+    // Descargar el reporte como PDF (oculta el botón en PDF)
+    $("#btn-descargar-pdf").click(function () {
+      var element = document.getElementById("reporte-pdf");
+      var btn = document.getElementById("btn-descargar-pdf");
+      btn.style.display = "none";
+      var opt = {
+        margin: 0.5,
+        filename: "reporte-resultados.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+      };
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(function () {
+          btn.style.display = "";
+        });
+    });
+  });
+</script>
+
+  </body>
+</html>

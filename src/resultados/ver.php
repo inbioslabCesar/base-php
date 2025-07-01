@@ -4,51 +4,46 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-
-// Consulta el resultado de examen
-$sql = "SELECT re.*, e.nombre AS nombre_examen, c.nombre AS nombre_cliente
-        FROM resultados_examenes re
-        JOIN examenes e ON re.id_examen = e.id
-        JOIN clientes c ON re.id_cliente = c.id
-        WHERE re.id = ?";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$res = $stmt->get_result();
-$resultado = $res->fetch_assoc();
-
-if (!$resultado) {
-    echo "<div class='alert alert-danger'>No se encontró el registro.</div>";
-    exit;
+// Mostrar mensaje de éxito si existe
+if (isset($_SESSION['mensaje'])) {
+    echo '<div class="alert alert-success">' . htmlspecialchars($_SESSION['mensaje']) . '</div>';
+    unset($_SESSION['mensaje']);
 }
 
-// Decodifica los resultados (si existen)
-$valores = [];
-if (!empty($resultado['resultados'])) {
-    $valores = json_decode($resultado['resultados'], true);
+// Obtener IDs de la URL
+$id_resultado = $_GET['id_resultado'] ?? null;
+$id_examen = $_GET['id_examen'] ?? null;
+
+if ($id_resultado && $id_examen) {
+    // Obtener resultados guardados
+    $sql = "SELECT resultados FROM resultados_examenes WHERE id = ? AND id_examen = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id_resultado, $id_examen]);
+    $resultados_json = $stmt->fetchColumn();
+
+    // Obtener parámetros del examen
+    $sql2 = "SELECT adicional FROM examenes WHERE id = ?";
+    $stmt2 = $pdo->prepare($sql2);
+    $stmt2->execute([$id_examen]);
+    $adicional_json = $stmt2->fetchColumn();
+
+    $parametros = $adicional_json ? json_decode($adicional_json, true) : [];
+    $resultados = $resultados_json ? json_decode($resultados_json, true) : [];
+
+    echo "<h4>Resultados guardados</h4>";
+    echo "<table class='table table-bordered'>";
+    echo "<thead><tr><th>Parámetro</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody>";
+    foreach ($parametros as $param) {
+        if ($param['tipo'] === 'Parámetro') {
+            $nombre = htmlspecialchars($param['nombre']);
+            $unidad = htmlspecialchars($param['unidad']);
+            $referencia = isset($param['referencias'][0]['valor']) ? htmlspecialchars($param['referencias'][0]['valor']) : '';
+            $valor = isset($resultados[$nombre]) ? htmlspecialchars($resultados[$nombre]) : '-';
+            echo "<tr><td>$nombre</td><td>$valor</td><td>$unidad</td><td>$referencia</td></tr>";
+        }
+    }
+    echo "</tbody></table>";
+} else {
+    echo '<div class="alert alert-warning">No se encontraron resultados para mostrar.</div>';
 }
 ?>
-
-<div class="container">
-    <h3>Resultados de <?= htmlspecialchars($resultado['nombre_examen']) ?> - Cliente: <?= htmlspecialchars($resultado['nombre_cliente']) ?></h3>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Parámetro</th>
-                <th>Valor</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php
-        foreach ($valores as $param => $valor) {
-            echo '<tr>';
-            echo '<td>' . htmlspecialchars($param) . '</td>';
-            echo '<td>' . htmlspecialchars($valor) . '</td>';
-            echo '</tr>';
-        }
-        ?>
-        </tbody>
-    </table>
-    <a href="listado.php" class="btn btn-secondary">Volver al listado</a>
-</div>

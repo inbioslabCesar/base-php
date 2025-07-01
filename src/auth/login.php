@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../clases/Auth.php';
+require_once __DIR__ . '/empresa_config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -44,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['empresa_id'] = $empresa['id'];
         $_SESSION['rol'] = 'empresa';
 
-        header('Location: ../dashboard.php?vista=empresa');
+        header('Location: dashboard.php?vista=empresa');
         exit;
     }
 
@@ -80,33 +81,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Iniciar Sesión | INBIOSLAB</title>
+    <title>Iniciar Sesión | <?= htmlspecialchars($config['nombre']) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Bootstrap y estilos -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- CSS general de autenticación -->
+    <link rel="stylesheet" href="../styles/auth.css">
     <style>
-        /* Estilos personalizados y animaciones aquí */
-        body {
-            background: #f5f6fa;
-        }
-        .login-container {
+        .login-box {
             max-width: 400px;
             margin: 60px auto;
             padding: 30px 40px;
             background: #fff;
             border-radius: 12px;
             box-shadow: 0 0 16px rgba(0,0,0,0.08);
+            position: relative;
+            z-index: 2;
+        }
+        .logo-img {
+            width: 120px;
+            display: block;
+            margin: 0 auto 12px auto;
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h2 class="mb-4 text-center">INBIOSLAB | Iniciar Sesión</h2>
+    <!-- Fondo de burbujas -->
+    <div class="bubbles">
+        <?php for ($i = 0; $i < 18; $i++): ?>
+            <div class="bubble"
+                style="
+                    left: <?= rand(0, 98) ?>vw;
+                    width: <?= rand(30, 80) ?>px;
+                    height: <?= rand(30, 80) ?>px;
+                    animation-delay: <?= rand(0, 18) ?>s;
+                    background: rgba(<?= rand(180,255) ?>,<?= rand(180,255) ?>,255,0.07);
+                ">
+            </div>
+        <?php endfor; ?>
+    </div>
+
+    <div class="login-box mt-5 shadow">
+        <!-- Logo y nombre dinámicos -->
+        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
+        <h4 class="text-center mb-3">Iniciar Sesión</h4>
         <?php if (!empty($_SESSION['mensaje'])): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($_SESSION['mensaje']) ?></div>
             <?php unset($_SESSION['mensaje']); ?>
@@ -120,12 +142,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="password" class="form-label">Contraseña</label>
                 <input type="password" class="form-control" id="password" name="password" required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+            <button type="submit" class="btn btn-primary w-100 mb-2">Ingresar</button>
+            <div class="d-flex justify-content-between">
+                <a href="registro.php" class="small">¿No tienes cuenta? Regístrate</a>
+                <a href="recuperar.php" class="small">¿Olvidaste tu contraseña?</a>
+            </div>
         </form>
-        <div class="mt-3 text-center">
-            <a href="registro.php">¿No tienes cuenta? Regístrate</a> <br>
-            <a href="recuperar.php">¿Olvidaste tu contraseña?</a>
-        </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

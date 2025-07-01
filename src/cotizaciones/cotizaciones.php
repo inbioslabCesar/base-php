@@ -4,26 +4,6 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 
-// Filtro por DNI (si se envía por GET o POST)
-$dniFiltro = trim($_GET['dni'] ?? '');
-
-// Consulta base
-$sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
-        FROM cotizaciones c
-        JOIN clientes cl ON c.id_cliente = cl.id";
-
-// Si hay filtro, aplica WHERE por DNI
-$params = [];
-if ($dniFiltro !== '') {
-    $sql .= " WHERE cl.dni = ?";
-    $params[] = $dniFiltro;
-}
-$sql .= " ORDER BY c.id DESC";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
 // Botón según rol
 $rol = $_SESSION['rol'] ?? '';
 $botonTexto = '';
@@ -35,8 +15,45 @@ if ($rol === 'cliente') {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=clientes';
 }
-?>
 
+// Filtro por DNI (si se envía por GET o POST)
+$dniFiltro = trim($_GET['dni'] ?? '');
+
+// Consulta base
+$sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
+        FROM cotizaciones c
+        JOIN clientes cl ON c.id_cliente = cl.id";
+
+$params = [];
+if ($dniFiltro !== '') {
+    $sql .= " WHERE cl.dni = ?";
+    $params[] = $dniFiltro;
+}
+$sql .= " ORDER BY c.id DESC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Consulta para exámenes de cada cotización
+$examenesPorCotizacion = [];
+if ($cotizaciones) {
+    $idsCotizaciones = array_column($cotizaciones, 'id');
+    if ($idsCotizaciones) {
+        $inQuery = implode(',', array_fill(0, count($idsCotizaciones), '?'));
+        $sqlExamenes = "SELECT re.id AS id_resultado, re.id_cotizacion, re.id_examen, re.estado, e.nombre AS nombre_examen
+                        FROM resultados_examenes re
+                        JOIN examenes e ON re.id_examen = e.id
+                        WHERE re.id_cotizacion IN ($inQuery)";
+        $stmtEx = $pdo->prepare($sqlExamenes);
+        $stmtEx->execute($idsCotizaciones);
+        $examenes = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($examenes as $ex) {
+            $examenesPorCotizacion[$ex['id_cotizacion']][] = $ex;
+        }
+    }
+}
+?>
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
         <h4 class="mb-2 mb-md-0">Historial de Cotizaciones</h4>
@@ -80,37 +97,48 @@ if ($rol === 'cliente') {
                             <td><?= htmlspecialchars($cotizacion['dni'] ?? '') ?></td>
                             <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
                             <td>S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></td>
-                            <td><?= htmlspecialchars($cotizacion['estado_pago'] ?? '') ?></td>
+                            <td>
+                                <?php
+                                $examenes = $examenesPorCotizacion[$cotizacion['id']] ?? [];
+                                $pendientes = array_filter($examenes, function ($ex) {
+                                    return $ex['estado'] === 'pendiente';
+                                });
+                                echo $pendientes ? "<span class='badge bg-warning text-dark'>Pendiente</span>" : "<span class='badge bg-success'>Completado</span>";
+                                ?>
+                            </td>
                             <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
                             <td>
-                                <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm" title="Ver">
+                                <!-- Botón para ver la cotización -->
+                                <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-info btn-sm"
+                                    title="Ver cotización">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <a href="dashboard.php?vista=descargar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-success btn-sm" title="Descargar PDF">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
+                                <!-- Botones para cada examen asociado -->
+                                <?php foreach ($examenes as $examen): ?>
+                                    <a href="dashboard.php?vista=formulario&id_examen=<?= $examen['id_examen'] ?>&id_resultado=<?= $examen['id_resultado'] ?>"
+                                        class="btn btn-primary btn-sm me-1 mb-1"
+                                        title="Editar o actualizar resultados">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                    <a href="resultados/descarga-pdf.html?id=<?= $examen['id_resultado'] ?>"
+                                        class="btn btn-success btn-sm mb-1"
+                                        title="Descargar PDF de resultados"
+                                        target="_blank">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                <?php endforeach; ?>
                             </td>
+
+
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="8" class="text-center">No hay cotizaciones registradas.</td></tr>
+                    <tr>
+                        <td colspan="8" class="text-center">No hay cotizaciones registradas.</td>
+                    </tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 </div>
-
-<!-- DataTables y Bootstrap JS -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-    $('#tablaCotizaciones').DataTable({
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
-        }
-    });
-});
-</script>

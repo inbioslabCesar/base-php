@@ -606,3 +606,152 @@ SELECT COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = 'laboratorio'
   AND TABLE_NAME = 'examenes';
+
+sql para traer todo los datos del campo json
+SELECT
+  j.nombre,
+  j.unidad,
+  j.referencia
+FROM examenes,
+  JSON_TABLE(
+    adicional, '$[*]'
+    COLUMNS (
+      nombre VARCHAR(100) PATH '$.nombre',
+      unidad VARCHAR(20) PATH '$.unidad',
+      referencia VARCHAR(50) PATH '$.referencia'
+    )
+  ) AS j
+WHERE id = 1;
+
+
+CAMPO ADICIONAL EN JSON
+
+[
+  {
+    "tipo": "Subtítulo",
+    "orden": 1,
+    "nombre": "Perfil lipídico Completo",
+    "unidad": "",
+    "formula": "",
+    "negrita": true,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "",
+    "referencias": []
+  },
+  {
+    "tipo": "Parámetro",
+    "orden": 2,
+    "nombre": "Colesterol Total",
+    "unidad": "mg/dl",
+    "formula": "",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Enzimatico Colorimétrico",
+    "referencias": [{"desc": "", "valor": "(<200)"}]
+  },
+  {
+    "tipo": "Parámetro",
+    "orden": 3,
+    "nombre": "Colesterol HDL",
+    "unidad": "mg/dl",
+    "formula": "[Colesterol Total]/5",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Enzimatico Colorimétrico",
+    "referencias": [{"desc": "", "valor": "(35-65)"}]
+  },
+  {
+    "tipo": "Parámetro",
+    "orden": 4,
+    "nombre": "Colesterol LDL",
+    "unidad": "mg/dl",
+    "formula": "[Colesterol Total]-[Colesterol HDL]-[Colesterol VLDL]",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Enzimatico Colorimétrico",
+    "referencias": [{"desc": "", "valor": "(<135)"}]
+  },
+  {
+    
+    "tipo": "Parámetro",
+    "orden": 7,
+    "nombre": "Trigliceridos",
+    "unidad": "mg/dl",
+    "formula": "",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Enzimatico Colorimétrico",
+    "referencias": [{"desc": "", "valor": "(<150)"}]
+  }
+   {"tipo": "Parámetro",
+    "orden": 5,
+    "nombre": "Colesterol VLDL",
+    "unidad": "mg/dl",
+    "formula": "[Trigliceridos]/5",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Enzimatico Colorimétrico",
+    "referencias": [{"desc": "", "valor": "(25-35)"}]
+  },
+  {
+    "tipo": "Parámetro",
+    "orden": 6,
+    "nombre": "Riesgo Coronario",
+    "unidad": "%",
+    "formula": "[Colesterol Total]/[Colesterol HDL]",
+    "negrita": false,
+    "opciones": [],
+    "color_fondo": "#ffffff",
+    "color_texto": "#000000",
+    "metodologia": "Calculo",
+    "referencias": [{"desc": "", "valor": "(<5.0)"}]
+  },
+  {
+
+
+$(document).ready(function() {
+  $.ajax({
+    url: 'resultados.php',
+    method: 'GET',
+    dataType: 'json',
+    success: function(data) {
+      // Mostrar datos del paciente
+      $('#datos-paciente').html(
+        `<strong>Nombre:</strong> ${data.paciente.nombre}   
+         <strong>Edad:</strong> ${data.paciente.edad}   
+         <strong>Sexo:</strong> ${data.paciente.sexo}   
+         <strong>Fecha:</strong> ${data.paciente.fecha}   
+         <strong>ID:</strong> ${data.paciente.id}`
+      );
+      // Llenar la tabla de resultados
+      let filas = '';
+      data.resultados.forEach(function(r) {
+        filas += `<tr>
+          <td>${r.prueba}</td>
+          <td>${r.metodologia}</td>
+          <td>${r.resultado}</td>
+          <td>${r.unidades}</td>
+          <td>${r.referencia}</td>
+        </tr>`;
+      });
+      $('#tabla-resultados').html(filas);
+    }
+  });
+});
+
+
+
+----COMO RENDERIZA EN MEDIO DE LA PALABRA----
+<h4 class="text-center mb-3">Iniciar Sesión en <?= htmlspecialchars($config['nombre']) ?></h4>
