@@ -5,8 +5,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php'; // $pdo disponible
 
-$id = $_GET['id'] ?? null;
-if (!$id) {
+$cotizacion_id = $_GET['cotizacion_id'] ?? null;
+if (!$cotizacion_id) {
     echo json_encode([
         "paciente" => [
             "nombre" => "",
@@ -17,27 +17,28 @@ if (!$id) {
             "fecha" => "",
             "id" => ""
         ],
-        "examen" => "",
-        "resultados" => [],
+        "items" => [],
         "empresa" => [
             "nombre" => "",
             "direccion" => "",
             "telefono" => "",
             "celular" => "",
+            "logo" => "",
+            "firma" => ""
         ]
     ]);
     exit;
 }
-// 1. Obtener el resultado y datos del paciente
-$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni 
+// 1. Obtener todos los resultados de la cotización
+$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
-        WHERE re.id = :id";
+        WHERE re.id_cotizacion = :cotizacion_id";
 $stmt = $pdo->prepare($sql);
-$stmt->execute(['id' => $id]);
-$row = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->execute(['cotizacion_id' => $cotizacion_id]);
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-if (!$row) {
+if (!$rows || count($rows) === 0) {
     echo json_encode([
         "paciente" => [
             "nombre" => "",
@@ -48,82 +49,124 @@ if (!$row) {
             "fecha" => "",
             "id" => ""
         ],
-        "examen" => "",
-        "resultados" => [],
+        "items" => [],
         "empresa" => [
             "nombre" => "",
             "direccion" => "",
             "telefono" => "",
             "celular" => "",
+            "logo" => "",
+            "firma" => ""
         ]
     ]);
     exit;
 }
-// 2. Obtener el campo adicional del examen
-$sql2 = "SELECT nombre AS nombre_examen, adicional FROM examenes WHERE id = :id_examen";
-$stmt2 = $pdo->prepare($sql2);
-$stmt2->execute(['id_examen' => $row['id_examen']]);
-$examen = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-// 3. Decodificar los JSON
-$adicional = json_decode($examen['adicional'], true);
-$resultados_json = json_decode($row['resultados'], true);
-// 4. Recorrer parámetros y armar array final
-$resultados = [];
-if (is_array($adicional)) {
-    foreach ($adicional as $param) {
-        if ($param['tipo'] === 'Parámetro') {
-            $nombre = $param['nombre'];
+// Tomar datos del paciente del primer examen
+$primer_row = $rows[0];
+$paciente = [
+    "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
+    "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
+    "dni"            => $primer_row['dni'] ?? "",
+    "edad"           => $primer_row['edad'],
+    "sexo"           => $primer_row['sexo'],
+    "fecha"          => $primer_row['fecha_ingreso'],
+    "id"             => $primer_row['cliente_id']
+];
+// ...código inicial igual...
+
+$items = [];
+foreach ($rows as $row) {
+    $sql2 = "SELECT nombre AS nombre_examen, adicional FROM examenes WHERE id = :id_examen";
+    $stmt2 = $pdo->prepare($sql2);
+    $stmt2->execute(['id_examen' => $row['id_examen']]);
+    $examen = $stmt2->fetch(PDO::FETCH_ASSOC);
+
+    $adicional = $examen && $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
+    $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
+
+    usort($adicional, function ($a, $b) {
+        return ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0);
+    });
+
+    $valores = [];
+    $examen_items = [];
+
+    foreach ($adicional as $item) {
+        if ($item['tipo'] === 'Parámetro' && empty($item['formula'])) {
+            $nombre = $item['nombre'];
             $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
-            $referencias = [];
-            if (!empty($param['referencias'])) {
-                foreach ($param['referencias'] as $ref) {
-                    $referencias[] = ($ref['desc'] ? $ref['desc'] . ': ' : '') . $ref['valor'];
-                }
-            }
-            $resultados[] = [
-                "prueba"        => $nombre,
-                "metodologia"   => $param['metodologia'],
-                "resultado"     => $valor,
-                "unidades"      => $param['unidad'],
-                "referencia"    => $referencias // Array para soportar múltiples referencias
-            ];
+            $valores[$nombre] = $valor;
+            $examen_items[] = array_merge($item, [
+                "prueba" => $nombre, // SOLO el nombre del parámetro
+                "valor" => $valor,
+                "tipo" => "Parámetro"
+            ]);
+        } elseif ($item['tipo'] !== 'Parámetro') {
+            $examen_items[] = array_merge($item, [
+                "prueba" => $item['nombre'] // Para títulos/subtítulos
+            ]);
         }
     }
+    foreach ($adicional as $item) {
+    if ($item['tipo'] === 'Parámetro' && !empty($item['formula'])) {
+        $formula = $item['formula'];
+        $formula_eval = preg_replace_callback('/\[(.*?)\]/', function($matches) use ($valores) {
+            $param = trim($matches[1]);
+            return isset($valores[$param]) && is_numeric($valores[$param]) ? $valores[$param] : 0;
+        }, $formula);
+        $valor = '';
+        try {
+            $valor = eval('return ' . $formula_eval . ';');
+            if (is_numeric($valor)) {
+                $valor = number_format($valor, 1, '.', '');
+            }
+        } catch (Throwable $e) {
+            $valor = '';
+        }
+        $nombre = $item['nombre'];
+        $valores[$nombre] = $valor;
+        $examen_items[] = array_merge($item, [
+            "prueba" => $nombre,
+            "valor" => $valor,
+            "tipo" => "Parámetro"
+        ]);
+    }
 }
-// 5. Obtener datos dinámicos de la empresa desde config_empresa
+
+    $items = array_merge($items, $examen_items);
+}
+
+// ...código de empresa y salida en JSON igual...
+
+// 3. Obtener datos dinámicos de la empresa desde config_empresa
 $sql3 = "SELECT nombre, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
 $stmt3 = $pdo->prepare($sql3);
 $stmt3->execute();
 $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
 
-// Si no hay datos, pon valores vacíos para evitar undefined
 if (!$empresa) {
     $empresa = [
         "nombre" => "",
         "direccion" => "",
         "telefono" => "",
         "celular" => "",
+        "logo" => "",
+        "firma" => ""
     ];
 }
 
-// 6. Salida en JSON
+// 4. Salida en JSON
 echo json_encode([
-    "paciente" => [
-        "nombre"         => trim($row['nombre'] . ' ' . $row['apellido']),
-        "codigo_cliente" => isset($row['codigo_cliente']) ? $row['codigo_cliente'] : "",
-        "dni"            => isset($row['dni']) ? $row['dni'] : "",
-        "edad"           => $row['edad'],
-        "sexo"           => $row['sexo'],
-        "fecha"          => $row['fecha_ingreso'],
-        "id"             => $row['id']
-    ],
-    "examen"     => $examen['nombre_examen'],
-    "resultados" => $resultados,
+    "paciente"   => $paciente,
+    "items"      => $items, // Incluye subtítulos, parámetros y valores calculados con prueba y parámetro
     "empresa"    => [
         "nombre"    => $empresa['nombre'],
         "direccion" => $empresa['direccion'],
         "telefono"  => $empresa['telefono'],
         "celular"   => $empresa['celular'],
+        "logo"      => $empresa['logo'] ?? "",
+        "firma"     => $empresa['firma'] ?? ""
     ]
 ]);
+exit;

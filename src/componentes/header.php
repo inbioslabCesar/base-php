@@ -135,8 +135,7 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
     <header class="bg-white shadow-sm mb-3 position-relative" style="z-index: 1050;">
         <div class="container-fluid d-flex align-items-center justify-content-between py-2">
             <div class="d-flex align-items-center">
-                <img src="../src/<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:74px; margin-right:24px;">
-                
+                <img src="../src/<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:74px; margin-right:24px;">                
                 <span class="fw-bold" style="font-size:1.3rem;">
                     Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!
                 </span>

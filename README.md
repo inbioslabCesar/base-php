@@ -755,3 +755,17 @@ $(document).ready(function() {
 
 ----COMO RENDERIZA EN MEDIO DE LA PALABRA----
 <h4 class="text-center mb-3">Iniciar Sesión en <?= htmlspecialchars($config['nombre']) ?></h4>
+
+
+----conexion---
+
+<?php $host = 'localhost';
+$dbname = 'laboratorio';
+$user = 'root';
+$pass = '';
+
+
+<?php $host = 'localhost';
+$dbname = 'u330560936_medditechbd';
+$user = 'u330560936_medditech';
+$pass = 'Medditech123';

@@ -41,7 +41,7 @@ function capitalize($string) {
             <div class="col-md-4 mb-3">
                 <label for="codigo_cliente" class="form-label">Código Cliente *</label>
                 <div class="input-group">
-                    <input type="text" class="form-control" name="codigo_cliente" id="codigo_cliente" value="<?= htmlspecialchars($cliente['codigo_cliente']) ?>" required readonly>
+                    <input type="text" class="form-control" name="codigo_cliente" id="codigo_cliente" value="<?= htmlspecialchars($cliente['codigo_cliente']??'') ?>" required>
                     <button class="btn btn-secondary" type="button" onclick="generarCodigo()">Generar</button>
                 </div>
             </div>
@@ -67,15 +67,15 @@ function capitalize($string) {
             </div>
             <div class="col-md-4 mb-3">
                 <label for="password" class="form-label"><?= $esEdicion ? 'Nueva contraseña' : 'Contraseña *' ?></label>
-                <input type="password" class="form-control" name="password" id="password" <?= $esEdicion ? '' : 'required' ?>>
+                <input type="text" class="form-control" name="password" id="password" <?= $esEdicion ? '' : 'required' ?>>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="telefono" class="form-label">Teléfono</label>
-                <input type="text" class="form-control" name="telefono" id="telefono" value="<?= htmlspecialchars($cliente['telefono']) ?>">
+                <input type="text" class="form-control" name="telefono" id="telefono" value="<?= htmlspecialchars($cliente['telefono']??'') ?>">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="direccion" class="form-label">Dirección</label>
-                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($cliente['direccion']) ?>">
+                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($cliente['direccion']??'') ?>">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="sexo" class="form-label">Sexo</label>
@@ -109,7 +109,13 @@ function capitalize($string) {
 
 <script>
 function generarCodigo() {
-    let codigo = 'CLI-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+    let fecha = new Date();
+    let año = fecha.getFullYear().toString().slice(-2); // últimos 2 dígitos del año
+    let mes = ('0' + (fecha.getMonth() + 1)).slice(-2); // mes con dos dígitos
+    let dia = ('0' + fecha.getDate()).slice(-2); // día con dos dígitos
+    let aleatorio = Math.random().toString(36).substr(2, 6).toUpperCase();
+    let codigo = 'CLI-' + año + mes + dia + '-' + aleatorio;
     document.getElementById('codigo_cliente').value = codigo;
 }
 </script>
+

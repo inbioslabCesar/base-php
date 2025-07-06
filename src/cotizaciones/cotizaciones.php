@@ -114,23 +114,20 @@ if ($cotizaciones) {
                                     title="Ver cotización">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <!-- Botones para cada examen asociado -->
-                                <?php foreach ($examenes as $examen): ?>
-                                    <a href="dashboard.php?vista=formulario&id_examen=<?= $examen['id_examen'] ?>&id_resultado=<?= $examen['id_resultado'] ?>"
-                                        class="btn btn-primary btn-sm me-1 mb-1"
-                                        title="Editar o actualizar resultados">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </a>
-                                    <a href="resultados/descarga-pdf.html?id=<?= $examen['id_resultado'] ?>"
-                                        class="btn btn-success btn-sm mb-1"
-                                        title="Descargar PDF de resultados"
-                                        target="_blank">
-                                        <i class="bi bi-file-earmark-pdf"></i>
-                                    </a>
-                                <?php endforeach; ?>
+                                <!-- Botón único para editar/agregar resultados -->
+                                <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-primary btn-sm"
+                                    title="Editar o agregar resultados">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <!-- Botón único para descargar PDF de todos los resultados -->
+                                <a href="resultados/descarga-pdf.html?cotizacion_id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-success btn-sm mb-1"
+                                    title="Descargar PDF de todos los resultados"
+                                    target="_blank">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
                             </td>
-
-
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -139,6 +136,7 @@ if ($cotizaciones) {
                     </tr>
                 <?php endif; ?>
             </tbody>
+
         </table>
     </div>
 </div>
