@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/config.php';
 
 function capitalizar($texto)
 {
@@ -142,7 +143,7 @@ if ($esEdicion) {
     </form>
 </div>
 
-<script src="/base-php/src/examenes/format-builder.js"></script>
+<script src="<?= BASE_URL ?>examenes/format-builder.js"></script>
 <script>
     // Cargar datos al editar
     var datosAdicionales = <?php echo json_encode($adicional_array, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

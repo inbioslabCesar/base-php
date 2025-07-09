@@ -34,7 +34,7 @@ $id_cotizacion = isset($_GET['id_cotizacion']) ? intval($_GET['id_cotizacion']) 
         </div>
 
         <button type="submit" class="btn btn-success">Guardar cita</button>
-        <a href="form_cotizacion.php?id_cotizacion=<?php echo $id_cotizacion; ?>" class="btn btn-secondary ms-2">Cancelar</a>
+        <a href="javascript:history.back()" class="btn btn-secondary ms-2">Cancelar</a>
       </form>
     </div>
   </div>

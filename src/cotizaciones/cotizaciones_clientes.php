@@ -63,9 +63,17 @@ if ($cotizaciones) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
 
 <div class="container mt-4">
     <h4 class="mb-3">Mis Cotizaciones</h4>
+    <div class="d-flex justify-content-end mb-3">
+        <a href="dashboard.php?vista=form_cotizacion" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nueva Cotización
+        </a>
+    </div>
+
     <div class="alert alert-info">
         Puedes descargar tus resultados solo si no tienes deuda pendiente y todos los exámenes están completos.<br>
         El porcentaje de resultados indica el avance de tus exámenes.

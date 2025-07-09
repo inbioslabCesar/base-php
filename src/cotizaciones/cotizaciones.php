@@ -11,7 +11,7 @@ $botonUrl   = '';
 if ($rol === 'cliente') {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=form_cotizacion';
-} elseif ($rol === 'recepcionista') {
+} elseif ($rol === 'recepcionista' || $rol === 'admin' ) {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=clientes';
 }

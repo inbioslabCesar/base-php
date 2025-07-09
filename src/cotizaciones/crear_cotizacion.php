@@ -135,7 +135,7 @@ foreach ($detalles as $detalle) {
 $rol = $_SESSION['rol'] ?? null;
 
 // Redirigir según el rol
-if ($rol == 'cliente' || $rol == 'recepcionista') {
+if ($rol == 'cliente' || $rol == 'recepcionista'|| $rol == 'admin') {
     header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
     exit;
 }

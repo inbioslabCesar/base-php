@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/src/conexion/conexion.php';
+require_once __DIR__ . '/src/config/config.php';
 
 $stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
 $config_empresa = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -141,7 +142,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="#">
-                <img src="/base-php/src/<?= htmlspecialchars($logo) ?>?ver=<?= time() ?>" alt="Logo Empresa" class="logo-navbar">
+                <img src="<?= BASE_URL ?><?= htmlspecialchars($logo) ?>?ver=<?= time() ?>" alt="Logo Empresa" class="logo-navbar">
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarLab"
                 aria-controls="navbarLab" aria-expanded="false" aria-label="Toggle navigation">

@@ -33,7 +33,7 @@ if (count($errores) === 0) {
     $stmt = $pdo->prepare("UPDATE cotizaciones SET tipo_toma = ?, fecha_toma = ?, hora_toma = ?, direccion_toma = ? WHERE id = ?");
     $stmt->execute([$tipo_toma, $fecha_toma, $hora_toma, $direccion_toma, $id_cotizacion]);
     // Agrega aquí tu lógica para la redirección usando $acciones o muestra un mensaje de éxito
-    if ($_SESSION['rol'] == 'recepcionista') {
+    if ($_SESSION['rol'] == 'recepcionista' || $_SESSION['rol'] == 'admin') {
         header("Location: dashboard.php?vista=cotizaciones");
         exit;
     } elseif ($_SESSION['rol'] == 'cliente') {
