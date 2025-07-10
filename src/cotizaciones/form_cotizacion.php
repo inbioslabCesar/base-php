@@ -22,6 +22,17 @@ if (empty($id_cliente)) {
 $stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico FROM examenes WHERE vigente = 1 ORDER BY nombre");
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $examenes_json = json_encode($examenes);
+
+// 2. Empresas y convenios (solo si el usuario es admin o recepcionista)
+$empresas = [];
+$convenios = [];
+if ($rol === 'admin' || $rol === 'recepcionista') {
+    $stmtEmp = $pdo->query("SELECT id, razon_social, nombre_comercial, descuento FROM empresas WHERE estado = 1 ORDER BY nombre_comercial");
+    $empresas = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmtConv = $pdo->query("SELECT id, nombre, descuento FROM convenios ORDER BY nombre");
+    $convenios = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
@@ -37,6 +48,46 @@ $examenes_json = json_encode($examenes);
             </div>
             <form action="dashboard.php?action=crear_cotizacion" method="POST" id="formCotizacion">
                 <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
+                
+                <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
+                <div class="mb-3">
+                    <label for="tipoCliente" class="form-label">Tipo de cliente</label>
+                    <select id="tipoCliente" name="tipo_usuario" class="form-select" required>
+                        <option value="">Seleccione...</option>
+                        <option value="particular">Particular</option>
+                        <option value="empresa">Empresa</option>
+                        <option value="convenio">Convenio</option>
+                    </select>
+                </div>
+                <div class="mb-3 d-none" id="selectEmpresa">
+                    <label for="empresa" class="form-label">Empresa</label>
+                    <select id="empresa" name="id_empresa" class="form-select">
+                        <option value="">Seleccione empresa...</option>
+                        <?php foreach ($empresas as $emp): ?>
+                            <option value="<?= $emp['id'] ?>">
+                                <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
+                                <?php if ($emp['descuento'] > 0): ?>
+                                    (<?= $emp['descuento'] ?>% desc.)
+                                <?php endif; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="mb-3 d-none" id="selectConvenio">
+                    <label for="convenio" class="form-label">Convenio</label>
+                    <select id="convenio" name="id_convenio" class="form-select">
+                        <option value="">Seleccione convenio...</option>
+                        <?php foreach ($convenios as $conv): ?>
+                            <option value="<?= $conv['id'] ?>">
+                                <?= htmlspecialchars($conv['nombre']) ?>
+                                <?php if ($conv['descuento'] > 0): ?>
+                                    (<?= $conv['descuento'] ?>% desc.)
+                                <?php endif; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
                 <div class="mb-3">
                     <label for="buscadorExamen" class="form-label">Buscar examen</label>
                     <select id="buscadorExamen" class="form-select" style="width:100%;">
@@ -52,6 +103,7 @@ $examenes_json = json_encode($examenes);
                 </div>
                 <div id="examenes-seleccionados"></div>
                 <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="0">
+
                 <!-- Footer fijo -->
                 <div class="fixed-bottom bg-white border-top shadow-sm p-3" id="footerCotizacion" style="z-index:1040;">
                     <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center">
@@ -87,10 +139,31 @@ $examenes_json = json_encode($examenes);
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
 let examenesData = <?= $examenes_json ?>;
 let examenesSeleccionados = [];
+
+// Mostrar/ocultar selectores según tipo de cliente
+$('#tipoCliente').on('change', function() {
+    let tipo = $(this).val();
+    $('#selectEmpresa').addClass('d-none');
+    $('#selectConvenio').addClass('d-none');
+    $('#empresa').prop('required', false);
+    $('#convenio').prop('required', false);
+
+    if (tipo === 'empresa') {
+        $('#selectEmpresa').removeClass('d-none');
+        $('#empresa').prop('required', true);
+        $('#convenio').val('');
+    } else if (tipo === 'convenio') {
+        $('#selectConvenio').removeClass('d-none');
+        $('#convenio').prop('required', true);
+        $('#empresa').val('');
+    } else {
+        $('#empresa').val('');
+        $('#convenio').val('');
+    }
+});
 
 $(function() {
     $('#buscadorExamen').select2({

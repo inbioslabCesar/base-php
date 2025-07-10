@@ -2,7 +2,6 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
 require_once __DIR__ . '/../conexion/conexion.php';
 
 // Validar sesión de usuario
@@ -15,6 +14,9 @@ if (!isset($_SESSION['rol'])) {
 $id_cliente = $_POST['id_cliente'] ?? null;
 $examenes = $_POST['examenes'] ?? [];
 $cantidades = $_POST['cantidades'] ?? [];
+$tipo_usuario = $_POST['tipo_usuario'] ?? 'particular';
+$id_empresa = $tipo_usuario === 'empresa' ? ($_POST['id_empresa'] ?? null) : null;
+$id_convenio = $tipo_usuario === 'convenio' ? ($_POST['id_convenio'] ?? null) : null;
 $fecha = date('Y-m-d H:i:s');
 $total = 0;
 $detalles = [];
@@ -23,25 +25,6 @@ $detalles = [];
 if (empty($examenes) || empty($cantidades) || count($examenes) != count($cantidades)) {
     echo '<div class="alert alert-danger">Debes seleccionar al menos un examen.</div>';
     exit;
-}
-// Obtener promociones activas para los exámenes seleccionados
-$ids_examenes = implode(',', array_map('intval', $examenes));
-$stmt = $pdo->prepare("
-    SELECT p.*, pe.examen_id
-    FROM promociones p
-    JOIN promociones_examen pe ON p.id = pe.promocion_id
-    WHERE p.activo = 1 AND p.vigente = 1
-      AND p.fecha_inicio <= ? AND p.fecha_fin >= ?
-      AND pe.examen_id IN ($ids_examenes)
-");
-$hoy = date('Y-m-d');
-$stmt->execute([$hoy, $hoy]);
-$promos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Mapear promociones por examen
-$promo_map = [];
-foreach ($promos as $promo) {
-    $promo_map[$promo['examen_id']] = $promo;
 }
 
 // Procesar cada examen y calcular totales
@@ -57,34 +40,23 @@ for ($i = 0; $i < count($examenes); $i++) {
     if (!$examen) continue;
 
     $precio_unitario = floatval($examen['precio_publico']);
-    $promo = $promo_map[$examen_id] ?? null;
-    $precio_final = $precio_unitario;
-
-    // Aplicar promoción si existe
-    if ($promo) {
-        if ($promo['descuento'] > 0) {
-            $precio_final = $precio_unitario - ($precio_unitario * $promo['descuento'] / 100);
-        } elseif ($promo['precio_promocional'] > 0) {
-            $precio_final = floatval($promo['precio_promocional']);
-        }
-    }
-
-    $subtotal = $precio_final * $cantidad;
+    $subtotal = $precio_unitario * $cantidad;
     $total += $subtotal;
 
     $detalles[] = [
         'id_examen' => $examen_id,
         'nombre_examen' => $examen['nombre'],
-        'precio_unitario' => $precio_final,
+        'precio_unitario' => $precio_unitario,
         'cantidad' => $cantidad,
         'subtotal' => $subtotal
     ];
 }
+
 // Preparar datos obligatorios para la tabla cotizaciones
 $codigo = 'COT-' . strtoupper(uniqid());
 $estado_pago = 'pendiente';
 $rol_creador = $_SESSION['rol'] ?? 'cliente';
-$creado_por = $_SESSION['usuario_id'] ?? $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null; // Ajusta según tu lógica
+$creado_por = $_SESSION['usuario_id'] ?? $_SESSION['id_cliente'] ?? $_SESSION['cliente_id'] ?? null;
 
 if (!$id_cliente || !$creado_por) {
     echo '<div class="alert alert-danger">No se encontró el cliente o el usuario creador en sesión.</div>';
@@ -93,12 +65,14 @@ if (!$id_cliente || !$creado_por) {
 
 // Insertar cotización principal
 $stmt = $pdo->prepare("INSERT INTO cotizaciones 
-    (codigo, id_cliente, fecha, total, estado_pago, creado_por, rol_creador, tipo_toma, fecha_toma, hora_toma, direccion_toma)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
+    (codigo, id_cliente, id_empresa, id_convenio, tipo_usuario, fecha, total, estado_pago, creado_por, rol_creador, tipo_toma, fecha_toma, hora_toma, direccion_toma)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 $stmt->execute([
     $codigo, 
     $id_cliente, 
+    $id_empresa,
+    $id_convenio,
+    $tipo_usuario,
     $fecha, 
     $total, 
     $estado_pago, 
@@ -139,7 +113,5 @@ if ($rol == 'cliente' || $rol == 'recepcionista'|| $rol == 'admin') {
     header("Location: dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
     exit;
 }
-
-// Puedes agregar otros roles o una redirección por defecto si es necesario
 header("Location: dashboard.php?vista=cotizaciones");
 exit;
