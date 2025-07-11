@@ -79,7 +79,7 @@ if (!$token) {
         <?php endfor; ?>
     </div>
     <div class="login-box mt-5 shadow">
-        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Restablecer Contraseña</h4>
         <?php if (!empty($mensaje)): ?>
             <div class="alert alert-<?= $alerta_tipo ?>"><?= $mensaje ?></div>

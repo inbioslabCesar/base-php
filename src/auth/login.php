@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="login-box mt-5 shadow">
         <!-- Logo y nombre dinámicos -->
-        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Iniciar Sesión</h4>
         <?php if (!empty($_SESSION['mensaje'])): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($_SESSION['mensaje']) ?></div>

@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <!-- Formulario de registro -->
     <div class="login-box mt-5 shadow">
-        <img src="../<?= htmlspecialchars($config['logo']) ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Registro de Cliente</h4>
         <?php if (!empty($mensaje_error)): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($mensaje_error) ?></div>

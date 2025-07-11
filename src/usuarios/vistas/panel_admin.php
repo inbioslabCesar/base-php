@@ -48,18 +48,24 @@ require_once __DIR__ . '/../../config/config.php';
                     </a>
                 </div>
                 <?php if ($_SESSION['rol'] === 'admin'): ?>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-warning w-100">
-                        <i class="bi bi-megaphone"></i> Gestionar Promociones
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-            <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary btn-lg">
-                <i class="bi bi-file-earmark-text"></i> Mis Cotizaciones
-            </a>
-        </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-warning w-100">
+                            <i class="bi bi-megaphone"></i> Gestionar Promociones
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="<?= BASE_URL ?>dashboard.php?vista=pendientes_toma" class="btn btn-outline-warning w-100">
+                            <i class="bi bi-clock-history"></i> Ver exámenes pendientes de toma de muestra
+                        </a>
+                    </div>
+
+                    <div class="col-md-3 mb-3">
+                        <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary btn-lg">
+                            <i class="bi bi-file-earmark-text"></i> Mis Cotizaciones
+                        </a>
+                    </div>
                 <?php endif; ?>
-            </div>           
+            </div>
         </div>
     </div>
 </div>

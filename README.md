@@ -769,3 +769,7 @@ $pass = '';
 $dbname = 'u330560936_medditechbd';
 $user = 'u330560936_medditech';
 $pass = 'Medditech123';
+
+
+
+pasame el codigo completo de form_cotizacion con todas las actualizaciones y modificaciones desde el principio por partes si es extenso el codigo no modifiques ninguna variable o cambie de nombre lo que ya tiene para no alterar el codigo

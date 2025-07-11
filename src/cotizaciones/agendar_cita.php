@@ -2,7 +2,6 @@
 $id_cotizacion = isset($_GET['id_cotizacion']) ? intval($_GET['id_cotizacion']) : 0;
 ?>
 
-
 <div class="container mt-4">
   <div class="card">
     <div class="card-body">

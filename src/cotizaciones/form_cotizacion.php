@@ -33,6 +33,14 @@ if ($rol === 'admin' || $rol === 'recepcionista') {
     $stmtConv = $pdo->query("SELECT id, nombre, descuento FROM convenios ORDER BY nombre");
     $convenios = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
 }
+
+// 3. Obtener descuento del cliente (si aplica)
+$descuento_cliente = 0;
+if ($id_cliente) {
+    $stmtDesc = $pdo->prepare("SELECT descuento FROM clientes WHERE id = ?");
+    $stmtDesc->execute([$id_cliente]);
+    $descuento_cliente = $stmtDesc->fetchColumn() ?: 0;
+}
 ?>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
@@ -48,46 +56,48 @@ if ($rol === 'admin' || $rol === 'recepcionista') {
             </div>
             <form action="dashboard.php?action=crear_cotizacion" method="POST" id="formCotizacion">
                 <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
-                
+                <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="<?= $descuento_cliente ?>">
+
                 <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
-                <div class="mb-3">
-                    <label for="tipoCliente" class="form-label">Tipo de cliente</label>
-                    <select id="tipoCliente" name="tipo_usuario" class="form-select" required>
-                        <option value="">Seleccione...</option>
-                        <option value="particular">Particular</option>
-                        <option value="empresa">Empresa</option>
-                        <option value="convenio">Convenio</option>
-                    </select>
-                </div>
-                <div class="mb-3 d-none" id="selectEmpresa">
-                    <label for="empresa" class="form-label">Empresa</label>
-                    <select id="empresa" name="id_empresa" class="form-select">
-                        <option value="">Seleccione empresa...</option>
-                        <?php foreach ($empresas as $emp): ?>
-                            <option value="<?= $emp['id'] ?>">
-                                <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
-                                <?php if ($emp['descuento'] > 0): ?>
-                                    (<?= $emp['descuento'] ?>% desc.)
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="mb-3 d-none" id="selectConvenio">
-                    <label for="convenio" class="form-label">Convenio</label>
-                    <select id="convenio" name="id_convenio" class="form-select">
-                        <option value="">Seleccione convenio...</option>
-                        <?php foreach ($convenios as $conv): ?>
-                            <option value="<?= $conv['id'] ?>">
-                                <?= htmlspecialchars($conv['nombre']) ?>
-                                <?php if ($conv['descuento'] > 0): ?>
-                                    (<?= $conv['descuento'] ?>% desc.)
-                                <?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                    <div class="mb-3">
+                        <label for="tipoCliente" class="form-label">Tipo de cliente</label>
+                        <select id="tipoCliente" name="tipo_usuario" class="form-select" required>
+                            <option value="">Seleccione...</option>
+                            <option value="cliente">Particular</option>
+                            <option value="empresa">Empresa</option>
+                            <option value="convenio">Convenio</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 d-none" id="selectEmpresa">
+                        <label for="empresa" class="form-label">Empresa</label>
+                        <select id="empresa" name="id_empresa" class="form-select">
+                            <option value="">Seleccione empresa...</option>
+                            <?php foreach ($empresas as $emp): ?>
+                                <option value="<?= $emp['id'] ?>" data-descuento="<?= $emp['descuento'] ?>">
+                                    <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
+                                    <?php if ($emp['descuento'] > 0): ?>
+                                        (<?= $emp['descuento'] ?>% desc.)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3 d-none" id="selectConvenio">
+                        <label for="convenio" class="form-label">Convenio</label>
+                        <select id="convenio" name="id_convenio" class="form-select">
+                            <option value="">Seleccione convenio...</option>
+                            <?php foreach ($convenios as $conv): ?>
+                                <option value="<?= $conv['id'] ?>" data-descuento="<?= $conv['descuento'] ?>">
+                                    <?= htmlspecialchars($conv['nombre']) ?>
+                                    <?php if ($conv['descuento'] > 0): ?>
+                                        (<?= $conv['descuento'] ?>% desc.)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 <?php endif; ?>
+
                 <div class="mb-3">
                     <label for="buscadorExamen" class="form-label">Buscar examen</label>
                     <select id="buscadorExamen" class="form-select" style="width:100%;">
@@ -102,7 +112,7 @@ if ($rol === 'admin' || $rol === 'recepcionista') {
                     </select>
                 </div>
                 <div id="examenes-seleccionados"></div>
-                <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="0">
+                <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="<?= $descuento_cliente ?>">
 
                 <!-- Footer fijo -->
                 <div class="fixed-bottom bg-white border-top shadow-sm p-3" id="footerCotizacion" style="z-index:1040;">
@@ -140,70 +150,110 @@ if ($rol === 'admin' || $rol === 'recepcionista') {
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-let examenesData = <?= $examenes_json ?>;
-let examenesSeleccionados = [];
+    var rolUsuario = '<?= $rol ?>';
+    let examenesData = <?= $examenes_json ?>;
+    let examenesSeleccionados = [];
+    let descuentoCliente = <?= $descuento_cliente ?>;
+    let descuentoActual = descuentoCliente;
 
-// Mostrar/ocultar selectores según tipo de cliente
-$('#tipoCliente').on('change', function() {
-    let tipo = $(this).val();
-    $('#selectEmpresa').addClass('d-none');
-    $('#selectConvenio').addClass('d-none');
-    $('#empresa').prop('required', false);
-    $('#convenio').prop('required', false);
+    // Manejo de tipo de cliente y descuento
+    $('#tipoCliente').on('change', function() {
+        let tipo = $(this).val();
+        $('#selectEmpresa, #selectConvenio').addClass('d-none');
+        $('#empresa, #convenio').prop('required', false);
 
-    if (tipo === 'empresa') {
-        $('#selectEmpresa').removeClass('d-none');
-        $('#empresa').prop('required', true);
-        $('#convenio').val('');
-    } else if (tipo === 'convenio') {
-        $('#selectConvenio').removeClass('d-none');
-        $('#convenio').prop('required', true);
-        $('#empresa').val('');
-    } else {
-        $('#empresa').val('');
-        $('#convenio').val('');
-    }
-});
-
-$(function() {
-    $('#buscadorExamen').select2({
-        placeholder: "Escribe para buscar un examen...",
-        allowClear: true,
-        width: '100%'
-    });
-
-    $('#buscadorExamen').on('select2:select', function(e) {
-        let id = e.params.data.id;
-        let examen = examenesData.find(ex => ex.id == id);
-        if (!examenesSeleccionados.find(ex => ex.id == id)) {
-            examenesSeleccionados.push({
-                ...examen,
-                cantidad: 1
-            });
-            renderizarLista();
+        if (tipo === 'empresa') {
+            $('#selectEmpresa').removeClass('d-none');
+            $('#empresa').prop('required', true);
+            $('#convenio').val('');
+        } else if (tipo === 'convenio') {
+            $('#selectConvenio').removeClass('d-none');
+            $('#convenio').prop('required', true);
+            $('#empresa').val('');
+        } else {
+            $('#empresa, #convenio').val('');
         }
-        $(this).val('').trigger('change');
+        actualizarDescuento();
     });
 
-    // Cambiar cantidad
-    $(document).on('input', '.cantidadExamen', function() {
-        let idx = $(this).data('idx');
-        examenesSeleccionados[idx].cantidad = parseInt($(this).val()) || 1;
+    // Detectar selección de empresa/convenio y actualizar descuento
+    $('#empresa').on('change', actualizarDescuento);
+    $('#convenio').on('change', actualizarDescuento);
+
+    function actualizarDescuento() {
+        let tipo = $('#tipoCliente').val();
+        descuentoActual = 0;
+        if (tipo === 'empresa') {
+            let desc = $('#empresa option:selected').data('descuento');
+            descuentoActual = desc ? parseFloat(desc) : 0;
+        } else if (tipo === 'convenio') {
+            let desc = $('#convenio option:selected').data('descuento');
+            descuentoActual = desc ? parseFloat(desc) : 0;
+        } else if (tipo === 'cliente' || tipo === undefined) {
+            descuentoActual = descuentoCliente; // Usa el descuento del cliente si es particular
+        }
+        $('#descuento_aplicado').val(descuentoActual);
+        // Aplicar descuento a todos los precios
+        examenesSeleccionados.forEach((ex, idx) => {
+            ex.precio_unitario = aplicarDescuento(ex.precio_publico, descuentoActual);
+        });
         renderizarLista();
-    });
+    }
 
-    // Quitar examen
-    $(document).on('click', '.btn-remove', function() {
-        let idx = $(this).data('idx');
-        examenesSeleccionados.splice(idx, 1);
-        renderizarLista();
-    });
+    function aplicarDescuento(precio, descuento) {
+        return (precio - (precio * descuento / 100)).toFixed(2);
+    }
 
-    // Ver detalles
-    $(document).on('click', '.btn-detalle', function() {
-        let idx = $(this).data('idx');
-        let ex = examenesSeleccionados[idx];
-        let detalle = `
+    // Select2 para buscar exámenes
+    $(function() {
+        $('#buscadorExamen').select2({
+            placeholder: "Escribe para buscar un examen...",
+            allowClear: true,
+            width: '100%'
+        });
+
+        $('#buscadorExamen').on('select2:select', function(e) {
+            let id = e.params.data.id;
+            let examen = examenesData.find(ex => ex.id == id);
+            if (!examenesSeleccionados.find(ex => ex.id == id)) {
+                let precioConDescuento = aplicarDescuento(parseFloat(examen.precio_publico), descuentoActual);
+                examenesSeleccionados.push({
+                    ...examen,
+                    precio_unitario: precioConDescuento,
+                    cantidad: 1
+                });
+                renderizarLista();
+            }
+            $(this).val('').trigger('change');
+        });
+
+        // Cambiar cantidad
+        $(document).on('input', '.cantidadExamen', function() {
+            let idx = $(this).data('idx');
+            examenesSeleccionados[idx].cantidad = parseInt($(this).val()) || 1;
+            renderizarLista();
+        });
+
+        // Cambiar precio manualmente
+        $(document).on('input', '.precioExamen', function() {
+            let idx = $(this).data('idx');
+            let nuevoPrecio = parseFloat($(this).val());
+            examenesSeleccionados[idx].precio_unitario = isNaN(nuevoPrecio) ? 0 : nuevoPrecio;
+            renderizarLista();
+        });
+
+        // Quitar examen
+        $(document).on('click', '.btn-remove', function() {
+            let idx = $(this).data('idx');
+            examenesSeleccionados.splice(idx, 1);
+            renderizarLista();
+        });
+
+        // Ver detalles
+        $(document).on('click', '.btn-detalle', function() {
+            let idx = $(this).data('idx');
+            let ex = examenesSeleccionados[idx];
+            let detalle = `
             <table class="table table-bordered">
                 <tr><th>Código</th><td>${ex.codigo}</td></tr>
                 <tr><th>Nombre</th><td>${ex.nombre}</td></tr>
@@ -213,61 +263,69 @@ $(function() {
                 <tr><th>Observaciones</th><td>${ex.observaciones || '-'}</td></tr>
             </table>
         `;
-        $('#detalleExamenBody').html(detalle);
-        let modal = new bootstrap.Modal(document.getElementById('modalDetalleExamen'));
-        modal.show();
+            $('#detalleExamenBody').html(detalle);
+            let modal = new bootstrap.Modal(document.getElementById('modalDetalleExamen'));
+            modal.show();
+        });
+
+        renderizarLista();
+        actualizarDescuento(); // Al cargar, aplica el descuento del cliente si lo hay
     });
 
-    renderizarLista();
-});
-
-function renderizarLista() {
-    let html = '';
-    let total = 0;
-    if (examenesSeleccionados.length === 0) {
-        html = '<div class="alert alert-warning text-center">No hay exámenes seleccionados.</div>';
-    } else {
-        html += `<div class="table-responsive"><table class="table table-bordered align-middle">
+    function renderizarLista() {
+        let html = '';
+        let total = 0;
+        if (examenesSeleccionados.length === 0) {
+            html = '<div class="alert alert-warning text-center">No hay exámenes seleccionados.</div>';
+        } else {
+            html += `<div class="table-responsive"><table class="table table-bordered align-middle">
             <thead class="table-light">
                 <tr>
                     <th>Examen</th>
                     <th style="width:90px;">Cantidad</th>
-                    <th>Precio</th>
+                    <th style="width:120px;">Precio (S/.)</th>
                     <th>Subtotal</th>
                     <th colspan="2">Acciones</th>
                 </tr>
             </thead>
             <tbody>`;
-        examenesSeleccionados.forEach((ex, idx) => {
-            let precio = parseFloat(ex.precio_publico);
-            let subtotal = precio * ex.cantidad;
-            total += subtotal;
-            html += `
-                <tr>
-                    <td>${ex.nombre}</td>
-                    <td>
-                        <input type="number" min="1" class="form-control cantidadExamen" data-idx="${idx}" value="${ex.cantidad}">
-                    </td>
-                    <td>S/. ${precio.toFixed(2)}</td>
-                    <td class="fw-bold">S/. ${subtotal.toFixed(2)}</td>
-                    <td>
-                        <button type="button" class="btn btn-info btn-sm btn-detalle" data-idx="${idx}" title="Ver detalles">
-                            <i class="bi bi-info-circle"></i> Detalles
-                        </button>
-                    </td>
-                    <td>
-                        <button type="button" class="btn btn-danger btn-sm btn-remove" data-idx="${idx}" title="Quitar">
-                            <i class="bi bi-x-circle"></i> Quitar
-                        </button>
-                    </td>
-                    <input type="hidden" name="examenes[]" value="${ex.id}">
-                    <input type="hidden" name="cantidades[]" value="${ex.cantidad}">
-                </tr>
-            `;
-        });
-        html += `</tbody></table></div>`;
+            examenesSeleccionados.forEach((ex, idx) => {
+                let precio = parseFloat(ex.precio_unitario);
+                let subtotal = precio * ex.cantidad;
+                total += subtotal;
+                html += `
+                        <tr>
+                        <td>${ex.nombre}</td>
+                        <td>
+                            <input type="number" min="1" class="form-control cantidadExamen" data-idx="${idx}" value="${ex.cantidad}">
+                        </td>
+                        <td>
+                            ${
+                                (rolUsuario === 'admin' || rolUsuario === 'recepcionista')
+                                    ? `<input type="number" step="0.01" class="form-control precioExamen" data-idx="${idx}" value="${precio.toFixed(2)}">`
+                                    : `<span class="form-control-plaintext">${precio.toFixed(2)}</span>`
+                            }
+                            <input type="hidden" name="examenes[]" value="${ex.id}">
+                            <input type="hidden" name="cantidades[]" value="${ex.cantidad}">
+                            <input type="hidden" name="precios[]" value="${precio.toFixed(2)}">
+                        </td>
+                        <td class="fw-bold">S/. ${subtotal.toFixed(2)}</td>
+                        <td>
+                            <button type="button" class="btn btn-info btn-sm btn-detalle" data-idx="${idx}" title="Ver detalles">
+                                <i class="bi bi-info-circle"></i> Detalles
+                            </button>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm btn-remove" data-idx="${idx}" title="Quitar">
+                                <i class="bi bi-x-circle"></i> Quitar
+                            </button>
+                        </td>
+                        </tr>
+                            `;
+                             });
+            html += `</tbody></table></div>`;
+        }
+        $('#examenes-seleccionados').html(html);
+        $('#totalCotizacion').text('S/. ' + total.toFixed(2));
     }
-    $('#examenes-seleccionados').html(html);
-    $('#totalCotizacion').text('S/. ' + total.toFixed(2));
-}
 </script>
