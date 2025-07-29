@@ -8,13 +8,15 @@ require_once __DIR__ . '/../conexion/conexion.php';
 $rol = $_SESSION['rol'] ?? '';
 $botonTexto = '';
 $botonUrl   = '';
-if ($rol === 'cliente') {
-    $botonTexto = 'Nueva Cotización';
-    $botonUrl   = 'dashboard.php?vista=form_cotizacion';
-} elseif ($rol === 'recepcionista' || $rol === 'admin') {
+
+if ($rol === 'recepcionista' || $rol === 'admin') {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=clientes';
+} elseif ($rol === 'laboratorista') {
+    $botonTexto = 'Panel de Laboratorio';
+    $botonUrl   = 'dashboard.php?vista=laboratorista';
 }
+
 
 // Filtros recibidos por GET
 $dniFiltro      = trim($_GET['dni'] ?? '');
@@ -221,38 +223,31 @@ if ($cotizaciones) {
                             </td>
                             <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
                             <td>
-                                <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>"
-                                    class="btn btn-info btn-sm mb-1"
-                                    title="Ver cotización">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                                <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>"
-                                    class="btn btn-primary btn-sm mb-1"
-                                    title="Editar o agregar resultados">
-                                    <i class="bi bi-pencil-square"></i>
-                                </a>
-                                <?php if ($saldo > 0): ?>
-                                    <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>"
-                                        class="btn btn-warning btn-sm mb-1"
-                                        title="Registrar pago">
+                                <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
+                                    <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm mb-1" title="Ver cotización">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista'): ?>
+                                    <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-primary btn-sm mb-1" title="Editar o agregar resultados">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                <?php endif; ?>
+                                <?php if (($rol === 'admin' || $rol === 'recepcionista') && $saldo > 0): ?>
+                                    <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-warning btn-sm mb-1" title="Registrar pago">
                                         <i class="bi bi-cash-coin"></i>
                                     </a>
                                 <?php endif; ?>
                                 <?php if ($rol === 'admin'): ?>
-                                    <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>"
-                                        class="btn btn-danger btn-sm mb-1"
-                                        title="Eliminar cotización"
-                                        onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
+                                    <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-danger btn-sm mb-1" title="Eliminar cotización" onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
                                         <i class="bi bi-trash"></i>
                                     </a>
                                 <?php endif; ?>
-                                <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacion['id'] ?>"
-                                    class="btn btn-success btn-sm mb-1"
-                                    title="Descargar PDF de todos los resultados"
-                                    target="_blank">
-                                    <i class="bi bi-file-earmark-pdf"></i>
-                                </a>
-
+                                <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
+                                    <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-success btn-sm mb-1" title="Descargar PDF de todos los resultados" target="_blank">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

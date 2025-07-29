@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    // 1. USUARIOS (admin, recepcionista, laboratorista, etc.)
+    // 1. USUARIOS (admin, recepcionista, laboratorista, empresa, etc.)
     $auth = new Auth($pdo, 'usuarios');
     $usuario = $auth->login($email, $password);
     if ($usuario) {
@@ -29,6 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'laboratorista':
                 header('Location: ../dashboard.php?vista=laboratorista');
                 break;
+                case 'empresa':
+                header('Location: ../dashboard.php?vista=empresa');
+                break;
+                case 'convenio':
+                header('Location: ../dashboard.php?vista=convenio');
+                break;
             default:
                 header('Location: ../dashboard.php');
                 break;
@@ -45,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['empresa_id'] = $empresa['id'];
         $_SESSION['rol'] = 'empresa';
 
-        header('Location: dashboard.php?vista=empresa');
+        header('Location: ../dashboard.php?vista=empresa');
         exit;
     }
 
