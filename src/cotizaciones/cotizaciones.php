@@ -11,7 +11,7 @@ $botonUrl   = '';
 if ($rol === 'cliente') {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=form_cotizacion';
-} elseif ($rol === 'recepcionista' || $rol === 'admin' ) {
+} elseif ($rol === 'recepcionista' || $rol === 'admin') {
     $botonTexto = 'Nueva Cotización';
     $botonUrl   = 'dashboard.php?vista=clientes';
 }
@@ -159,107 +159,108 @@ if ($cotizaciones) {
                 </tr>
             </thead>
             <tbody>
-<?php if ($cotizaciones): ?>
-    <?php foreach ($cotizaciones as $cotizacion): ?>
-        <tr>
-            <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
-            <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
-            <td><?= htmlspecialchars($cotizacion['dni'] ?? '') ?></td>
-            <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
-            <td>S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></td>
-            <!-- Columna de referencia -->
-            <td>
-                <?php
-                if ($cotizacion['tipo_usuario'] === 'empresa' && $cotizacion['nombre_comercial']) {
-                    echo '<span class="badge bg-info text-dark">' . htmlspecialchars($cotizacion['nombre_comercial'] ?: $cotizacion['razon_social']) . '</span>';
-                } elseif ($cotizacion['tipo_usuario'] === 'convenio' && $cotizacion['nombre_convenio']) {
-                    echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($cotizacion['nombre_convenio']) . '</span>';
-                } else {
-                    echo '<span class="badge bg-secondary">Particular</span>';
-                }
-                ?>
-            </td>
-            <!-- Estado Pago calculado -->
-            <td>
-                <?php
-                $total = floatval($cotizacion['total']);
-                $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
-                $saldo = $total - $pagado;
+                <?php if ($cotizaciones): ?>
+                    <?php foreach ($cotizaciones as $cotizacion): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($cotizacion['dni'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
+                            <td>S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></td>
+                            <!-- Columna de referencia -->
+                            <td>
+                                <?php
+                                if ($cotizacion['tipo_usuario'] === 'empresa' && $cotizacion['nombre_comercial']) {
+                                    echo '<span class="badge bg-info text-dark">' . htmlspecialchars($cotizacion['nombre_comercial'] ?: $cotizacion['razon_social']) . '</span>';
+                                } elseif ($cotizacion['tipo_usuario'] === 'convenio' && $cotizacion['nombre_convenio']) {
+                                    echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($cotizacion['nombre_convenio']) . '</span>';
+                                } else {
+                                    echo '<span class="badge bg-secondary">Particular</span>';
+                                }
+                                ?>
+                            </td>
+                            <!-- Estado Pago calculado -->
+                            <td>
+                                <?php
+                                $total = floatval($cotizacion['total']);
+                                $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
+                                $saldo = $total - $pagado;
 
-                if ($saldo <= 0) {
-                    $badgeClassPago = 'bg-success';
-                    $iconPago = 'bi-check-circle-fill';
-                    $textoPago = 'Pagado';
-                } elseif ($pagado > 0) {
-                    $badgeClassPago = 'bg-warning text-dark';
-                    $iconPago = 'bi-hourglass-split';
-                    $textoPago = 'Parcial: S/ ' . number_format($saldo, 2);
-                } else {
-                    $badgeClassPago = 'bg-danger';
-                    $iconPago = 'bi-x-circle-fill';
-                    $textoPago = 'Pendiente: S/ ' . number_format($saldo, 2);
-                }
-                ?>
-                <span class="badge <?= $badgeClassPago ?>">
-                    <i class="bi <?= $iconPago ?>"></i>
-                    <?= $textoPago ?>
-                </span>
-            </td>
-            <!-- Estado Examen -->
-            <td>
-                <?php
-                $examenes = $examenesPorCotizacion[$cotizacion['id']] ?? [];
-                $pendientes = array_filter($examenes, function ($ex) {
-                    return $ex['estado'] === 'pendiente';
-                });
-                if ($pendientes) {
-                    echo "<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>";
-                } else {
-                    echo "<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>";
-                }
-                ?>
-            </td>
-            <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
-            <td>
-                <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>"
-                    class="btn btn-info btn-sm mb-1"
-                    title="Ver cotización">
-                    <i class="bi bi-eye"></i>
-                </a>
-                <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>"
-                    class="btn btn-primary btn-sm mb-1"
-                    title="Editar o agregar resultados">
-                    <i class="bi bi-pencil-square"></i>
-                </a>
-                <?php if ($saldo > 0): ?>
-                    <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>"
-                        class="btn btn-warning btn-sm mb-1"
-                        title="Registrar pago">
-                        <i class="bi bi-cash-coin"></i>
-                    </a>
+                                if ($saldo <= 0) {
+                                    $badgeClassPago = 'bg-success';
+                                    $iconPago = 'bi-check-circle-fill';
+                                    $textoPago = 'Pagado';
+                                } elseif ($pagado > 0) {
+                                    $badgeClassPago = 'bg-warning text-dark';
+                                    $iconPago = 'bi-hourglass-split';
+                                    $textoPago = 'Parcial: S/ ' . number_format($saldo, 2);
+                                } else {
+                                    $badgeClassPago = 'bg-danger';
+                                    $iconPago = 'bi-x-circle-fill';
+                                    $textoPago = 'Pendiente: S/ ' . number_format($saldo, 2);
+                                }
+                                ?>
+                                <span class="badge <?= $badgeClassPago ?>">
+                                    <i class="bi <?= $iconPago ?>"></i>
+                                    <?= $textoPago ?>
+                                </span>
+                            </td>
+                            <!-- Estado Examen -->
+                            <td>
+                                <?php
+                                $examenes = $examenesPorCotizacion[$cotizacion['id']] ?? [];
+                                $pendientes = array_filter($examenes, function ($ex) {
+                                    return $ex['estado'] === 'pendiente';
+                                });
+                                if ($pendientes) {
+                                    echo "<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>";
+                                } else {
+                                    echo "<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>";
+                                }
+                                ?>
+                            </td>
+                            <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
+                            <td>
+                                <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-info btn-sm mb-1"
+                                    title="Ver cotización">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-primary btn-sm mb-1"
+                                    title="Editar o agregar resultados">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <?php if ($saldo > 0): ?>
+                                    <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>"
+                                        class="btn btn-warning btn-sm mb-1"
+                                        title="Registrar pago">
+                                        <i class="bi bi-cash-coin"></i>
+                                    </a>
+                                <?php endif; ?>
+                                <?php if ($rol === 'admin'): ?>
+                                    <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>"
+                                        class="btn btn-danger btn-sm mb-1"
+                                        title="Eliminar cotización"
+                                        onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                <?php endif; ?>
+                                <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacion['id'] ?>"
+                                    class="btn btn-success btn-sm mb-1"
+                                    title="Descargar PDF de todos los resultados"
+                                    target="_blank">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
+
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="10" class="text-center">No hay cotizaciones registradas.</td>
+                    </tr>
                 <?php endif; ?>
-                <?php if ($rol === 'admin'): ?>
-                    <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>"
-                        class="btn btn-danger btn-sm mb-1"
-                        title="Eliminar cotización"
-                        onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
-                        <i class="bi bi-trash"></i>
-                    </a>
-                <?php endif; ?>
-                <a href="resultados/descarga-pdf.html?cotizacion_id=<?= $cotizacion['id'] ?>"
-                    class="btn btn-success btn-sm mb-1"
-                    title="Descargar PDF de todos los resultados"
-                    target="_blank">
-                    <i class="bi bi-file-earmark-pdf"></i>
-                </a>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-<?php else: ?>
-    <tr>
-        <td colspan="10" class="text-center">No hay cotizaciones registradas.</td>
-    </tr>
-<?php endif; ?>
             </tbody>
         </table>
     </div>

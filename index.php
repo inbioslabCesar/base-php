@@ -50,6 +50,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="./src/images/inbioslab-logo.svg" />
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -86,8 +87,9 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
         .carousel-inner img {
             object-fit: cover;
             width: 100%;
-            height: 340px;
+            height: 700px;
         }
+        
 
         .logo-navbar {
             max-width: 100px;
@@ -112,6 +114,15 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
         .servicios-slider::-webkit-scrollbar {
             display: none;
+        }
+
+        .card-body{
+             background: #5390D9;
+             color: white;
+
+        }
+        .card-title{
+            color: white;
         }
 
         .card-testimonio {
@@ -191,7 +202,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             <h5>Conócenos</h5>
             <div class="d-flex flex-wrap justify-content-center">
                 <?php foreach ($imagenes_institucionales as $img): ?>
-                    <img src="<?= htmlspecialchars($img) ?>" class="institucional-img" alt="Imagen institucional">
+                    <img src="src/<?= htmlspecialchars($img) ?>" class="institucional-img" alt="Imagen institucional">
                 <?php endforeach; ?>
             </div>
         </section>
@@ -215,7 +226,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
                 </div>
                 <div class="col-md-5 text-center">
                     <?php if (!empty($imagenes_institucionales[0])): ?>
-                        <img src="<?= htmlspecialchars($imagenes_institucionales[0]) ?>" alt="Imagen institucional" style="max-width:250px;border-radius:10px;">
+                        <img src="src/<?= htmlspecialchars($imagenes_institucionales[0]) ?>" alt="Imagen institucional" style="max-width:250px;border-radius:10px;">
                     <?php endif; ?>
                 </div>
             </div>

@@ -26,22 +26,31 @@
         font-size: 13px;
       }
       .logo {
-        height: 100px;
+        height: 90px;
         margin-bottom: 0;
         margin-top: 0;
+        display: block;
       }
-      .datos-cliente {
-        font-size: 0.95rem;
-        color: #444;
-        margin-bottom: 12px;
+      .d-flex.align-items-center.mb-1 {
+        margin-bottom: 4px !important;
+      }
+      .datos-cliente-tabla {
+        width: 100%;
+        margin: 2px 0 8px 0;
+        font-size: 13px;
+        color: #333;
+      }
+      .datos-cliente-tabla td {
+        padding: 2px 8px;
+        vertical-align: top;
       }
       .titulo-reporte {
         font-size: 1.2rem;
         font-weight: bold;
         text-align: center;
-        margin-bottom: 18px;
+        margin-bottom: 10px;
+        margin-top: 0;
         color: #1a237e;
-        background: none;
       }
       .table.no-borders,
       .table.no-borders th,
@@ -50,12 +59,12 @@
       }
       .table th {
         background: #f4f6fa;
-        color: #333;
+        color: #1a237e;
         font-weight: 600;
         font-size: 13px;
       }
       .table td {
-        font-size: 12px;
+        font-size: 13px;
       }
       .referencia-list {
         margin: 0;
@@ -75,6 +84,7 @@
       }
       .firma-footer {
         page-break-after: avoid;
+        text-align: right;
       }
       @media print {
         thead {
@@ -105,55 +115,63 @@
     <div class="container">
       <div class="reporte-box" id="reporte-pdf">
         <!-- Encabezado con logo y datos de la empresa -->
-        <div>
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <img
-              id="logo-empresa"
-              src="../images/empresa/logo_empresa.png"
-              alt="Logo Empresa"
-              class="logo"
-            />
-            <div class="empresa-info" id="empresa-info"></div>
-          </div>
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <img
+            id="logo-empresa"
+            src="../images/empresa/logo_empresa.png"
+            alt="Logo Empresa"
+            class="logo"
+            style="max-height: 90px"
+          />
+          <div class="empresa-info" id="empresa-info"></div>
+        </div>
 
-          <!-- Datos del paciente -->
-          <div class="row mb-2 mt-2 datos-cliente" id="datos-cliente"></div>
+        <!-- Datos del paciente en dos columnas -->
+        <table class="datos-cliente-tabla" id="tabla-datos-cliente">
+          <!-- Se llenará dinámicamente -->
+        </table>
 
-          <!-- Título del reporte -->
-          <div class="titulo-reporte">Reporte de Resultados</div>
+        <!-- Título del reporte -->
+        <div class="titulo-reporte">Reporte de Resultados</div>
 
-          <!-- Tabla de resultados -->
-          <table class="table no-borders" style="margin-top: 5px">
-            <thead>
-              <tr>
-                <th>Prueba</th>
-                <th>Metodología</th>
-                <th>Resultado</th>
-                <th>Unidades</th>
-                <th>Valores de Referencia</th>
-              </tr>
-            </thead>
-            <tbody id="tabla-resultados">
-              <!-- Las filas se llenan vía JS -->
-            </tbody>
-          </table>
+        <!-- Tabla de resultados -->
+        <table class="table no-borders" style="margin-top: 5px">
+          <thead>
+            <tr>
+              <th>Prueba</th>
+              <th>Metodología</th>
+              <th>Resultado</th>
+              <th>Unidades</th>
+              <th>Valores de Referencia</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-resultados">
+            <!-- Las filas se llenan vía JS -->
+          </tbody>
+        </table>
 
-          <button id="btn-descargar-pdf" class="btn btn-primary mt-4 no-print">
+        <!-- Botón pequeño alineado a la derecha -->
+        <div class="d-flex justify-content-end">
+          <button
+            id="btn-descargar-pdf"
+            class="btn btn-primary btn-sm mt-2 mb-3 no-print"
+          >
             <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
           </button>
         </div>
+
         <!-- Pie de página solo al final -->
-        <div class="firma-footer">
+        <div class="firma-footer" id="firma-footer">
           <div class="d-flex justify-content-end align-items-end mt-4">
             <img
               id="firma-empresa"
-              src="../images/empresa/firma.png"
+              src=""
               alt="Firma y sello"
               style="height: 80px"
             />
           </div>
           <hr class="my-3" />
-          <div style="font-size: 12px; color: #444">
+          <div style="font-size: 12px; color: #444; text-align: left">
             <div>(L) Laboratorio de Referencia</div>
             <div>* Resultados fuera de los rangos referenciales</div>
             <div>
@@ -164,22 +182,12 @@
       </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
+      // Asigna rutas por defecto al cargar la página
       const logo = document.getElementById("logo-empresa");
-      logo.src = logo.src + "?ver=" + new Date().getTime();
-
+      logo.src = "../images/empresa/logo_empresa.png";
       const firma = document.getElementById("firma-empresa");
-      firma.src = firma.src + "?ver=" + new Date().getTime();
-
-      function capitalizarPrimeraLetra(texto) {
-        if (!texto) return "";
-        return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
-      }
+      firma.src = "../images/empresa/firma.png";
 
       function getParameterByName(name) {
         const url = window.location.href;
@@ -190,65 +198,71 @@
         if (!results[2]) return "";
         return decodeURIComponent(results[2].replace(/\+/g, " "));
       }
-      const id = getParameterByName("cotizacion_id");
-
-      const empresa = {
-        direccion: "Av. Siempre Viva 123, Ciudad",
-        telefono: "123-456789",
-        celular: "987-654321",
-      };
+      const cotizacion_id = getParameterByName("cotizacion_id");
 
       $(document).ready(function () {
-        $("#empresa-info").html(
-          `<strong>Dirección:</strong> ${empresa.direccion}<br>
-       <strong>Teléfono:</strong> ${empresa.telefono}<br>
-       <strong>Celular:</strong> ${empresa.celular}`
-        );
-
         $.ajax({
-          url: "descarga-pdf.php",
+          url: "datos-reporte.php",
           method: "GET",
-          data: { cotizacion_id: id },
+          data: { cotizacion_id: cotizacion_id },
           dataType: "json",
           success: function (data) {
-            if (data.empresa) {
-              if (data.empresa.direccion)
-                empresa.direccion = data.empresa.direccion;
-              if (data.empresa.telefono)
-                empresa.telefono = data.empresa.telefono;
-              if (data.empresa.celular) empresa.celular = data.empresa.celular;
-              $("#empresa-info").html(
-                `<strong>Dirección:</strong> ${empresa.direccion}<br>
-             <strong>Teléfono:</strong> ${empresa.telefono}<br>
-             <strong>Celular:</strong> ${empresa.celular}`
+            // Logo y firma dinámicos si son diferentes a la ruta por defecto
+            if (data.empresa.logo) {
+              let logoRuta = "../../" + data.empresa.logo;
+              $("#logo-empresa").attr(
+                "src",
+                logoRuta + "?ver=" + new Date().getTime()
+              );
+            }
+            if (data.empresa.firma) {
+              let firmaRuta = "../../" + data.empresa.firma;
+              $("#firma-empresa").attr(
+                "src",
+                firmaRuta + "?ver=" + new Date().getTime()
               );
             }
 
-            $("#datos-cliente").html(`
-          <div class="col-6">
-            <strong>Paciente:</strong> ${data.paciente.nombre || ""} <br>
-            <strong>Código Cliente:</strong> ${
-              data.paciente.codigo_cliente || ""
-            } <br>
-            <strong>DNI:</strong> ${data.paciente.dni || ""} <br>
-          </div>
-          <div class="col-6">
-            <strong>Edad:</strong> ${data.paciente.edad || ""} <br>
-            <strong>Sexo:</strong> ${capitalizarPrimeraLetra(
-              data.paciente.sexo || ""
-            )} <br>
-            <strong>Fecha:</strong> ${data.paciente.fecha || ""}
-          </div>
-        `);
-
+            // Datos de empresa
+            $("#empresa-info").html(
+              `<strong>${data.empresa.nombre || ""}</strong><br>
+               ${data.empresa.direccion || ""}<br>
+               <span>Tel: ${data.empresa.telefono || ""}</span><br>
+               <span>Celular: ${data.empresa.celular || ""}</span>`
+            );
+            // Datos de paciente en dos columnas
+            $("#tabla-datos-cliente").html(`
+              <tr>
+                <td><strong>Paciente:</strong> ${
+                  data.paciente.nombre || ""
+                }</td>
+                <td><strong>Código Cliente:</strong> ${
+                  data.paciente.codigo_cliente || ""
+                }</td>
+              </tr>
+              <tr>
+                <td><strong>DNI:</strong> ${data.paciente.dni || ""}</td>
+                <td><strong>Edad:</strong> ${
+                  data.paciente.edad || ""
+                }   <strong>Sexo:</strong> ${data.paciente.sexo || ""}</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Fecha:</strong> ${
+                  data.paciente.fecha || ""
+                }</td>
+              </tr>
+            `);
+            // Resultados
             let filas = "";
             data.items.forEach(function (item) {
               if (item.tipo === "Subtítulo" || item.tipo === "Título") {
+                let colorFondo = item.color_fondo || "#f4f6fa";
+                let colorTexto = item.color_texto || "#333";
                 filas += `<tr>
-              <td colspan="5" style="background:${item.color_fondo};color:${item.color_texto};font-weight:bold;">
-                ${item.prueba}
-              </td>
-            </tr>`;
+                  <td colspan="5" style="background:${colorFondo};color:${colorTexto};font-weight:bold;border-radius:6px;">
+                    ${item.prueba}
+                  </td>
+                </tr>`;
               } else if (item.tipo === "Parámetro") {
                 let refHTML = "";
                 let referencias = Array.isArray(item.referencias)
@@ -265,8 +279,7 @@
                 } else if (referencias) {
                   refHTML = referencias;
                 }
-
-                // Formatea a 1 decimal si es numérico (corrige strings y floats)
+                // Formatea a 1 decimal si es numérico
                 let valorFormateado = item.valor;
                 if (
                   valorFormateado !== undefined &&
@@ -275,14 +288,13 @@
                 ) {
                   valorFormateado = Number(valorFormateado).toFixed(1);
                 }
-
                 filas += `<tr>
-              <td>${item.prueba}</td>
-              <td>${item.metodologia || ""}</td>
-              <td>${valorFormateado}</td>
-              <td>${item.unidad || ""}</td>
-              <td>${refHTML}</td>
-            </tr>`;
+                  <td>${item.prueba || ""}</td>
+                  <td>${item.metodologia || ""}</td>
+                  <td>${valorFormateado || ""}</td>
+                  <td>${item.unidad || ""}</td>
+                  <td>${refHTML || ""}</td>
+                </tr>`;
               }
             });
             $("#tabla-resultados").html(filas);
@@ -292,24 +304,12 @@
           },
         });
 
+        // Botón para descargar el PDF
         $("#btn-descargar-pdf").click(function () {
-          var element = document.getElementById("reporte-pdf");
-          var btn = document.getElementById("btn-descargar-pdf");
-          btn.style.display = "none";
-          var opt = {
-            margin: 0.5,
-            filename: "reporte-resultados.pdf",
-            image: { type: "jpeg", quality: 0.98 },
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
-          };
-          html2pdf()
-            .set(opt)
-            .from(element)
-            .save()
-            .then(function () {
-              btn.style.display = "";
-            });
+          window.open(
+            "descarga-pdf.php?cotizacion_id=" + cotizacion_id,
+            "_blank"
+          );
         });
       });
     </script>

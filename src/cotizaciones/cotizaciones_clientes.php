@@ -113,13 +113,14 @@ if ($cotizaciones) {
                         $totalExamenes = count($examenes);
                         $completados = count(array_filter($examenes, fn($ex) => $ex['estado'] !== 'pendiente'));
                         $porcentaje = $totalExamenes ? round(($completados / $totalExamenes) * 100) : 0;
-                        if ($porcentaje === 100) {
+                        if ((int)$porcentaje === 100) {
                             $resultBadge = '<span class="badge bg-success">Completado: 100%</span>';
                         } elseif ($porcentaje > 0) {
                             $resultBadge = '<span class="badge bg-warning text-dark">Parcial: ' . $porcentaje . '%</span>';
                         } else {
                             $resultBadge = '<span class="badge bg-danger">Pendiente: 0%</span>';
                         }
+
 
                         $descargarDisabled = ($saldo > 0 || $porcentaje < 100) ? 'disabled style="pointer-events: none; opacity: 0.6;"' : 'target="_blank"';
                         ?>
@@ -137,10 +138,11 @@ if ($cotizaciones) {
                                     title="Ver cotización">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <a href="resultados/descarga-pdf.html?cotizacion_id=<?= $cotizacionId ?>"
+                                <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacionId ?>"
                                     class="btn btn-success btn-sm mb-1"
                                     title="Descargar PDF de todos los resultados"
-                                    <?= $descargarDisabled ?>>
+                                    <?= $descargarDisabled ?>
+                                    target="_blank">
                                     <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
                                 </a>
                             </td>

@@ -1,0 +1,3 @@
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^inbioslabstore\.com [NC]
+RewriteRule ^(.*)$ https://www.inbioslabstore.com/$1 [L,R=301]

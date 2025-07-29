@@ -34,10 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$tipo_toma, $fecha_toma, $hora_toma, $direccion_toma, $estado_muestra, $id_cotizacion]);
 
     $rol = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
-    if ($rol === 'cliente') {
-        header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones_clientes');
-    } else {
-        header('Location: ' . BASE_URL . 'dashboard.php?vista=admin');
-    }
-    exit;
+if ($rol === 'cliente') {
+    header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones_clientes');
+} else {
+    header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones');
+}
+exit;
+
 }

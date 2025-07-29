@@ -1,16 +1,16 @@
-# INBIOSLAB - Sistema Modular para Laboratorio Clínico ## Descripción Sistema web modular y escalable para la gestión de un laboratorio clínico. Permite administrar usuarios, clientes, empresas, exámenes, resultados y cotizaciones, con autenticación y roles diferenciados. --- ## Estructura de Carpetas 
+# INBIOSLAB - Sistema Modular para Laboratorio Clínico ## Descripción Sistema web modular y escalable para la gestión de un laboratorio clínico. Permite administrar usuarios, clientes, empresas, exámenes, resultados y cotizaciones, con autenticación y roles diferenciados. --- ## Estructura de Carpetas
 
 /src /auth login.php logout.php registro.php recuperar.php /clientes editar_cliente.php eliminar_cliente.php form_cliente.php tabla_cliente.php /empresas editar_empresa.php eliminar_empresa.php form_empresa.php tabla_empresa.php /usuarios editar_usuario.php eliminar_usuario.php form_usuario.php tabla_usuario.php /examenes editar_examen.php eliminar_examen.php form_examen.php tabla_examen.php /componentes navbar.php sidebar.php footer.php /conexion config.php dashboard.php index.php
 
- --- ## Tablas de Base de Datos (MySQL/MariaDB) ### Tabla usuarios ```sql CREATE TABLE usuarios ( id INT AUTO_INCREMENT PRIMARY KEY, usuario VARCHAR(50) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, nombre VARCHAR(50) NOT NULL, apellido VARCHAR(50) NOT NULL, dni VARCHAR(20) NOT NULL UNIQUE, sexo ENUM('masculino','femenino','otro') NOT NULL, fecha_nacimiento DATE, email VARCHAR(100) NOT NULL UNIQUE, telefono VARCHAR(20), direccion VARCHAR(150), cargo VARCHAR(50), profesion VARCHAR(50), rol ENUM('admin','recepcionista','bioquimico') DEFAULT 'recepcionista', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP, estado ENUM('activo','inactivo') DEFAULT 'activo' ); 
+--- ## Tablas de Base de Datos (MySQL/MariaDB) ### Tabla usuarios ```sql CREATE TABLE usuarios ( id INT AUTO_INCREMENT PRIMARY KEY, usuario VARCHAR(50) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, nombre VARCHAR(50) NOT NULL, apellido VARCHAR(50) NOT NULL, dni VARCHAR(20) NOT NULL UNIQUE, sexo ENUM('masculino','femenino','otro') NOT NULL, fecha_nacimiento DATE, email VARCHAR(100) NOT NULL UNIQUE, telefono VARCHAR(20), direccion VARCHAR(150), cargo VARCHAR(50), profesion VARCHAR(50), rol ENUM('admin','recepcionista','bioquimico') DEFAULT 'recepcionista', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP, estado ENUM('activo','inactivo') DEFAULT 'activo' );
 
- CREATE TABLE clientes ( id INT AUTO_INCREMENT PRIMARY KEY, codigo_cliente VARCHAR(20) NOT NULL UNIQUE, nombre VARCHAR(50) NOT NULL, apellido VARCHAR(50) NOT NULL, email VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, telefono VARCHAR(20), direccion VARCHAR(150), dni VARCHAR(20), sexo ENUM('masculino','femenino','otro'), fecha_nacimiento DATE, referencia VARCHAR(100), procedencia VARCHAR(100), promociones JSON, fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP, estado ENUM('activo','inactivo') DEFAULT 'activo' ); 
+CREATE TABLE clientes ( id INT AUTO_INCREMENT PRIMARY KEY, codigo_cliente VARCHAR(20) NOT NULL UNIQUE, nombre VARCHAR(50) NOT NULL, apellido VARCHAR(50) NOT NULL, email VARCHAR(100) NOT NULL UNIQUE, password VARCHAR(255) NOT NULL, telefono VARCHAR(20), direccion VARCHAR(150), dni VARCHAR(20), sexo ENUM('masculino','femenino','otro'), fecha_nacimiento DATE, referencia VARCHAR(100), procedencia VARCHAR(100), promociones JSON, fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP, estado ENUM('activo','inactivo') DEFAULT 'activo' );
 
- CREATE TABLE empresas ( id INT AUTO_INCREMENT PRIMARY KEY, ruc VARCHAR(20) NOT NULL UNIQUE, razon_social VARCHAR(100) NOT NULL, nombre_comercial VARCHAR(100), direccion VARCHAR(150), telefono VARCHAR(20), email VARCHAR(100) NOT NULL UNIQUE, representante VARCHAR(100), password VARCHAR(255) NOT NULL, convenio VARCHAR(100), estado ENUM('activo','inactivo') DEFAULT 'activo', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP ); 
+CREATE TABLE empresas ( id INT AUTO_INCREMENT PRIMARY KEY, ruc VARCHAR(20) NOT NULL UNIQUE, razon_social VARCHAR(100) NOT NULL, nombre_comercial VARCHAR(100), direccion VARCHAR(150), telefono VARCHAR(20), email VARCHAR(100) NOT NULL UNIQUE, representante VARCHAR(100), password VARCHAR(255) NOT NULL, convenio VARCHAR(100), estado ENUM('activo','inactivo') DEFAULT 'activo', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP );
 
- CREATE TABLE examenes ( id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(100) NOT NULL, descripcion TEXT, area VARCHAR(50), metodologia VARCHAR(100), fase_preanalitica TEXT, tiempo_proceso VARCHAR(50), precio_publico DECIMAL(10,2) NOT NULL, precio_convenio DECIMAL(10,2), precio_campania DECIMAL(10,2), precio_oferta DECIMAL(10,2), stock INT DEFAULT 0, contador_consumo INT DEFAULT 0, promociones JSON, estado ENUM('activo','inactivo') DEFAULT 'activo', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP ); 
+CREATE TABLE examenes ( id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(100) NOT NULL, descripcion TEXT, area VARCHAR(50), metodologia VARCHAR(100), fase_preanalitica TEXT, tiempo_proceso VARCHAR(50), precio_publico DECIMAL(10,2) NOT NULL, precio_convenio DECIMAL(10,2), precio_campania DECIMAL(10,2), precio_oferta DECIMAL(10,2), stock INT DEFAULT 0, contador_consumo INT DEFAULT 0, promociones JSON, estado ENUM('activo','inactivo') DEFAULT 'activo', fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP );
 
- CREATE TABLE formatos_resultados ( id INT AUTO_INCREMENT PRIMARY KEY, examen_id INT NOT NULL, nombre_formato VARCHAR(50), tipo_formato ENUM('media_hoja','a4','personalizado') DEFAULT 'a4', plantilla TEXT, FOREIGN KEY (examen_id) REFERENCES examenes(id) ); 
+CREATE TABLE formatos_resultados ( id INT AUTO_INCREMENT PRIMARY KEY, examen_id INT NOT NULL, nombre_formato VARCHAR(50), tipo_formato ENUM('media_hoja','a4','personalizado') DEFAULT 'a4', plantilla TEXT, FOREIGN KEY (examen_id) REFERENCES examenes(id) );
 
 Buenas Prácticas Implementadas
 Código modular, organizado por carpetas y componentes.
@@ -28,8 +28,6 @@ Autor:
 Cesar & Kodee (Hostinger AI)
 2025
 
-
-
 INBIOSLAB - Sistema de Gestión de Clientes
 Descripción
 Este proyecto es un sistema modular para la gestión de clientes de un laboratorio clínico, desarrollado en PHP y MySQL. Permite a los usuarios con permisos (admin) registrar, listar, editar y eliminar clientes, y cuenta con control de acceso por roles.
@@ -43,12 +41,12 @@ Roles: Solo el admin puede gestionar clientes; los clientes solo ven una bienven
 Seguridad: Contraseñas hasheadas y validaciones en el backend.
 Interfaz modular: Uso de componentes (header, navbar, sidebar, footer) para fácil personalización.
 Estructura del proyecto
-/src/ /clientes/ tabla_clientes.php form_clientes.php editar_cliente.php eliminar_cliente.php /componentes/ header.php navbar.php sidebar.php footer.php /conexion/ conexion.php /config/ config.php dashboard.php index.php 
+/src/ /clientes/ tabla_clientes.php form_clientes.php editar_cliente.php eliminar_cliente.php /componentes/ header.php navbar.php sidebar.php footer.php /conexion/ conexion.php /config/ config.php dashboard.php index.php
 
 Instalación
 Clona el repositorio o sube los archivos a tu servidor local/hosting.
 Importa la base de datos y ejecuta este SQL para agregar los nuevos campos:
-ALTER TABLE clientes ADD COLUMN edad INT(3) AFTER apellido, ADD COLUMN procedencia VARCHAR(100) AFTER sexo, ADD COLUMN referencia VARCHAR(100) AFTER procedencia; 
+ALTER TABLE clientes ADD COLUMN edad INT(3) AFTER apellido, ADD COLUMN procedencia VARCHAR(100) AFTER sexo, ADD COLUMN referencia VARCHAR(100) AFTER procedencia;
 
 Configura la conexión a la base de datos en /src/conexion/conexion.php. Accede al sistema desde:
 http://localhost/base-php/src/dashboard.php
@@ -63,31 +61,30 @@ El sistema está preparado para extenderse a otros módulos (usuarios, empresas,
 Si tienes dudas, revisa los archivos PHP comentados y la estructura modular.
 ¿Quieres que agregue instrucciones para otros módulos o más detalles técnicos?
 
-
 ++-------03-----
 Proyecto: INBIOSLAB - Laboratorio Clínico Estructura de carpetas y archivos principales
 Copy
 src/
-  ├── auth/
-  │     ├── login.php, registro.php, recuperar.php, restablecer.php
-  ├── clases/
-  ├── clientes/
-  │     ├── tabla_clientes.php, form_clientes.php, editar_cliente.php, eliminar_cliente.php
-  ├── empresas/
-  │     ├── tabla_empresas.php, form_empresa.php, editar_empresa.php, eliminar_empresa.php
-  ├── usuarios/
-  │     ├── tabla_usuarios.php, form_usuario.php, editar_usuario.php, eliminar_usuario.php
-  ├── componentes/
-  │     ├── header.php, navbar.php, sidebar.php, footer.php
-  ├── config/
-  │     ├── config.php
-  ├── conexion/
-  │     ├── conexion.php
-  └── dashboard.php
+├── auth/
+│ ├── login.php, registro.php, recuperar.php, restablecer.php
+├── clases/
+├── clientes/
+│ ├── tabla_clientes.php, form_clientes.php, editar_cliente.php, eliminar_cliente.php
+├── empresas/
+│ ├── tabla_empresas.php, form_empresa.php, editar_empresa.php, eliminar_empresa.php
+├── usuarios/
+│ ├── tabla_usuarios.php, form_usuario.php, editar_usuario.php, eliminar_usuario.php
+├── componentes/
+│ ├── header.php, navbar.php, sidebar.php, footer.php
+├── config/
+│ ├── config.php
+├── conexion/
+│ ├── conexion.php
+└── dashboard.php
 Variables y lógica clave Variables de sesión
 $_SESSION[&apos;usuario&apos;] → Email del usuario autenticado.
-$_SESSION[&apos;nombre&apos;] → Nombre visible del usuario.
-$_SESSION[&apos;rol&apos;] → Rol principal: admin, recepcionista, laboratorista, cliente, empresa.
+$\_SESSION[&apos;nombre&apos;] → Nombre visible del usuario.
+$\_SESSION[&apos;rol&apos;] → Rol principal: admin, recepcionista, laboratorista, cliente, empresa.
 (En empresas/clientes, el acceso es personalizado; en usuarios el acceso depende del rol ENUM.)
 Roles y permisos
 admin: Acceso total a CRUD de clientes, usuarios y empresas.
@@ -104,7 +101,7 @@ Validaciones PHP con in_array para evitar errores de truncado.
 Email único para usuarios.
 CRUD Modular
 Cada entidad (clientes, usuarios, empresas) tiene sus propios archivos: tabla, form, editar, eliminar.
-Todos los includes usan rutas absolutas con __DIR__.
+Todos los includes usan rutas absolutas con **DIR**.
 Sidebar y dashboard
 Sidebar muestra solo los enlaces permitidos según el rol.
 dashboard.php valida permisos y carga vistas dinámicamente según el rol y el parámetro vista.
@@ -140,55 +137,55 @@ Totalmente responsivo con Bootstrap 5.
 El botón hamburguesa solo aparece en móvil y controla el sidebar offcanvas.
 Espaciado adicional en el sidebar móvil para mejorar la experiencia de usuario.
 Rutas y Includes
-Todos los includes usan rutas absolutas con __DIR__ para evitar errores de ubicación.
+Todos los includes usan rutas absolutas con **DIR** para evitar errores de ubicación.
 Los archivos de vistas para cada rol están organizados en carpetas específicas.
 Ejemplo de Estructura
 Copy
 BASE-PHP/src/
 │
 ├── componentes/
-│   ├── header.php
-│   ├── sidebar.php
-│   └── footer.php
+│ ├── header.php
+│ ├── sidebar.php
+│ └── footer.php
 │
 ├── config/
-│   └── config.php
+│ └── config.php
 │
 ├── usuarios/
-│   └── editar_usuario.php
-│   └── eliminar_usuario.php
-│   └── form_usuarios.php
-│   └── tabla_usuarios.php vistas/
-│                          └── panel_admin.php
-│                          │__ panel_recepcionista.php
-│                          │__ panel_laboratorista.php
+│ └── editar_usuario.php
+│ └── eliminar_usuario.php
+│ └── form_usuarios.php
+│ └── tabla_usuarios.php vistas/
+│ └── panel_admin.php
+│ │** panel_recepcionista.php
+│ │** panel_laboratorista.php
 │
 ├── empresas/
-│   └── editar_empresa.php
-│   └── eliminar_empresa.php
-│   └── form_empresa.php
-│   └── tabla_uempresas.php vistas/
-│                           └── panel_empresa.php
+│ └── editar_empresa.php
+│ └── eliminar_empresa.php
+│ └── form_empresa.php
+│ └── tabla_uempresas.php vistas/
+│ └── panel_empresa.php
 |
 ├── convenios/
-│   └── editar_convenio.php
-│   └── eliminar_convenio.php
-│   └── form_convenios.php
-│   └── tabla_convenios.php vistas/
-│                           └── panel_cconvenio.php
+│ └── editar_convenio.php
+│ └── eliminar_convenio.php
+│ └── form_convenios.php
+│ └── tabla_convenios.php vistas/
+│ └── panel_cconvenio.php
 │
 ├── clientes/
-│   └── editar_cliente.php
-│   └── eliminar_cliente.php
-│   └── form_clientes.php
-│   └── tabla_clientes.php vistas/
-│                           └── panel_cliente.php
+│ └── editar_cliente.php
+│ └── eliminar_cliente.php
+│ └── form_clientes.php
+│ └── tabla_clientes.php vistas/
+│ └── panel_cliente.php
 ├── examenes/
-│   └── editar_examen.php
-│   └── eliminar_examen.php
-│   └── form_examenes.php
-│   └── tabla_examenes.php funciones/
-|                          |__examenes_crud.php
+│ └── editar_examen.php
+│ └── eliminar_examen.php
+│ └── form_examenes.php
+│ └── tabla_examenes.php funciones/
+| |\_\_examenes_crud.php
 │
 ├── dashboard.php
 └── ...
@@ -198,6 +195,7 @@ Para agregar nuevos roles o vistas, sigue la estructura y lógica de los módulo
 Todos los cambios de diseño deben hacerse en los archivos de componentes para mantener la modularidad.
 
 ----------11-06-2025-------------
+
 # Módulo de Cotizaciones – INBIOSLAB
 
 Este módulo permite la generación, gestión y consulta de cotizaciones de exámenes para clientes, empresas y convenios, tanto desde el panel de usuario como desde los perfiles de recepcionista y laboratorista.
@@ -207,6 +205,7 @@ Este módulo permite la generación, gestión y consulta de cotizaciones de exá
 ## Estructura de Base de Datos
 
 ### Tabla: cotizaciones
+
 - `id`: INT, clave primaria, auto-incremental.
 - `codigo`: VARCHAR(30), código único de cotización (ej: COT-2024-0001).
 - `id_cliente`: INT, referencia a clientes (nullable).
@@ -222,6 +221,7 @@ Este módulo permite la generación, gestión y consulta de cotizaciones de exá
 - `rol_creador`: ENUM('cliente','recepcionista','laboratorista','admin'), rol del creador.
 
 ### Tabla: cotizaciones_detalle
+
 - `id`: INT, clave primaria.
 - `id_cotizacion`: INT, referencia a cotizaciones.
 - `id_examen`: INT, referencia a examenes.
@@ -235,22 +235,26 @@ Este módulo permite la generación, gestión y consulta de cotizaciones de exá
 ## Funcionalidades
 
 ### 1. Generación de Cotizaciones
+
 - El usuario (cliente, empresa, convenio, recepcionista o laboratorista) selecciona exámenes y genera una cotización.
 - El sistema calcula precios según el tipo de usuario y muestra el total.
 - Se genera un PDF formal con logo, datos del laboratorio, datos del cliente/empresa/convenio, lista de exámenes, totales y condiciones.
 - El PDF incluye el código de cotización y los datos para rotulación de muestras.
 
 ### 2. Consulta e Historial
+
 - Cada usuario puede ver su historial de cotizaciones filtrando por fecha, estado de pago, etc.
 - Recepcionistas y laboratoristas pueden buscar clientes por DNI, código, nombre o apellido para generar cotizaciones en el laboratorio.
 - El sistema registra quién y cuándo realizó cada cotización.
 - El historial muestra estado del pago y permite descargar/imprimir el PDF.
 
 ### 3. Restricciones y Seguridad
+
 - Si la cotización tiene exámenes pendientes de pago, el usuario no puede descargar los resultados.
 - Solo el usuario correspondiente o personal autorizado puede ver y descargar sus cotizaciones y resultados.
 
 ### 4. Reportes y Auditoría
+
 - Para empresas/convenios: resumen de producción y deuda según el contrato (mensual, quincenal, semanal, diario).
 - Auditoría de cotizaciones por usuario creador (recepcionista/laboratorista).
 
@@ -294,18 +298,17 @@ Este módulo permite la generación, gestión y consulta de cotizaciones de exá
 
 src/
 └── cotizaciones/
-    ├── cotizaciones.php             # Listado e historial de cotizaciones del cliente
-    ├── form_cotizacion.php          # Formulario para crear nueva cotización
-    ├── crear_cotizacion.php         # Lógica para crear cotización (procesa el formulario)
-    ├── ver_cotizacion.php           # Vista/Detalle de una cotización específica
-    ├── descargar_pdf.php            # Descarga la cotización en PDF (si está pagada)
-    ├── imprimir_cotizacion.php      # Vista amigable para imprimir
-    ├── data/
-    │   └── cotizaciones_detalle.php # Gestión AJAX/detalle de exámenes en la cotización (opcional)
-    └── assets/
-        ├── cotizacion.css           # Estilos específicos para cotizaciones (opcional)
-        └── cotizacion.js            # JS específico para formularios/cotizaciones (opcional)
-
+├── cotizaciones.php # Listado e historial de cotizaciones del cliente
+├── form_cotizacion.php # Formulario para crear nueva cotización
+├── crear_cotizacion.php # Lógica para crear cotización (procesa el formulario)
+├── ver_cotizacion.php # Vista/Detalle de una cotización específica
+├── descargar_pdf.php # Descarga la cotización en PDF (si está pagada)
+├── imprimir_cotizacion.php # Vista amigable para imprimir
+├── data/
+│ └── cotizaciones_detalle.php # Gestión AJAX/detalle de exámenes en la cotización (opcional)
+└── assets/
+├── cotizacion.css # Estilos específicos para cotizaciones (opcional)
+└── cotizacion.js # JS específico para formularios/cotizaciones (opcional)
 
 ¿Qué hace cada archivo?
 cotizaciones.php:
@@ -330,7 +333,7 @@ data/cotizaciones_detalle.php (opcional):
 Para cargar detalles dinámicamente vía AJAX si quieres una experiencia más interactiva.
 
 assets/:
-Para tus estilos y scripts propios del módulo de cotizaciones.    
+Para tus estilos y scripts propios del módulo de cotizaciones.
 
 -----------12-06-25-------------
 Módulo de Cotizaciones – INBIOSLAB Descripción General
@@ -338,20 +341,19 @@ Este módulo permite la gestión integral de cotizaciones para el laboratorio cl
 
 Estructura de Archivos
 cotizaciones/
-    crear_cotizacion.php
-    descargar_pdf.php
-    editar_cotizacion.php
-    eliminar_cotizacion.php
-    form_cotizacion.php
-    imprimir_cotizacion.php
-    ver_cotizacion.php
-    cotizaciones.php
- assets/
-    cotizacion.css
-    cotizacion.js
- data/
-    cotizaciones_detalle.php
-
+crear_cotizacion.php
+descargar_pdf.php
+editar_cotizacion.php
+eliminar_cotizacion.php
+form_cotizacion.php
+imprimir_cotizacion.php
+ver_cotizacion.php
+cotizaciones.php
+assets/
+cotizacion.css
+cotizacion.js
+data/
+cotizaciones_detalle.php
 
 funcionalidades recomendadas para continuar y fortalecer tu sistema:
 
@@ -381,30 +383,25 @@ Cambiar el estado_pago desde la interfaz.
 Mostrar estadísticas: cotizaciones por mes, por estado, por usuario, etc.
 
 Flujo y Convenciones 1. Acceso y Sesiones
-Control de acceso: Todas las vistas y acciones verifican el rol y el ID del usuario mediante variables de sesión ($_SESSION[&apos;rol&apos;], $_SESSION[&apos;usuario_id&apos;], $_SESSION[&apos;cliente_id&apos;], etc.).
+Control de acceso: Todas las vistas y acciones verifican el rol y el ID del usuario mediante variables de sesión ($\_SESSION[&apos;rol&apos;], $\_SESSION[&apos;usuario_id&apos;], $\_SESSION[&apos;cliente_id&apos;], etc.).
 Redirecciones: Toda lógica que use header() se ejecuta antes de incluir header.php/sidebar.php para evitar errores de headers.
-Roles soportados: admin, cliente, empresa, convenio, recepcionista, laboratorista.
-2. CRUD de Cotizaciones
+Roles soportados: admin, cliente, empresa, convenio, recepcionista, laboratorista. 2. CRUD de Cotizaciones
 Crear: El formulario se accede vía dashboard.php?vista=form_cotizacion y se procesa con dashboard.php?action=crear_cotizacion.
 Ver: Detalles completos en ver_cotizacion.php, mostrando exámenes, cantidades y totales.
 Editar y Eliminar: Solo para cotizaciones pendientes y según permisos.
-Listar: Vista responsiva con DataTables, muestra código, fecha, exámenes, total, estado y acciones.
-3. Base de Datos
+Listar: Vista responsiva con DataTables, muestra código, fecha, exámenes, total, estado y acciones. 3. Base de Datos
 Campos clave:
 codigo (string, generado automáticamente)
 creado_por (ID del usuario que crea)
 rol_creador (rol del creador)
 nombre_examen (en cotizaciones_detalle, obligatorio)
-Relaciones: Cada cotización puede estar asociada a cliente, empresa o convenio, y guarda historial de detalles.
-4. Interfaz y Usabilidad
+Relaciones: Cada cotización puede estar asociada a cliente, empresa o convenio, y guarda historial de detalles. 4. Interfaz y Usabilidad
 Responsividad: Tablas y botones adaptados para PC, tablet y móvil, usando Bootstrap y Bootstrap Icons.
 Acciones: En PC/tablet, botones directos; en móvil, menú desplegable.
-Mensajes: Uso de $_SESSION[&apos;mensaje&apos;] para retroalimentación al usuario.
-5. Seguridad y Buenas Prácticas
+Mensajes: Uso de $\_SESSION[&apos;mensaje&apos;] para retroalimentación al usuario. 5. Seguridad y Buenas Prácticas
 Validación: Todos los formularios validan datos requeridos y roles antes de procesar.
 Preparación de consultas: Uso de PDO y consultas preparadas para evitar inyección SQL.
-No acceso directo: Todos los archivos lógicos se acceden mediante el dashboard y no directamente.
-6. Recomendaciones para Continuar
+No acceso directo: Todos los archivos lógicos se acceden mediante el dashboard y no directamente. 6. Recomendaciones para Continuar
 Implementa edición y eliminación segura de cotizaciones.
 Mejora la gestión de pagos y permite cambiar el estado desde la interfaz.
 Agrega notificaciones por email/SMS (opcional).
@@ -416,7 +413,6 @@ Usa siempre validaciones de sesión y rol.
 Ejecuta lógica de redirección antes de cualquier renderizado HTML.
 Mantén los mensajes y la interfaz consistentes con Bootstrap y DataTables.
 Documenta cualquier cambio importante en este archivo.
-
 
 Documentación: Visualización de Cotizaciones Pendientes en Panel Cliente Descripción
 El panel del cliente muestra un resumen de cotizaciones pendientes, incluyendo el número de cotizaciones en proceso y el monto total a pagar. Esta funcionalidad es clave para que el cliente tenga visibilidad clara y rápida de sus deudas y procesos activos.
@@ -441,9 +437,9 @@ $pendientes = 0;
 $total_deuda = 0;
 foreach ($estados as $e) {
     if (strtolower($e['estado_pago']) === 'pendiente') {
-        $pendientes = $e['total'];
-        $total_deuda = $e['suma'];
-    }
+$pendientes = $e['total'];
+$total_deuda = $e['suma'];
+}
 }
 Se utiliza strtolower para evitar problemas con mayúsculas/minúsculas.
 No se usa floatval/intval si la consulta y la base de datos ya devuelven datos correctos, pero puede agregarse para mayor robustez.
@@ -451,6 +447,7 @@ Visualización en la interfaz
 El resultado se muestra en una card Bootstrap:
 
 Copy
+
 <p class="mb-0"><strong>Total a pagar:</strong> S/ <?= number_format($total_deuda, 2) ?></p>
 Esto asegura que el cliente vea el monto exacto de sus cotizaciones pendientes, con formato monetario adecuado.
 
@@ -461,11 +458,11 @@ Siempre validar y sanitizar los datos antes de mostrarlos en la interfaz.
 Si se agregan nuevos estados de pago, actualizar la lógica del foreach en consecuencia.
 Resumen
 Este flujo garantiza que el cliente siempre vea el número correcto de cotizaciones pendientes y el total a pagar, mejorando la experiencia y la transparencia en el sistema.
+
 <form action="dashboard.php?action=<?= $esEdicion ? 'editar_promocion&id=' . $promo['id'] : 'crear_promocion' ?>" method="post" enctype="multipart/form-data">
 
 <button type="submit" class="btn btn-primary"><?= $esEdicion ? 'Actualizar' : 'Crear' ?> Cotización</button>
-        <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Cancelar</a>
-
+<a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Cancelar</a>
 
         ----19/06/2025---
         Proyecto modular en PHP para la gestión de usuarios y vistas con control de acceso basado en roles.
@@ -474,15 +471,15 @@ Estructura del Proyecto
 BASE-PHP/
 │
 ├── src/
-│   ├── autenticacion/
-│   ├── configuracion/
-│   ├── clientes/
-│   ├── componentes/
-│   ├── conexión/
-│   │   └── conexion.php
-│   ├── dashboard.php
-│   ├── index.php
-│   └── ...
+│ ├── autenticacion/
+│ ├── configuracion/
+│ ├── clientes/
+│ ├── componentes/
+│ ├── conexión/
+│ │ └── conexion.php
+│ ├── dashboard.php
+│ ├── index.php
+│ └── ...
 ├── tmp/
 ├── vendor/
 └── ...
@@ -490,7 +487,7 @@ Principales características
 Gestión de sesiones:
 Las sesiones se inician solo si no están activas, previniendo errores de headers.
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+session_start();
 }
 Control de acceso basado en roles:
 Los permisos y accesos a vistas están definidos en arrays asociativos, asignando acciones y vistas a cada rol de usuario.
@@ -528,11 +525,6 @@ promociones: Permite gestionar promociones activas, con campos para títulos, de
 examenes: Contiene los datos de los exámenes disponibles, con información técnica y comercial relevante.
 Cada tabla puede servir como base para módulos específicos (clientes, cotizaciones, promociones, exámenes, etc.).
 
-
-
-
-
-
 ----modulo reporte resultados----
 Flujo recomendado para el módulo de resultados
 Cotización: El cliente/recepcionista cotiza uno o más exámenes.
@@ -561,13 +553,13 @@ Archivo JavaScript para manejar AJAX, inicializar DataTables, validaciones y acc
 
 Estructura de archivos sugerida
 /src/resultados/
-    listado.php
-    formulario.php
-    guardar.php
-    ver.php
-    api_listado.php
-    js/
-        resultados.js
+listado.php
+formulario.php
+guardar.php
+ver.php
+api_listado.php
+js/
+resultados.js
 
 Recomendaciones adicionales
 Usa Bootstrap 5 en todas las vistas para asegurar el diseño responsive.
@@ -576,7 +568,6 @@ Utiliza AJAX para guardar y consultar resultados sin recargar la página.
 Separa la lógica PHP (backend) de la presentación (frontend) y los scripts JS.
 Aplica validaciones tanto en el frontend (JS) como en el backend (PHP).
 Prueba en móvil y tablet para asegurar la experiencia responsive.
-
 
 Usa includes o templates para la cabecera y pie en las vistas PHP, centralizando el HTML común.
 Realiza las validaciones de datos en JS antes de enviar el formulario y, nuevamente, en PHP al recibir los datos.
@@ -605,82 +596,81 @@ sql para traer solo los nombres de la coumnas de una tablas
 SELECT COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = 'laboratorio'
-  AND TABLE_NAME = 'examenes';
+AND TABLE_NAME = 'examenes';
 
 sql para traer todo los datos del campo json
 SELECT
-  j.nombre,
-  j.unidad,
-  j.referencia
+j.nombre,
+j.unidad,
+j.referencia
 FROM examenes,
-  JSON_TABLE(
-    adicional, '$[*]'
+JSON_TABLE(
+adicional, '$[*]'
     COLUMNS (
       nombre VARCHAR(100) PATH '$.nombre',
-      unidad VARCHAR(20) PATH '$.unidad',
+unidad VARCHAR(20) PATH '$.unidad',
       referencia VARCHAR(50) PATH '$.referencia'
-    )
-  ) AS j
+)
+) AS j
 WHERE id = 1;
-
 
 CAMPO ADICIONAL EN JSON
 
 [
-  {
-    "tipo": "Subtítulo",
-    "orden": 1,
-    "nombre": "Perfil lipídico Completo",
-    "unidad": "",
-    "formula": "",
-    "negrita": true,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "",
-    "referencias": []
-  },
-  {
-    "tipo": "Parámetro",
-    "orden": 2,
-    "nombre": "Colesterol Total",
-    "unidad": "mg/dl",
-    "formula": "",
-    "negrita": false,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "Enzimatico Colorimétrico",
-    "referencias": [{"desc": "", "valor": "(<200)"}]
-  },
-  {
-    "tipo": "Parámetro",
-    "orden": 3,
-    "nombre": "Colesterol HDL",
-    "unidad": "mg/dl",
-    "formula": "[Colesterol Total]/5",
-    "negrita": false,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "Enzimatico Colorimétrico",
-    "referencias": [{"desc": "", "valor": "(35-65)"}]
-  },
-  {
-    "tipo": "Parámetro",
-    "orden": 4,
-    "nombre": "Colesterol LDL",
-    "unidad": "mg/dl",
-    "formula": "[Colesterol Total]-[Colesterol HDL]-[Colesterol VLDL]",
-    "negrita": false,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "Enzimatico Colorimétrico",
-    "referencias": [{"desc": "", "valor": "(<135)"}]
-  },
-  {
-    
+{
+"tipo": "Subtítulo",
+"orden": 1,
+"nombre": "Perfil lipídico Completo",
+"unidad": "",
+"formula": "",
+"negrita": true,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "",
+"referencias": []
+},
+{
+"tipo": "Parámetro",
+"orden": 2,
+"nombre": "Colesterol Total",
+"unidad": "mg/dl",
+"formula": "",
+"negrita": false,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "Enzimatico Colorimétrico",
+"referencias": [{"desc": "", "valor": "(<200)"}]
+},
+{
+"tipo": "Parámetro",
+"orden": 3,
+"nombre": "Colesterol HDL",
+"unidad": "mg/dl",
+"formula": "[Colesterol Total]/5",
+"negrita": false,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "Enzimatico Colorimétrico",
+"referencias": [{"desc": "", "valor": "(35-65)"}]
+},
+{
+"tipo": "Parámetro",
+"orden": 4,
+"nombre": "Colesterol LDL",
+"unidad": "mg/dl",
+"formula": "[Colesterol Total]-[Colesterol HDL]-[Colesterol VLDL]",
+"negrita": false,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "Enzimatico Colorimétrico",
+"referencias": [{"desc": "", "valor": "(<135)"}]
+},
+{
+
     "tipo": "Parámetro",
     "orden": 7,
     "nombre": "Trigliceridos",
@@ -692,34 +682,34 @@ CAMPO ADICIONAL EN JSON
     "color_texto": "#000000",
     "metodologia": "Enzimatico Colorimétrico",
     "referencias": [{"desc": "", "valor": "(<150)"}]
-  }
-   {"tipo": "Parámetro",
-    "orden": 5,
-    "nombre": "Colesterol VLDL",
-    "unidad": "mg/dl",
-    "formula": "[Trigliceridos]/5",
-    "negrita": false,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "Enzimatico Colorimétrico",
-    "referencias": [{"desc": "", "valor": "(25-35)"}]
-  },
-  {
-    "tipo": "Parámetro",
-    "orden": 6,
-    "nombre": "Riesgo Coronario",
-    "unidad": "%",
-    "formula": "[Colesterol Total]/[Colesterol HDL]",
-    "negrita": false,
-    "opciones": [],
-    "color_fondo": "#ffffff",
-    "color_texto": "#000000",
-    "metodologia": "Calculo",
-    "referencias": [{"desc": "", "valor": "(<5.0)"}]
-  },
-  {
 
+}
+{"tipo": "Parámetro",
+"orden": 5,
+"nombre": "Colesterol VLDL",
+"unidad": "mg/dl",
+"formula": "[Trigliceridos]/5",
+"negrita": false,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "Enzimatico Colorimétrico",
+"referencias": [{"desc": "", "valor": "(25-35)"}]
+},
+{
+"tipo": "Parámetro",
+"orden": 6,
+"nombre": "Riesgo Coronario",
+"unidad": "%",
+"formula": "[Colesterol Total]/[Colesterol HDL]",
+"negrita": false,
+"opciones": [],
+"color_fondo": "#ffffff",
+"color_texto": "#000000",
+"metodologia": "Calculo",
+"referencias": [{"desc": "", "valor": "(<5.0)"}]
+},
+{
 
 $(document).ready(function() {
   $.ajax({
@@ -740,22 +730,20 @@ $(document).ready(function() {
       data.resultados.forEach(function(r) {
         filas += `<tr>
           <td>${r.prueba}</td>
-          <td>${r.metodologia}</td>
+<td>${r.metodologia}</td>
           <td>${r.resultado}</td>
-          <td>${r.unidades}</td>
+<td>${r.unidades}</td>
           <td>${r.referencia}</td>
-        </tr>`;
-      });
-      $('#tabla-resultados').html(filas);
-    }
-  });
+</tr>`;
+});
+$('#tabla-resultados').html(filas);
+}
+});
 });
 
-
-
 ----COMO RENDERIZA EN MEDIO DE LA PALABRA----
-<h4 class="text-center mb-3">Iniciar Sesión en <?= htmlspecialchars($config['nombre']) ?></h4>
 
+<h4 class="text-center mb-3">Iniciar Sesión en <?= htmlspecialchars($config['nombre']) ?></h4>
 
 ----conexion---
 
@@ -773,3 +761,6 @@ $pass = 'Medditech123';
 
 
 pasame el codigo completo de form_cotizacion con todas las actualizaciones y modificaciones desde el principio por partes si es extenso el codigo no modifiques ninguna variable o cambie de nombre lo que ya tiene para no alterar el codigo
+
+
+{"HCM": "30.0", "VCM": "90.8", "CHCM": "33.0", "RDW-CV": "14.6", "MONOCITOS": "0.3", "PLAQUETAS": "200,000", "BASÓFILOS": "0.1", "LINFOCITOS": "1.3", "MONOCITOS%": "4", "ABASTONADOS": "0.1", "BASÓFILOS%": "1", "HEMATOCRITO": "45.4", "HEMOGLOBINA": "15", "LINFOCITOS%": "19", "SEGMENTADOS": "5.0", "ABASTONADOS%": "1", "EOSINÓFILOS": "0.3", "SEGMENTADOS%": "71", "EOSINÓFILOS%": "4", "R_GLOBULOS_ROJOS": "5.0", "R_GLOBULOS_BLANCOS": "7,000"}
