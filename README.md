@@ -764,3 +764,232 @@ pasame el codigo completo de form_cotizacion con todas las actualizaciones y mod
 
 
 {"HCM": "30.0", "VCM": "90.8", "CHCM": "33.0", "RDW-CV": "14.6", "MONOCITOS": "0.3", "PLAQUETAS": "200,000", "BASÓFILOS": "0.1", "LINFOCITOS": "1.3", "MONOCITOS%": "4", "ABASTONADOS": "0.1", "BASÓFILOS%": "1", "HEMATOCRITO": "45.4", "HEMOGLOBINA": "15", "LINFOCITOS%": "19", "SEGMENTADOS": "5.0", "ABASTONADOS%": "1", "EOSINÓFILOS": "0.3", "SEGMENTADOS%": "71", "EOSINÓFILOS%": "4", "R_GLOBULOS_ROJOS": "5.0", "R_GLOBULOS_BLANCOS": "7,000"}
+
+
+----flujo empresa convenio 29/07/2025---
+ Flujo de Registro y Cotización de Clientes para Empresas y Convenios 1. Registro y Búsqueda de Clientes
+Evitar duplicados:
+Antes de registrar un cliente, el sistema debe buscar por DNI (o correo) en la tabla clientes.
+Si el cliente existe:
+Mostrar sus datos y permitir asociarlo a la empresa/convenio actual.
+O permitir hacer una nueva cotización para ese cliente.
+Si el cliente no existe:
+Permitir registrar un nuevo cliente, guardando el empresa_id o convenio_id según corresponda.
+2. Asociación de Clientes
+Un cliente puede estar asociado a varias empresas/convenios.
+Si detectas un cliente existente, asócialo a la empresa/convenio actual usando un campo empresa_id o convenio_id en la tabla clientes, o una tabla intermedia si necesitas relaciones múltiples.
+3. Creación de Cotización
+Al seleccionar un cliente existente:
+El formulario de cotización debe autocompletar los datos del cliente.
+Al registrar un nuevo cliente:
+Después del registro, redirigir al formulario de cotización con los datos del nuevo cliente.
+4. Flujo recomendado en la interfaz
+Buscar cliente por DNI o nombre.
+Si existe:
+Mostrar datos y botón “Asociar y cotizar”.
+Si no existe:
+Mostrar formulario para registrar nuevo cliente.
+Una vez seleccionado/registrado el cliente:
+Mostrar formulario de cotización autocompletado con los datos del cliente.
+Registrar cotización asociando el id_cliente y el id_empresa o id_convenio correspondiente.
+5. Listados y permisos
+Empresa/convenio:
+Puede ver todos sus clientes y sus cotizaciones.
+Puede registrar nuevos clientes y cotizaciones.
+Puede descargar resultados solo si no hay deuda y los exámenes están completos.
+Cliente:
+Solo puede ver y descargar sus propias cotizaciones y resultados.
+6. Recomendaciones técnicas
+Usa la tabla clientes para todos los clientes.
+Usa los campos empresa_id o convenio_id para asociar clientes según corresponda.
+Evita duplicar clientes, valida siempre por DNI/correo antes de registrar.
+Reutiliza los formularios y CRUD existentes adaptando los filtros y relaciones.
+
+Ejemplo de Consulta para Buscar Cliente
+
+SELECT * FROM clientes WHERE dni = ? LIMIT 1;
+
+Ejemplo de Asociación
+Si el cliente ya existe, actualiza el campo empresa_id o convenio_id si corresponde, o crea la relación en una tabla intermedia.
+Próximos pasos
+Implementa la búsqueda y validación de clientes al registrar.
+Prepara el formulario de cotización para autocompletar datos si el cliente existe.
+Adapta las vistas de empresa y convenio para mostrar y gestionar sus clientes y cotizaciones.
+
+Esto te servirá de guía clara y rápida para implementar el flujo de registro, asociación y cotización de clientes para empresas y convenios.
+
+📊 Diagrama de Flujo (Texto)
+[INICIO]
+   |
+   v
+[Buscar cliente por DNI]
+   |
+   +---[¿Existe cliente?]---+
+   |                        |
+  Sí                        No
+   |                        |
+   v                        v
+[Mostrar datos]        [Formulario registro]
+   |                        |
+[¿Asociado a empresa/convenio?]
+   |                        |
+  No                        Sí
+   |                        |
+[Asociar]               [Ir a cotización]
+   |                        |
+   v                        v
+[Formulario cotización (autocompletado)]
+   |
+   v
+[Registrar cotización]
+   |
+   v
+[FIN]
+
+
+ Ejemplo de Código PHP/MySQL 
+ 
+ 1. Buscar Cliente por DNI
+
+ $dni = $_POST['dni'];
+$sql = "SELECT * FROM clientes WHERE dni = ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$dni]);
+$cliente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($cliente) {
+    // Cliente existe, mostrar datos y opción de asociar/cotizar
+} else {
+    // Mostrar formulario para registrar nuevo cliente
+}
+
+2. Asociar Cliente Existente a Empresa/Convenio
+Si usas un campo directo en clientes:
+
+// Por ejemplo, para asociar a empresa
+$sql = "UPDATE clientes SET empresa_id = ? WHERE id = ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$empresa_id, $cliente['id']]);
+
+Si usas tabla intermedia (ejemplo: clientes_empresas):
+
+$sql = "INSERT IGNORE INTO clientes_empresas (cliente_id, empresa_id) VALUES (?, ?)";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$cliente['id'], $empresa_id]);
+
+3. Registrar Cotización
+
+$sql = "INSERT INTO cotizaciones (id_cliente, id_empresa, fecha, total, ...) VALUES (?, ?, ?, ?, ...)";
+$stmt = $pdo->prepare($sql);
+$stmt->execute([$cliente['id'], $empresa_id, date('Y-m-d'), $total, ...]);
+
+4. Autocompletar Formulario de Cotización
+En el formulario HTML, si $cliente existe:
+
+<input type="text" name="nombre" value="<?= htmlspecialchars($cliente['nombre']) ?>" readonly>
+<input type="text" name="dni" value="<?= htmlspecialchars($cliente['dni']) ?>" readonly>
+<!-- y así con los demás campos -->
+📝 Recomendaciones Visuales
+En el formulario de búsqueda, usa un campo de texto para DNI y un botón "Buscar".
+Si el cliente existe, muestra sus datos en campos readonly y un botón “Cotizar”.
+Si no existe, muestra el formulario de registro completo.
+Después de registrar o seleccionar el cliente, muestra el formulario de cotización ya rellenado.
+📐 Sugerencia de Tablas Relacionales
+clientes: todos los clientes.
+empresas: todas las empresas.
+convenio: todos los convenios.
+cotizaciones: todas las cotizaciones.
+(Opcional) clientes_empresas o clientes_convenios: si un cliente puede estar en varias empresas/convenios.
+
+para mantener tu proyecto ordenado y escalable.
+
+1. Carpeta y Archivo para Búsqueda de Cliente
+Carpeta sugerida:
+/empresa/ (y/o /convenio/ si prefieres separar)
+
+Archivo principal:
+buscar_cliente.php
+
+Formulario para ingresar DNI y buscar cliente.
+Muestra resultado (datos del cliente o formulario de registro).
+2. Carpeta y Archivo para Registro de Cliente
+Archivo:
+registrar_cliente.php
+
+Formulario de registro solo si el cliente no existe.
+Guarda el cliente y lo asocia a la empresa/convenio.
+3. Carpeta y Archivo para Cotización
+Archivo:
+form_cotizacion.php
+
+Formulario de cotización, autocompletado con los datos del cliente seleccionado o recién registrado.
+4. Carpeta y Archivo para Listado
+Archivo:
+listado_clientes.php
+
+Muestra todos los clientes asociados a la empresa/convenio logueado.
+Archivo:
+listado_cotizaciones.php
+
+Muestra todas las cotizaciones de los clientes asociados.
+📁 Estructura de carpetas sugerida
+
+/empresa/
+    buscar_cliente.php
+    registrar_cliente.php
+    form_cotizacion.php
+    listado_clientes.php
+    listado_cotizaciones.php
+
+/convenio/
+    buscar_cliente.php
+    registrar_cliente.php
+    form_cotizacion.php
+    listado_clientes.php
+    listado_cotizaciones.php
+Puedes compartir lógica y plantillas entre empresa y convenio usando includes, si lo deseas.
+
+¿Cómo seguimos?
+1. Creamos /empresa/buscar_cliente.php
+
+/src/
+  /empresas/
+    form_cotizacion_empresa.php
+    acciones/
+      cotizacion_empresa_accion.php
+  /convenios/
+    form_cotizacion_convenio.php
+    acciones/
+      cotizacion_convenio_accion.php
+
+      /src/
+  /empresas/
+    buscar_cliente.php
+    registrar_cliente.php
+    form_cotizacion_empresa.php
+    listado_clientes.php
+    listado_cotizaciones.php
+    /acciones/
+      buscar_cliente_accion.php
+      registrar_cliente_accion.php
+      cotizacion_empresa_accion.php
+  /convenios/
+    buscar_cliente.php
+    registrar_cliente.php
+    form_cotizacion_convenio.php
+    listado_clientes.php
+    listado_cotizaciones.php
+    /acciones/
+      buscar_cliente_accion.php
+      registrar_cliente_accion.php
+      cotizacion_convenio_accion.php
+
+http://localhost/base-php/src/dashboard.php?vista=form_cotizacion&id=59
+
+http://localhost/base-php/src/dashboard.php?vista=form_cotizacion&id=59
+
+al precionar guardar cotizacion
+
+admin => http://localhost/base-php/src/dashboard.php?vista=agendar_cita&id_cotizacion=204
+
+empresas => http://localhost/base-php/src/dashboard.php?action=crear_cotizacion

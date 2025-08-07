@@ -17,7 +17,6 @@ if ($rol === 'recepcionista' || $rol === 'admin') {
     $botonUrl   = 'dashboard.php?vista=laboratorista';
 }
 
-
 // Filtros recibidos por GET
 $dniFiltro      = trim($_GET['dni'] ?? '');
 $empresaFiltro  = trim($_GET['empresa'] ?? '');
@@ -27,7 +26,7 @@ $convenioFiltro = trim($_GET['convenio'] ?? '');
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
 
-// Construcción dinámica del SQL y parámetros
+// Consulta principal con LEFT JOIN para empresa y convenio
 $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni,
         e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
         FROM cotizaciones c
@@ -36,7 +35,6 @@ $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente
         LEFT JOIN convenios v ON c.id_convenio = v.id";
 $condiciones = [];
 $params = [];
-
 if ($dniFiltro !== '') {
     $condiciones[] = "cl.dni = ?";
     $params[] = $dniFiltro;
@@ -58,7 +56,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Consulta para exámenes de cada cotización (sin cambios)
+// Consulta para exámenes de cada cotización
 $examenesPorCotizacion = [];
 if ($cotizaciones) {
     $idsCotizaciones = array_column($cotizaciones, 'id');
@@ -77,7 +75,7 @@ if ($cotizaciones) {
     }
 }
 
-// Consulta pagos por cotización (sin cambios)
+// Consulta pagos por cotización
 $pagosPorCotizacion = [];
 if ($cotizaciones) {
     $idsCotizaciones = array_column($cotizaciones, 'id');
@@ -172,15 +170,18 @@ if ($cotizaciones) {
                             <!-- Columna de referencia -->
                             <td>
                                 <?php
-                                if ($cotizacion['tipo_usuario'] === 'empresa' && $cotizacion['nombre_comercial']) {
-                                    echo '<span class="badge bg-info text-dark">' . htmlspecialchars($cotizacion['nombre_comercial'] ?: $cotizacion['razon_social']) . '</span>';
-                                } elseif ($cotizacion['tipo_usuario'] === 'convenio' && $cotizacion['nombre_convenio']) {
+                                if (!empty($cotizacion['id_empresa']) && (!empty($cotizacion['nombre_comercial']) || !empty($cotizacion['razon_social']))) {
+                                    echo '<span class="badge bg-info text-dark">' .
+                                        htmlspecialchars($cotizacion['nombre_comercial'] ?: $cotizacion['razon_social']) .
+                                        '</span>';
+                                } elseif (!empty($cotizacion['id_convenio']) && !empty($cotizacion['nombre_convenio'])) {
                                     echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($cotizacion['nombre_convenio']) . '</span>';
                                 } else {
                                     echo '<span class="badge bg-secondary">Particular</span>';
                                 }
                                 ?>
                             </td>
+
                             <!-- Estado Pago calculado -->
                             <td>
                                 <?php

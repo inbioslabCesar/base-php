@@ -45,7 +45,8 @@ $stmt = $pdo->prepare("
         conv.nombre AS nombre_convenio,
         emp.nombre_comercial AS nombre_empresa,
         cl.nombre, cl.apellido,
-        SUM(p.monto) AS total_pagado
+        SUM(p.monto) AS total_pagado,
+        GROUP_CONCAT(DISTINCT p.metodo_pago SEPARATOR ', ') AS metodo_pago
     FROM cotizaciones c
     JOIN clientes cl ON c.id_cliente = cl.id
     LEFT JOIN convenios conv ON c.id_convenio = conv.id
@@ -81,163 +82,193 @@ $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </select>
         </div>
         <?php if ($tipo_paciente == 'convenio'): ?>
-        <div class="col-auto">
-            <label class="form-label">Convenio</label>
-            <select name="filtro_convenio" class="form-select" onchange="this.form.submit()">
-                <option value="">Todos</option>
-                <?php foreach ($convenios as $convenio): ?>
-                    <option value="<?= $convenio['id'] ?>" <?= $filtro_convenio == $convenio['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($convenio['nombre']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+            <div class="col-auto">
+                <label class="form-label">Convenio</label>
+                <select name="filtro_convenio" class="form-select" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <?php foreach ($convenios as $convenio): ?>
+                        <option value="<?= $convenio['id'] ?>" <?= $filtro_convenio == $convenio['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($convenio['nombre']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         <?php elseif ($tipo_paciente == 'empresa'): ?>
-        <div class="col-auto">
-            <label class="form-label">Empresa</label>
-            <select name="filtro_empresa" class="form-select" onchange="this.form.submit()">
-                <option value="">Todas</option>
-                <?php foreach ($empresas as $empresa): ?>
-                    <option value="<?= $empresa['id'] ?>" <?= $filtro_empresa == $empresa['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($empresa['nombre_comercial']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+            <div class="col-auto">
+                <label class="form-label">Empresa</label>
+                <select name="filtro_empresa" class="form-select" onchange="this.form.submit()">
+                    <option value="">Todas</option>
+                    <?php foreach ($empresas as $empresa): ?>
+                        <option value="<?= $empresa['id'] ?>" <?= $filtro_empresa == $empresa['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($empresa['nombre_comercial']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         <?php endif; ?>
         <div class="col-auto">
             <button type="submit" class="btn btn-primary">Filtrar</button>
             <a href="dashboard.php?vista=ingresos" class="btn btn-secondary">Limpiar</a>
         </div>
     </form>
-<div class="table-responsive">
-    <table id="tablaIngresos" class="table table-striped table-bordered align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Código Cotización</th>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Tipo de Paciente</th>
-                <th>Referencia</th>
-                <th>Total Cotización</th>
-                <th>Adelanto</th>
-                <th>Deuda</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php 
-            $total_deuda = 0;
-            $total_adelanto = 0;
-            foreach ($registros as $row): 
-                $total_cotizacion = floatval($row['total_cotizacion']);
-                $adelanto = floatval($row['total_pagado'] ?? 0);
-                $deuda = $total_cotizacion - $adelanto;
-                $total_deuda += $deuda;
-                $total_adelanto += $adelanto;
-            ?>
+    <div class="table-responsive">
+        <table id="tablaIngresos" class="table table-striped table-bordered align-middle">
+            <thead class="table-dark">
                 <tr>
-                    <td><?= htmlspecialchars($row['codigo_cotizacion']) ?></td>
-                    <td><?= htmlspecialchars($row['fecha']) ?></td>
-                    <td><?= htmlspecialchars($row['nombre'] . ' ' . $row['apellido']) ?></td>
-                    <td>
-                        <?php
-                        if ($row['tipo_usuario'] === 'empresa' && $row['nombre_empresa']) {
-                            echo 'Empresa';
-                        } elseif ($row['tipo_usuario'] === 'convenio' && $row['nombre_convenio']) {
-                            echo 'Convenio';
-                        } else {
-                            echo 'Particular';
-                        }
-                        ?>
-                    </td>
-                    <td>
-                        <?php
-                        if ($row['tipo_usuario'] === 'empresa' && $row['nombre_empresa']) {
-                            echo '<span class="badge bg-info text-dark">' . htmlspecialchars($row['nombre_empresa']) . '</span>';
-                        } elseif ($row['tipo_usuario'] === 'convenio' && $row['nombre_convenio']) {
-                            echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($row['nombre_convenio']) . '</span>';
-                        } else {
-                            echo '<span class="badge bg-secondary">Particular</span>';
-                        }
-                        ?>
-                    </td>
-                    <td>S/ <?= number_format($total_cotizacion, 2) ?></td>
-                    <td>S/ <?= number_format($adelanto, 2) ?></td>
-                    <td>
-                        <?php if ($deuda > 0): ?>
-                            <span class="badge bg-danger">S/ <?= number_format($deuda, 2) ?></span>
-                        <?php else: ?>
-                            <span class="badge bg-success">Sin deuda</span>
-                        <?php endif; ?>
-                    </td>
+                    <th>Código Cotización</th>
+                    <th>Fecha</th>
+                    <th>Mét. Pago</th>
+                    <th>Cliente</th>
+                    <th>Tipo de Paciente</th>
+                    <th>Referencia</th>
+                    <th>Total Cotización</th>
+                    <th>Adelanto</th>
+                    <th>Deuda</th>
                 </tr>
-            <?php endforeach; ?>
-            <?php if (!$registros): ?>
-                <tr>
-                    <td colspan="8" class="text-center">No hay registros en el periodo.</td>
+            </thead>
+            <tbody>
+                <?php
+                $total_deuda = 0;
+                $total_adelanto = 0;
+                foreach ($registros as $row):
+                    $total_cotizacion = floatval($row['total_cotizacion']);
+                    $adelanto = floatval($row['total_pagado'] ?? 0);
+                    $deuda = $total_cotizacion - $adelanto;
+                    $total_deuda += $deuda;
+                    $total_adelanto += $adelanto;
+                ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['codigo_cotizacion']) ?></td>
+                        <td><?= htmlspecialchars($row['fecha']) ?></td>
+                        <td>
+                            <?php
+                            if (!empty($row['metodo_pago'])) {
+                                $metodos = explode(',', $row['metodo_pago']);
+                                foreach ($metodos as $metodo) {
+                                    $metodo = trim($metodo);
+                                    switch (strtolower($metodo)) {
+                                        case 'efectivo':
+                                            $badge = 'success';
+                                            break;
+                                        case 'transferencia':
+                                            $badge = 'primary';
+                                            break;
+                                        case 'yape':
+                                            $badge = 'info';
+                                            break;
+                                        case 'tarjeta':
+                                            $badge = 'warning text-dark';
+                                            break;
+                                        default:
+                                            $badge = 'secondary';
+                                    }
+                                    echo '<span class="badge bg-' . $badge . ' me-1">' . htmlspecialchars(ucfirst($metodo)) . '</span>';
+                                }
+                            } else {
+                                echo 'Sin información';
+                            }
+                            ?>
+                        </td>
+
+                        <td><?= htmlspecialchars($row['nombre'] . ' ' . $row['apellido']) ?></td>
+                        <td>
+                            <?php
+                            if (!empty($row['id_empresa'])) {
+                                echo 'Empresa';
+                            } elseif (!empty($row['id_convenio'])) {
+                                echo 'Convenio';
+                            } else {
+                                echo 'Particular';
+                            }
+                            ?>
+                        </td>
+                        <td>
+                            <?php
+                            if (!empty($row['id_empresa']) && !empty($row['nombre_empresa'])) {
+                                echo '<span class="badge bg-info text-dark">' . htmlspecialchars($row['nombre_empresa']) . '</span>';
+                            } elseif (!empty($row['id_convenio']) && !empty($row['nombre_convenio'])) {
+                                echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($row['nombre_convenio']) . '</span>';
+                            } else {
+                                echo '<span class="badge bg-secondary">Particular</span>';
+                            }
+                            ?>
+                        </td>
+                        <td>S/ <?= number_format($total_cotizacion, 2) ?></td>
+                        <td>S/ <?= number_format($adelanto, 2) ?></td>
+                        <td>
+                            <?php if ($deuda > 0): ?>
+                                <span class="badge bg-danger">S/ <?= number_format($deuda, 2) ?></span>
+                            <?php else: ?>
+                                <span class="badge bg-success">Sin deuda</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$registros): ?>
+                    <tr>
+                        <td colspan="8" class="text-center">No hay registros en el periodo.</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+            <tfoot>
+                <tr class="table-info fw-bold">
+                    <td colspan="7" class="text-end">Totales del periodo:</td>
+                    <td>S/ <?= number_format($total_adelanto, 2) ?></td>
+                    <td>S/ <?= number_format($total_deuda, 2) ?></td>
                 </tr>
-            <?php endif; ?>
-        </tbody>
-        <tfoot>
-            <tr class="table-info fw-bold">
-                <td colspan="6" class="text-end">Totales del periodo:</td>
-                <td>S/ <?= number_format($total_adelanto, 2) ?></td>
-                <td>S/ <?= number_format($total_deuda, 2) ?></td>
-            </tr>
-        </tfoot>
-    </table>
-</div>
-<!-- CSS de DataTables y Botones -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+            </tfoot>
+        </table>
+    </div>
+    <!-- CSS de DataTables y Botones -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
 
-<!-- JS de jQuery, DataTables y Botones -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+    <!-- JS de jQuery, DataTables y Botones -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 
-<!-- Inicialización de DataTables con botones de exportación -->
-<script>
-$(document).ready(function() {
-    $('#tablaIngresos').DataTable({
-        "pageLength": 10,
-        "lengthMenu": [5, 10, 25, 50, 100],
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
-        },
-        dom: 'Bfrtip',
-        buttons: [
-            {
-                extend: 'excelHtml5',
-                text: '<i class="bi bi-file-earmark-excel"></i> Exportar a Excel',
-                className: 'btn btn-success mb-2'
-            },
-            {
-                extend: 'pdfHtml5',
-                text: '<i class="bi bi-file-earmark-pdf"></i> Exportar a PDF',
-                className: 'btn btn-danger mb-2',
-                orientation: 'landscape',
-                pageSize: 'A4',
-                exportOptions: {
-                    columns: ':visible'
+    <!-- Inicialización de DataTables con botones de exportación -->
+    <script>
+        $(document).ready(function() {
+            $('#tablaIngresos').DataTable({
+                "pageLength": 10,
+                "lengthMenu": [5, 10, 25, 50, 100],
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
                 },
-                customize: function(doc) {
-                    doc.defaultStyle.fontSize = 10;
-                }
-            },
-            {
-                extend: 'print',
-                text: '<i class="bi bi-printer"></i> Imprimir',
-                className: 'btn btn-info mb-2'
-            }
-        ]
-    });
-});
-</script>
+                dom: 'Bfrtip',
+                buttons: [{
+                        extend: 'excelHtml5',
+                        text: '<i class="bi bi-file-earmark-excel"></i> Exportar a Excel',
+                        className: 'btn btn-success mb-2'
+                    },
+                    {
+                        extend: 'pdfHtml5',
+                        text: '<i class="bi bi-file-earmark-pdf"></i> Exportar a PDF',
+                        className: 'btn btn-danger mb-2',
+                        orientation: 'landscape',
+                        pageSize: 'A4',
+                        exportOptions: {
+                            columns: ':visible'
+                        },
+                        customize: function(doc) {
+                            doc.defaultStyle.fontSize = 10;
+                        }
+                    },
+                    {
+                        extend: 'print',
+                        text: '<i class="bi bi-printer"></i> Imprimir',
+                        className: 'btn btn-info mb-2'
+                    }
+                ]
+            });
+        });
+    </script>

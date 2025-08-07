@@ -1,17 +1,16 @@
-<?php
-require_once __DIR__ . '/../../config/config.php';
-?>
-
-<div class="container my-4">
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h2 class="card-title mb-3">Bienvenido al Panel de Convenios</h2>
-            <p class="card-text">
-                Aquí puedes gestionar todos los convenios: registrar, editar, eliminar y consultar información de médicos, clínicas u otras entidades con precios especiales.
-            </p>
-            <a href="<?= BASE_URL ?>dashboard.php?vista=form_convenio" class="btn btn-success">
-                <i class="bi bi-plus-circle"></i> Registrar nuevo convenio
-            </a>
+<div class="container mt-5">
+    <div class="card shadow p-4">
+        <div class="row g-3">
+            <div class="col-md-6 d-grid">
+                <a href="dashboard.php?vista=buscar_cliente" class="btn btn-primary btn-lg">
+                    <i class="bi bi-search"></i> Buscar cliente
+                </a>
+            </div>
+            <div class="col-md-6 d-grid">
+                <a href="dashboard.php?vista=cotizaciones_convenios" class="btn btn-success btn-lg">
+                    <i class="bi bi-file-earmark-text"></i> Ver cotizaciones
+                </a>
+            </div>
         </div>
     </div>
 </div>

@@ -1,4 +1,16 @@
 <div class="container mt-5">
-    <h1>¡Bienvenido, Empresa formal!</h1>
-    <p>Este es tu panel personalizado. Próximamente tendrás más funcionalidades aquí.</p>
+    <div class="card shadow p-4">
+        <div class="row g-3">
+            <div class="col-md-6 d-grid">
+                <a href="dashboard.php?vista=buscar_cliente" class="btn btn-primary btn-lg">
+                    <i class="bi bi-search"></i> Buscar cliente
+                </a>
+            </div>
+            <div class="col-md-6 d-grid">
+                <a href="dashboard.php?vista=cotizaciones_empresas" class="btn btn-success btn-lg">
+                    <i class="bi bi-file-earmark-text"></i> Ver cotizaciones
+                </a>
+            </div>
+        </div>
+    </div>
 </div>

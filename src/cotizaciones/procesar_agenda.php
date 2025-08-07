@@ -36,6 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rol = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
 if ($rol === 'cliente') {
     header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones_clientes');
+} elseif ($rol === 'empresa') {
+    header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones_empresas');
+} elseif ($rol === 'convenio') {
+    header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones_convenios');
 } else {
     header('Location: ' . BASE_URL . 'dashboard.php?vista=cotizaciones');
 }
