@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../conexion/conexion.php';
 
 $idCotizacion = $_POST['id'] ?? null;
-$nuevo_abono = floatval($_POST['monto_abonado'] ?? 0);
+$nuevo_abono = round(floatval($_POST['monto_abonado'] ?? 0), 2);
 $metodo = $_POST['metodo'] ?? '';
 $fecha_pago = $_POST['fecha_pago'] ?? date('Y-m-d');
 
@@ -19,11 +19,14 @@ if (!$cotizacion) {
 // Calcular total abonado y saldo pendiente
 $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
 $stmtPagos->execute([$idCotizacion]);
-$totalPagado = floatval($stmtPagos->fetchColumn());
-$saldo = floatval($cotizacion['total']) - $totalPagado;
+$totalPagado = round(floatval($stmtPagos->fetchColumn()), 2);
+$saldo = round(floatval($cotizacion['total']) - $totalPagado, 2);
 
 // Validar y registrar pago
-if ($nuevo_abono <= 0 || $nuevo_abono > $saldo) {
+if (
+    ($metodo !== 'descarga_anticipada' && ($nuevo_abono <= 0 || $nuevo_abono > $saldo)) ||
+    ($metodo === 'descarga_anticipada' && $nuevo_abono < 0)
+) {
     header("Location: dashboard.php?vista=pago_cotizacion&id=$idCotizacion&msg=error");
     exit;
 } else {

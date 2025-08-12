@@ -1,41 +1,21 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-            if ($id > 0) {
-                $stmt = $pdo->prepare("SELECT * FROM promociones WHERE id = ?");
-                $stmt->execute([$id]);
-                $promocion = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($promocion) {
-                    $_SESSION['promocion_editar'] = $promocion;
-                    header('Location: dashboard.php?vista=form_promocion');
-                    exit;
-                } else {
-                    $_SESSION['error'] = 'Promoción no encontrada.';
-                    header('Location: dashboard.php?vista=promociones');
-                    exit;
-                }
-            } else {
-                $_SESSION['error'] = 'ID de promoción no válido.';
-                header('Location: dashboard.php?vista=promociones');
-                exit;
-            }
-
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $titulo = trim($_POST['titulo'] ?? '');
-    $descripcion = trim($_POST['descripcion'] ?? '');
-    $precio_promocional = floatval($_POST['precio_promocional'] ?? 0);
-    $fecha_inicio = $_POST['fecha_inicio'] ?? null;
-    $fecha_fin = $_POST['fecha_fin'] ?? null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['id'])) {
+    $id = intval($_GET['id']);
+    $titulo = trim($_POST['titulo']);
+    $descripcion = trim($_POST['descripcion']);
+    $precio_promocional = floatval($_POST['precio_promocional']);
+    $descuento = floatval($_POST['descuento']);
+    $fecha_inicio = $_POST['fecha_inicio'];
+    $fecha_fin = $_POST['fecha_fin'];
     $activo = isset($_POST['activo']) ? 1 : 0;
-
-    // Manejo de imagen (opcional)
+    $vigente = isset($_POST['vigente']) ? 1 : 0;
+    $tipo_publico = $_POST['tipo_publico'] ?? 'todos';
     $imagen = $_POST['imagen_actual'] ?? '';
+
     if (!empty($_FILES['imagen']['name'])) {
         $nombreArchivo = uniqid('promo_') . '_' . basename($_FILES['imagen']['name']);
         $rutaDestino = __DIR__ . '/assets/' . $nombreArchivo;
@@ -44,24 +24,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    try {
-        $stmt = $pdo->prepare("UPDATE promociones SET 
-            titulo = ?, descripcion = ?, imagen = ?, precio_promocional = ?, fecha_inicio = ?, fecha_fin = ?, activo = ?
-            WHERE id = ?");
-        $stmt->execute([
-            $titulo,
-            $descripcion,
-            $imagen,
-            $precio_promocional,
-            $fecha_inicio,
-            $fecha_fin,
-            $activo,
-            $id
-        ]);
-        $_SESSION['mensaje'] = "Promoción actualizada correctamente.";
-    } catch (Exception $e) {
-        $_SESSION['mensaje'] = "Error al actualizar promoción: " . $e->getMessage();
-    }
-    header('Location: dashboard.php?vista=promociones');
+    $stmt = $pdo->prepare("UPDATE promociones SET titulo=?, descripcion=?, imagen=?, precio_promocional=?, descuento=?, fecha_inicio=?, fecha_fin=?, activo=?, vigente=?, tipo_publico=? WHERE id=?");
+    $stmt->execute([
+        $titulo, $descripcion, $imagen, $precio_promocional, $descuento,
+        $fecha_inicio, $fecha_fin, $activo, $vigente, $tipo_publico, $id
+    ]);
+
+    $_SESSION['mensaje'] = "Promoción actualizada correctamente.";
+    header('Location: ' . BASE_URL . 'dashboard.php?vista=promociones');
     exit;
+}
+
+if (isset($_GET['id'])) {
+    $stmt = $pdo->prepare("SELECT * FROM promociones WHERE id=?");
+    $stmt->execute([$_GET['id']]);
+    $promocion = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($promocion) {
+        $_SESSION['promocion_editar'] = $promocion;
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=form_promocion');
+        exit;
+    } else {
+        $_SESSION['error'] = 'Promoción no encontrada.';
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=promociones');
+        exit;
+    }
 }

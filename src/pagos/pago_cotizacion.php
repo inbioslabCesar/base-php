@@ -5,15 +5,13 @@ $idCotizacion = $_GET['id'] ?? null;
 $cotizacion = null;
 $msg = $_GET['msg'] ?? '';
 
+$totalPagado = 0;
+$saldo = 0;
 if ($idCotizacion) {
     $stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
     $stmt->execute([$idCotizacion]);
     $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
-}
 
-$totalPagado = 0;
-$saldo = 0;
-if ($cotizacion) {
     $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
     $stmtPagos->execute([$idCotizacion]);
     $totalPagado = floatval($stmtPagos->fetchColumn());
@@ -23,10 +21,11 @@ if ($cotizacion) {
 <div class="container mt-4">
     <h4>Registrar Pago para Cotización #<?= htmlspecialchars($idCotizacion) ?></h4>
     <?php if ($msg == "error"): ?>
-        <div class="alert alert-danger">El monto debe ser positivo y no mayor al saldo pendiente.</div>
+        <div class="alert alert-danger">El monto debe ser positivo y no mayor al saldo pendiente (excepto para descarga anticipada).</div>
     <?php endif; ?>
+
     <?php if ($cotizacion): ?>
-        <form method="post" action="dashboard.php?action=pago_cotizacion_guardar" class="card p-4 shadow-sm mb-4">
+        <form method="post" action="dashboard.php?action=pago_cotizacion_guardar" class="card p-4 shadow-sm mb-4" id="formPago">
             <input type="hidden" name="id" value="<?= htmlspecialchars($idCotizacion) ?>">
             <div class="mb-3">
                 <label class="form-label">Monto total de la cotización</label>
@@ -43,16 +42,17 @@ if ($cotizacion) {
             <?php if ($saldo > 0): ?>
                 <div class="mb-3">
                     <label class="form-label">Nuevo abono (a cuenta)</label>
-                    <input type="number" step="0.01" name="monto_abonado" class="form-control" min="0.01" max="<?= $saldo ?>" required>
+                    <input type="number" step="0.01" name="monto_abonado" class="form-control" min="0" max="<?= $saldo ?>" required id="montoAbonado">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Método de pago</label>
-                    <select name="metodo" class="form-control" required>
+                    <select name="metodo" class="form-control" required id="metodoPago">
                         <option value="">Selecciona...</option>
                         <option value="efectivo">Efectivo</option>
                         <option value="tarjeta">Tarjeta</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="yape">Yape</option>
+                        <option value="descarga_anticipada">Descarga anticipada (pago pendiente)</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -61,13 +61,24 @@ if ($cotizacion) {
                 </div>
                 <button type="submit" class="btn btn-success">Registrar Pago</button>
                 <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Volver</a>
+                <script>
+                // Dinámicamente cambia el mínimo según el método de pago
+                document.getElementById('metodoPago').addEventListener('change', function() {
+                    var montoInput = document.getElementById('montoAbonado');
+                    if (this.value === 'descarga_anticipada') {
+                        montoInput.min = 0;
+                    } else {
+                        montoInput.min = 0.01;
+                    }
+                });
+                </script>
             <?php else: ?>
                 <div class="alert alert-success">Esta cotización ya está completamente pagada.</div>
                 <a href="dashboard.php?vista=cotizaciones" class="btn btn-secondary">Volver</a>
             <?php endif; ?>
         </form>
         <div class="alert alert-info">
-            <strong>Nota:</strong> El cliente solo podrá descargar sus resultados cuando el estado de pago sea "pagado".
+            <strong>Nota:</strong> El cliente solo podrá descargar sus resultados cuando el estado de pago sea "pagado" o si el método de pago fue "descarga anticipada".
         </div>
         <?php
         // Historial de pagos

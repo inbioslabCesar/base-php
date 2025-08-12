@@ -24,22 +24,89 @@ if ($fechaInicio && $fechaFin) {
     $params[] = $fechaFin;
 }
 
-// Consulta cotizaciones de la empresa logueada
-$sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
-        FROM cotizaciones c
-        JOIN clientes cl ON c.id_cliente = cl.id
-        WHERE c.id_empresa = ? $whereFecha
-        ORDER BY c.id DESC";
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Obtener IDs de clientes asociados a la empresa
+$sqlClientes = "SELECT cliente_id FROM empresa_cliente WHERE empresa_id = ?";
+$stmtClientes = $pdo->prepare($sqlClientes);
+$stmtClientes->execute([$id_empresa]);
+$clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
 
-// ... (resto de consultas igual que antes)
+// Consulta cotizaciones asociadas a la empresa
+if ($clientesAsociados) {
+    $inClientes = implode(',', array_fill(0, count($clientesAsociados), '?'));
+    $paramsCot = array_merge([$id_empresa], $clientesAsociados, array_slice($params, 1));
+    $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
+            FROM cotizaciones c
+            JOIN clientes cl ON c.id_cliente = cl.id
+            WHERE c.id_empresa = ? 
+              AND (
+                  c.id_cliente IN ($inClientes)
+                  OR c.rol_creador IN ('admin', 'recepcionista')
+              )
+              $whereFecha
+            ORDER BY c.id DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($paramsCot);
+    $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    // Si no hay clientes asociados, muestra solo las cotizaciones creadas por admin/recepcionista para la empresa
+    $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
+            FROM cotizaciones c
+            JOIN clientes cl ON c.id_cliente = cl.id
+            WHERE c.id_empresa = ? 
+              AND c.rol_creador IN ('admin', 'recepcionista')
+              $whereFecha
+            ORDER BY c.id DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Consulta de pagos y exámenes igual que el flujo anterior
 $totalEmpresa = 0.0;
 $totalPagadoEmpresa = 0.0;
 $saldoEmpresa = 0.0;
+$pagosPorCotizacion = [];
+$examenesPorCotizacion = [];
+$descargaAnticipadaPorCotizacion = [];
 
 if (!empty($cotizaciones)) {
+    $idsCotizaciones = array_column($cotizaciones, 'id');
+    if ($idsCotizaciones) {
+        $inQuery = implode(',', array_fill(0, count($idsCotizaciones), '?'));
+        // Pagos
+        $sqlPagos = "SELECT id_cotizacion, SUM(monto) AS total_pagado
+                     FROM pagos
+                     WHERE id_cotizacion IN ($inQuery)
+                     GROUP BY id_cotizacion";
+        $stmtPagos = $pdo->prepare($sqlPagos);
+        $stmtPagos->execute($idsCotizaciones);
+        $pagos = $stmtPagos->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($pagos as $pago) {
+            $pagosPorCotizacion[$pago['id_cotizacion']] = $pago['total_pagado'];
+        }
+
+        // Exámenes
+        $sqlExamenes = "SELECT re.id AS id_resultado, re.id_cotizacion, re.id_examen, re.estado, e.nombre AS nombre_examen
+                        FROM resultados_examenes re
+                        JOIN examenes e ON re.id_examen = e.id
+                        WHERE re.id_cotizacion IN ($inQuery)";
+        $stmtEx = $pdo->prepare($sqlExamenes);
+        $stmtEx->execute($idsCotizaciones);
+        $examenes = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($examenes as $ex) {
+            $examenesPorCotizacion[$ex['id_cotizacion']][] = $ex;
+        }
+
+        // Pagos con método descarga anticipada
+        $sqlDescAnt = "SELECT id_cotizacion FROM pagos WHERE id_cotizacion IN ($inQuery) AND metodo_pago = 'descarga_anticipada'";
+        $stmtDescAnt = $pdo->prepare($sqlDescAnt);
+        $stmtDescAnt->execute($idsCotizaciones);
+        $descAntRows = $stmtDescAnt->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($descAntRows as $cotId) {
+            $descargaAnticipadaPorCotizacion[$cotId] = true;
+        }
+    }
+
     foreach ($cotizaciones as $cot) {
         $totalEmpresa += floatval($cot['total'] ?? 0);
         $totalPagadoEmpresa += floatval($pagosPorCotizacion[$cot['id']] ?? 0);
@@ -47,7 +114,6 @@ if (!empty($cotizaciones)) {
     $saldoEmpresa = $totalEmpresa - $totalPagadoEmpresa;
 }
 ?>
-
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -71,13 +137,17 @@ if (!empty($cotizaciones)) {
         </div>
     </form>
     <div class="alert alert-secondary mb-3">
-    <strong>Total cotizado:</strong> S/ <?= number_format($totalEmpresa, 2) ?>  
-    <strong>Total pagado:</strong> S/ <?= number_format($totalPagadoEmpresa, 2) ?>  
-    <strong>Saldo pendiente:</strong>
-    <span class="badge <?= $saldoEmpresa > 0 ? 'bg-danger' : 'bg-success' ?>">
-        S/ <?= number_format($saldoEmpresa, 2) ?>
-    </span>
-</div>
+        <strong>Total cotizado:</strong> S/ <?= number_format($totalEmpresa, 2) ?>  
+        <strong>Total pagado:</strong> S/ <?= number_format($totalPagadoEmpresa, 2) ?>  
+        <strong>Saldo pendiente:</strong>
+        <span class="badge <?= $saldoEmpresa > 0 ? 'bg-danger' : 'bg-success' ?>">
+            S/ <?= number_format($saldoEmpresa, 2) ?>
+        </span>
+    </div>
+    <div class="alert alert-info">
+        Los resultados de los exámenes solo podrán ser descargados cuando la cotización esté completamente pagada y todos los exámenes estén finalizados.<br>
+        El porcentaje de resultados indica el avance de los exámenes de tus clientes.
+    </div>
     <div class="table-responsive">
         <table id="tablaCotizaciones" class="table table-striped table-bordered align-middle">
             <thead>
@@ -93,36 +163,38 @@ if (!empty($cotizaciones)) {
                 </tr>
             </thead>
             <tbody>
-<?php if ($cotizaciones): ?>
-<?php foreach ($cotizaciones as $cotizacion): ?>
-<?php
-    $cotizacionId = $cotizacion['id'];
-    $total = floatval($cotizacion['total']);
-    $pagado = floatval($pagosPorCotizacion[$cotizacionId] ?? 0);
-    $saldo = $total - $pagado;
+            <?php if ($cotizaciones): ?>
+                <?php foreach ($cotizaciones as $cotizacion): ?>
+                    <?php
+                    $cotizacionId = $cotizacion['id'];
+                    $total = floatval($cotizacion['total']);
+                    $pagado = floatval($pagosPorCotizacion[$cotizacionId] ?? 0);
+                    $saldo = $total - $pagado;
+                    $badgePendiente = $saldo > 0
+                        ? '<span class="badge bg-danger">S/ ' . number_format($saldo, 2) . '</span>'
+                        : '<span class="badge bg-success">S/ 0.00</span>';
+                    $badgeAbonado = $pagado > 0
+    ? '<span class="badge bg-primary">S/ ' . number_format($pagado, 2) . '</span>'
+    : '<span class="badge bg-secondary">S/ 0.00</span>';
 
-    $badgePendiente = $saldo > 0
-        ? '<span class="badge bg-danger">S/ ' . number_format($saldo, 2) . '</span>'
-        : '<span class="badge bg-success">S/ 0.00</span>';
+$examenes = $examenesPorCotizacion[$cotizacionId] ?? [];
+$totalExamenes = count($examenes);
+$completados = count(array_filter($examenes, fn($ex) => $ex['estado'] !== 'pendiente'));
+$porcentaje = $totalExamenes ? round(($completados / $totalExamenes) * 100) : 0;
 
-    $badgeAbonado = $pagado > 0
-        ? '<span class="badge bg-primary">S/ ' . number_format($pagado, 2) . '</span>'
-        : '<span class="badge bg-secondary">S/ 0.00</span>';
+if ((int)$porcentaje === 100) {
+    $resultBadge = '<span class="badge bg-success">Completado: 100%</span>';
+} elseif ($porcentaje > 0) {
+    $resultBadge = '<span class="badge bg-warning text-dark">Parcial: ' . $porcentaje . '%</span>';
+} else {
+    $resultBadge = '<span class="badge bg-danger">Pendiente: 0%</span>';
+}
 
-    $examenes = $examenesPorCotizacion[$cotizacionId] ?? [];
-    $totalExamenes = count($examenes);
-    $completados = count(array_filter($examenes, fn($ex) => $ex['estado'] !== 'pendiente'));
-    $porcentaje = $totalExamenes ? round(($completados / $totalExamenes) * 100) : 0;
-
-    if ((int)$porcentaje === 100) {
-        $resultBadge = '<span class="badge bg-success">Completado: 100%</span>';
-    } elseif ($porcentaje > 0) {
-        $resultBadge = '<span class="badge bg-warning text-dark">Parcial: ' . $porcentaje . '%</span>';
-    } else {
-        $resultBadge = '<span class="badge bg-danger">Pendiente: 0%</span>';
-    }
-
-    $descargarDisabled = ($saldo > 0 || $porcentaje < 100) ? 'disabled style="pointer-events: none; opacity: 0.6;"' : 'target="_blank"';
+// Lógica para descarga anticipada
+$tieneDescAnticipada = !empty($descargaAnticipadaPorCotizacion[$cotizacionId]);
+$descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada))
+    ? 'disabled style="pointer-events: none; opacity: 0.6;"'
+    : 'target="_blank"';
 ?>
 <tr>
     <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
@@ -141,8 +213,7 @@ if (!empty($cotizaciones)) {
         <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacionId ?>"
             class="btn btn-success btn-sm mb-1"
             title="Descargar PDF de todos los resultados"
-            <?= $descargarDisabled ?>
-            target="_blank">
+            <?= $descargarDisabled ?>>
             <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
         </a>
     </td>
@@ -153,10 +224,7 @@ if (!empty($cotizaciones)) {
     <td colspan="8" class="text-center">No hay cotizaciones registradas para la empresa.</td>
 </tr>
 <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
+</tbody>
 <!-- DataTables y extensiones para exportar -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -168,7 +236,6 @@ if (!empty($cotizaciones)) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-
 <script>
 $(document).ready(function() {
     $('#tablaCotizaciones').DataTable({

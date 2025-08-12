@@ -1,31 +1,31 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$id = intval($_GET['id'] ?? 0);
+if (isset($_GET['id'])) {
+    $id = intval($_GET['id']);
 
-if ($id) {
-    try {
-        // Opcional: eliminar imagen física si existe
-        $stmt = $pdo->prepare("SELECT imagen FROM promociones WHERE id = ?");
-        $stmt->execute([$id]);
-        $promo = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($promo && !empty($promo['imagen'])) {
-            $rutaImagen = __DIR__ . '/assets/' . $promo['imagen'];
-            if (file_exists($rutaImagen)) {
-                unlink($rutaImagen);
-            }
+    // Opcional: eliminar la imagen asociada si existe
+    $stmt = $pdo->prepare("SELECT imagen FROM promociones WHERE id=?");
+    $stmt->execute([$id]);
+    $promocion = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($promocion && $promocion['imagen']) {
+        $rutaImagen = __DIR__ . '/assets/' . $promocion['imagen'];
+        if (file_exists($rutaImagen)) {
+            unlink($rutaImagen);
+        } else {
+            echo "No se encontró la imagen a eliminar.";
         }
-
-        // Elimina la promoción
-        $stmt = $pdo->prepare("DELETE FROM promociones WHERE id = ?");
-        $stmt->execute([$id]);
-        $_SESSION['mensaje'] = "Promoción eliminada correctamente.";
-    } catch (Exception $e) {
-        $_SESSION['mensaje'] = "Error al eliminar promoción: " . $e->getMessage();
     }
+
+    // Eliminar la promoción de la base de datos
+    $stmt = $pdo->prepare("DELETE FROM promociones WHERE id=?");
+    $stmt->execute([$id]);
+
+    $_SESSION['mensaje'] = "Promoción eliminada correctamente.";
+} else {
+    $_SESSION['error'] = "ID de promoción no válido.";
 }
-header('Location: dashboard.php?vista=promociones');
+header('Location: ' . BASE_URL . 'dashboard.php?vista=promociones');
 exit;

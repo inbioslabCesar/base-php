@@ -9,14 +9,23 @@ $rol = $_SESSION['rol'] ?? '';
 // Filtro por DNI
 $dniFiltro = trim($_GET['dni'] ?? '');
 
-// Consulta con filtro por DNI si aplica
-$sql = "SELECT * FROM clientes";
+// Consulta principal con JOINs para traer los nombres correctos de empresa y convenio
+$sql = "
+SELECT c.*, 
+    e.nombre_comercial AS nombre_empresa, 
+    v.nombre AS nombre_convenio
+FROM clientes c
+LEFT JOIN empresa_cliente ec ON c.id = ec.cliente_id
+LEFT JOIN empresas e ON ec.empresa_id = e.id
+LEFT JOIN convenio_cliente cc ON c.id = cc.cliente_id
+LEFT JOIN convenios v ON cc.convenio_id = v.id
+";
 $params = [];
 if ($dniFiltro !== '') {
-    $sql .= " WHERE dni LIKE ?";
+    $sql .= " WHERE c.dni LIKE ?";
     $params[] = "%$dniFiltro%";
 }
-$sql .= " ORDER BY id DESC";
+$sql .= " ORDER BY c.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -48,6 +57,7 @@ function capitalize($string) {
         <div class="alert alert-info"><?= htmlspecialchars($_SESSION['msg']) ?></div>
         <?php unset($_SESSION['msg']); ?>
     <?php endif; ?>
+
     <div class="table-responsive">
         <table id="tablaClientes" class="table table-striped table-bordered">
             <thead>
@@ -62,6 +72,8 @@ function capitalize($string) {
                     <th>Teléfono</th>
                     <th>Dirección</th>
                     <th>Estado</th>
+                    <th>Rol creador</th>
+                    <th>Referencia</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -80,6 +92,26 @@ function capitalize($string) {
                             <td><?= htmlspecialchars($cliente['direccion'] ?? '') ?></td>
                             <td><?= htmlspecialchars($cliente['estado'] ?? '') ?></td>
                             <td>
+                                <?php
+                                    $rol_creador = strtolower(trim($cliente['rol_creador'] ?? ''));
+                                    $roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
+                                    $rol_mostrar = in_array($rol_creador, $roles_validos) && $rol_creador !== '' 
+                                        ? ucfirst($rol_creador) 
+                                        : 'Cliente';
+                                ?>
+                                <span class="badge bg-info text-dark"><?= $rol_mostrar ?></span>
+                            </td>
+                            <td>
+                                <?php
+                                    $emp = $cliente['nombre_empresa'] ?? '';
+                                    $conv = $cliente['nombre_convenio'] ?? '';
+                                    $output = [];
+                                    if ($emp) $output[] = '<span class="badge bg-success">' . htmlspecialchars($emp) . '</span>';
+                                    if ($conv) $output[] = '<span class="badge bg-primary">' . htmlspecialchars($conv) . '</span>';
+                                    echo implode(' ', $output) ?: '<span class="text-muted">-</span>';
+                                ?>
+                            </td>
+                            <td>
                                 <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" class="btn btn-warning btn-sm" title="Editar">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
@@ -87,15 +119,15 @@ function capitalize($string) {
                                     <i class="bi bi-trash"></i>
                                 </a>
                                 <?php if ($rol === 'recepcionista' || $rol === 'admin'): ?>
-                                <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" class="btn btn-primary btn-sm" title="Cotizar">
-                                    <i class="bi bi-file-earmark-plus"></i> Cotizar
-                                </a>
+                                    <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" class="btn btn-primary btn-sm" title="Cotizar">
+                                        <i class="bi bi-file-earmark-plus"></i> Cotizar
+                                    </a>
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endforeach; ?>xs
+                    <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="11" class="text-center">No hay clientes registrados.</td></tr>
+                    <tr><td colspan="13" class="text-center">No hay clientes registrados.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>

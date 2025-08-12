@@ -33,9 +33,13 @@ function capitalize($string) {
     return mb_convert_case(strtolower(trim((string)$string)), MB_CASE_TITLE, "UTF-8");
 }
 ?>
-
 <div class="container mt-4">
     <h4><?= $esEdicion ? 'Editar Cliente' : 'Nuevo Cliente' ?></h4>
+
+    <?php if (isset($_GET['error']) && $_GET['error'] === 'dni_duplicado'): ?>
+        <div class="alert alert-danger">El DNI ingresado ya está registrado.</div>
+    <?php endif; ?>
+
     <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>">
         <div class="row">
             <div class="col-md-4 mb-3">
@@ -106,7 +110,6 @@ function capitalize($string) {
         <a href="dashboard.php?vista=clientes" class="btn btn-secondary">Cancelar</a>
     </form>
 </div>
-
 <script>
 function generarCodigo() {
     let fecha = new Date();
@@ -118,4 +121,3 @@ function generarCodigo() {
     document.getElementById('codigo_cliente').value = codigo;
 }
 </script>
-

@@ -107,13 +107,13 @@ for ($i = 0; $i < count($examenes); $i++) {
 
     if (!$examen) continue;
 
-    $precio_unitario = floatval($examen['precio_publico']);
-    $precio_unitario_desc = $precio_unitario;
-    if ($descuento > 0) {
-        $precio_unitario_desc = $precio_unitario * (1 - ($descuento / 100));
-    }
+    // Tomar el precio modificado desde el formulario (admin/recepcionista)
+    $precio_unitario_desc = floatval($precios[$i]);
 
+    // Para mostrar totales de referencia, puedes seguir usando el precio original y el descuento calculado
+    $precio_unitario = floatval($examen['precio_publico']);
     $subtotal_bruto = $precio_unitario * $cantidad;
+
     $subtotal = $precio_unitario_desc * $cantidad;
 
     $total_bruto += $subtotal_bruto;
@@ -128,8 +128,6 @@ for ($i = 0; $i < count($examenes); $i++) {
     ];
 }
 
-//$id_empresa = !empty($id_empresa) ? $id_empresa : null;
-//$id_convenio = !empty($id_convenio) ? $id_convenio : null;
 
 // Preparar datos obligatorios para la tabla cotizaciones
 $codigo = 'COT-' . strtoupper(uniqid());

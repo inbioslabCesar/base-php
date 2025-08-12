@@ -159,13 +159,16 @@ $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         case 'tarjeta':
                                             $badge = 'warning text-dark';
                                             break;
+                                        case 'descarga_anticipada':
+                                            $badge = 'dark';
+                                            break;
                                         default:
                                             $badge = 'secondary';
                                     }
                                     echo '<span class="badge bg-' . $badge . ' me-1">' . htmlspecialchars(ucfirst($metodo)) . '</span>';
                                 }
                             } else {
-                                echo 'Sin información';
+                                echo '<span class="badge bg-secondary">Sin información</span>';
                             }
                             ?>
                         </td>

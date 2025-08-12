@@ -758,6 +758,11 @@ $dbname = 'u330560936_medditechbd';
 $user = 'u330560936_medditech';
 $pass = 'Medditech123';
 
+<?php $host = 'localhost';
+$dbname = 'u330560936_laboratorio';
+$user = 'u330560936_inbioslab';
+$pass = '41950361Cesar';
+
 
 
 pasame el codigo completo de form_cotizacion con todas las actualizaciones y modificaciones desde el principio por partes si es extenso el codigo no modifiques ninguna variable o cambie de nombre lo que ya tiene para no alterar el codigo
@@ -993,3 +998,37 @@ al precionar guardar cotizacion
 admin => http://localhost/base-php/src/dashboard.php?vista=agendar_cita&id_cotizacion=204
 
 empresas => http://localhost/base-php/src/dashboard.php?action=crear_cotizacion
+
+
+
+
+ALTER TABLE clientes ADD COLUMN rol_creador VARCHAR(50) AFTER estado;
+
+
+
+ALTER TABLE clientes 
+ADD COLUMN rol_creador VARCHAR(50) AFTER estado,
+ADD COLUMN empresa_nombre VARCHAR(100) DEFAULT NULL AFTER rol_creador,
+ADD COLUMN convenio_nombre VARCHAR(100) DEFAULT NULL AFTER empresa_nombre,
+ADD COLUMN tipo_registro VARCHAR(20) DEFAULT 'cliente' AFTER convenio_nombre;
+
+
+   <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "MEDDITECH",
+            "url": "https://www.medditech.es",
+            "logo": "https://www.medditech.es/src/images/empresa/logo_empresa.png"
+        }
+    </script>
+
+      <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "INBIOSLAB",
+            "url": "https://www.inbioslabstore.com",
+            "logo": "https://www.inbioslabstore.com/src/images/empresa/logo_empresa.png"
+        }
+    </script>

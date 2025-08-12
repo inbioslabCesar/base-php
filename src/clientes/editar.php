@@ -10,7 +10,6 @@ if (!$id) {
     header('Location: ../dashboard.php?vista=clientes');
     exit;
 }
-
 // Campos requeridos
 $codigo_cliente = trim($_POST['codigo_cliente'] ?? '');
 $nombre         = trim($_POST['nombre'] ?? '');
@@ -39,7 +38,6 @@ if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$edad || !$email) {
 function capitalize($string) {
     return mb_convert_case(strtolower(trim($string)), MB_CASE_TITLE, "UTF-8");
 }
-
 try {
     if ($password) {
         $sql = "UPDATE clientes SET 
@@ -85,6 +83,17 @@ try {
     $stmt->execute($params);
 
     $_SESSION['msg'] = 'Cliente actualizado correctamente.';
+
+    // Redirección según rol
+    if ($_SESSION['rol'] === 'empresa') {
+        header('Location: ../dashboard.php?vista=clientes_empresa');
+        exit;
+    }
+    if ($_SESSION['rol'] === 'convenio') {
+        header('Location: ../dashboard.php?vista=clientes_convenio');
+        exit;
+    }
+
     header('Location: ../dashboard.php?vista=clientes');
     exit;
 } catch (Exception $e) {

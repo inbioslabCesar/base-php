@@ -2,6 +2,10 @@
 require_once __DIR__ . '/src/conexion/conexion.php';
 require_once __DIR__ . '/src/config/config.php';
 
+// Consulta de promociones solo para clientes y todos
+$stmtPromo = $pdo->query("SELECT * FROM promociones WHERE activo = 1 AND (tipo_publico = 'clientes' OR tipo_publico = 'todos') AND (CURDATE() BETWEEN fecha_inicio AND fecha_fin OR vigente = 1) ORDER BY fecha_inicio DESC");
+$promociones = $stmtPromo->fetchAll(PDO::FETCH_ASSOC);
+
 $stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
 $config_empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -67,10 +71,28 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             background: <?= htmlspecialchars($color_principal) ?> !important;
         }
 
+        .navbar-toggler {
+            border-color: <?= htmlspecialchars($color_secundario) ?> !important;
+            /* Cambia por tu color */
+        }
+
+        .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml;charset=utf8,<?=
+                                                                    rawurlencode(
+                                                                        "<svg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'>
+                <path stroke='" . $color_secundario . "' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/>
+            </svg>"
+                                                                    )
+                                                                    ?>");
+        }
+
         .btn-custom {
             background: <?= htmlspecialchars($color_botones) ?> !important;
-            color: #fff !important;
             border: none;
+        }
+
+        .btn-custom:hover {
+            filter: brightness(0.9);
         }
 
         .navbar-brand,
@@ -89,7 +111,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             width: 100%;
             height: 700px;
         }
-        
+
 
         .logo-navbar {
             max-width: 100px;
@@ -116,13 +138,14 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             display: none;
         }
 
-        .card-body{
-             background: #5390D9;
-             color: white;
+        .card-body {
+            background: <?= htmlspecialchars($color_botones) ?> !important;
+            color: white;
 
         }
-        .card-title{
-            color: white;
+
+        .card-title {
+            color: <?= htmlspecialchars($color_secundario) ?>;
         }
 
         .card-testimonio {
@@ -135,6 +158,105 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
         .bi {
             vertical-align: middle;
+        }
+
+        /* Botón flotante WhatsApp */
+        .whatsapp-float {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 999;
+            background: #25d366;
+            color: #fff;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px #0002;
+            font-size: 2.2em;
+            transition: background 0.3s;
+        }
+
+        .whatsapp-float:hover {
+            background: #128c7e;
+            color: #fff;
+        }
+
+        .carousel-inner img,
+        .carousel-item img {
+            margin: 0 auto;
+            display: block;
+            border-radius: 20px;
+            box-shadow: 0 4px 24px #0002;
+            border: 4px solid #fff;
+            /* O usa tu color corporativo */
+            max-width: 90%;
+            max-height: 400px;
+            object-fit: cover;
+        }
+
+        @media (max-width: 768px) {
+
+            .carousel-inner img,
+            .carousel-item img {
+                max-height: 220px;
+            }
+        }
+
+        .promo-section-title {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #f6f7f8ff;
+            margin-bottom: 2rem;
+            letter-spacing: 1px;
+        }
+
+        .promo-img-container,
+        .promo-desc-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 220px;
+            border-radius: 20px;
+            box-shadow: 0 4px 24px #0002;
+            background: #fff;
+            padding: 0;
+        }
+
+        .promo-img-container img {
+            border-radius: 20px;
+            border: 4px solid #fff;
+            max-width: 90%;
+            max-height: 200px;
+            object-fit: cover;
+            box-shadow: 0 2px 12px #0001;
+        }
+
+        .promo-desc-container {
+            border: 2px solid #e3e3e3;
+            background: #f8f9fa;
+            min-height: 220px;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 24px #0002;
+        }
+
+        @media (max-width: 768px) {
+
+            .promo-img-container,
+            .promo-desc-container {
+                min-height: unset;
+                max-height: unset;
+                padding: 10px;
+            }
+
+            .promo-img-container img {
+                max-width: 100%;
+                max-height: 180px;
+            }
         }
     </style>
     <script type="application/ld+json">
@@ -161,11 +283,34 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             </button>
             <div class="collapse navbar-collapse" id="navbarLab">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                    <li class="nav-item"><a class="nav-link active" href="#inicio"><?= htmlspecialchars($menu_inicio) ?></a></li>
-                    <li class="nav-item"><a class="nav-link" href="#servicios"><?= htmlspecialchars($menu_servicios) ?></a></li>
-                    <li class="nav-item"><a class="nav-link" href="#testimonios"><?= htmlspecialchars($menu_testimonios) ?></a></li>
-                    <li class="nav-item"><a class="nav-link" href="#contacto"><?= htmlspecialchars($menu_contacto) ?></a></li>
-                    <li class="nav-item"><a href="src/auth/login.php" class="btn btn-light ms-3">Acceso Clientes</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#inicio" style="color:<?= htmlspecialchars($color_texto) ?>;">
+                            <?= htmlspecialchars($menu_inicio) ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#servicios" style="color:<?= htmlspecialchars($color_texto) ?>;">
+                            <?= htmlspecialchars($menu_servicios) ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#testimonios" style="color:<?= htmlspecialchars($color_texto) ?>;">
+                            <?= htmlspecialchars($menu_testimonios) ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#contacto" style="color:<?= htmlspecialchars($color_texto) ?>;">
+                            <?= htmlspecialchars($menu_contacto) ?>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="src/auth/login.php"
+                            class="btn ms-3"
+                            style="background:<?= htmlspecialchars($color_secundario) ?>; color:#fff; border:none;">
+                            Acceso Clientes
+                        </a>
+                    </li>
+
                 </ul>
             </div>
         </div>
@@ -199,7 +344,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <!-- Galería de imágenes institucionales -->
     <?php if (count($imagenes_institucionales) > 0): ?>
         <section class="container my-4 text-center">
-            <h5>Conócenos</h5>
+            <h5 style="color:<?= htmlspecialchars($color_principal) ?>;">Conócenos</h5>
             <div class="d-flex flex-wrap justify-content-center">
                 <?php foreach ($imagenes_institucionales as $img): ?>
                     <img src="src/<?= htmlspecialchars($img) ?>" class="institucional-img" alt="Imagen institucional">
@@ -207,6 +352,69 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             </div>
         </section>
     <?php endif; ?>
+    <!-- Carrusel de Promociones (solo clientes y todos) -->
+    <?php if ($promociones): ?>
+        <div class="container my-5">
+            <h2 class="promo-section-title" style="color:<?= htmlspecialchars($color_principal) ?>;">
+                <i class="bi bi-stars"></i> Promociones Especiales para Ti
+            </h2>
+            <div id="promoCarousel" class="carousel slide mb-4 shadow-sm rounded" data-bs-ride="carousel">
+                <div class="carousel-indicators">
+                    <?php foreach ($promociones as $i => $promo): ?>
+                        <button type="button" data-bs-target="#promoCarousel" data-bs-slide-to="<?= $i ?>" class="<?= $i === 0 ? 'active' : '' ?>" aria-current="<?= $i === 0 ? 'true' : 'false' ?>"></button>
+                    <?php endforeach; ?>
+                </div>
+                <div class="carousel-inner">
+                    <?php foreach ($promociones as $i => $promo): ?>
+                        <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
+                            <div class="row justify-content-center align-items-center bg-light rounded p-3 flex-column flex-md-row">
+                                <div class="col-md-5 mb-3 mb-md-0 promo-img-container order-1 order-md-1">
+                                    <?php if (!empty($promo['imagen']) && file_exists(__DIR__ . "/src/promociones/assets/" . $promo['imagen'])): ?>
+                                        <img src="<?= BASE_URL . 'promociones/assets/' . htmlspecialchars($promo['imagen']) ?>" alt="Promo">
+                                    <?php else: ?>
+                                        <div class="bg-secondary text-white text-center py-5 rounded w-100">Sin imagen</div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="col-md-7 promo-desc-container order-2 order-md-2">
+                                    <div>
+                                        <h4 class="card-title text-primary"><?= htmlspecialchars($promo['titulo']) ?></h4>
+                                        <?php
+                                        $descripcion_corta = mb_strimwidth($promo['descripcion'], 0, 100, '...');
+                                        ?>
+                                        <p class="card-text"><?= nl2br(htmlspecialchars($descripcion_corta)) ?></p>
+                                        <?php if ($promo['precio_promocional'] > 0): ?>
+                                            <span class="badge bg-warning text-dark fs-5 mb-2">¡Solo S/ <?= number_format($promo['precio_promocional'], 2) ?>!</span>
+                                        <?php endif; ?>
+                                        <?php if ($promo['descuento'] > 0): ?>
+                                            <span class="badge bg-success ms-2">Descuento: <?= $promo['descuento'] ?>%</span>
+                                        <?php endif; ?>
+                                        <div class="text-muted mb-1">
+                                            <i class="bi bi-calendar-event"></i> Vigente: <?= htmlspecialchars($promo['fecha_inicio']) ?> al <?= htmlspecialchars($promo['fecha_fin']) ?>
+                                            <?php if ($promo['vigente']): ?>
+                                                <span class="badge bg-primary ms-2">¡Promoción vigente!</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary ms-2">No vigente</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <a href="src/dashboard.php?vista=detalle_promocion&id=<?= $promo['id'] ?>" class="btn btn-outline-primary btn-sm mt-2">
+                                            Ver detalles
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#promoCarousel" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon"></span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#promoCarousel" data-bs-slide="next">
+                    <span class="carousel-control-next-icon"></span>
+                </button>
+            </div>
+        </div>
+    <?php endif; ?>
+
 
     <!-- INICIO -->
     <section id="inicio" class="py-5">
@@ -216,7 +424,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
                     <h1 class="mb-3" style="color:<?= htmlspecialchars($color_principal) ?>;">
                         Bienvenido a <?= htmlspecialchars($nombre_empresa) ?>
                     </h1>
-                    <p>
+                    <p style="color:<?= htmlspecialchars($color_principal) ?>;">
                         <?= htmlspecialchars($frase_promocion ?: 'Somos un laboratorio clínico comprometido con la calidad y la atención personalizada.') ?>
                     </p>
                     <?php if (!empty($oferta_mes)): ?>
@@ -235,7 +443,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <!-- SERVICIOS EN CARDS -->
     <section id="servicios" class="py-5 bg-light">
         <div class="container">
-            <h2 class="mb-4 text-center" style="color:<?= htmlspecialchars($color_principal) ?>;"><?= htmlspecialchars($menu_servicios) ?></h2>
+            <h2 class="mb-4 text-center" style="color:<?= htmlspecialchars($color_secundario) ?>;"><?= htmlspecialchars($menu_servicios) ?></h2>
             <div class="row">
                 <?php foreach ($servicios as $servicio): ?>
                     <div class="col-md-4 mb-4">
@@ -307,7 +515,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <!-- CONTACTO -->
     <section id="contacto" class="py-5 bg-light">
         <div class="container">
-            <h2 class="mb-4 text-center" style="color:<?= htmlspecialchars($color_principal) ?>;"><?= htmlspecialchars($menu_contacto) ?></h2>
+            <h2 class="mb-4 text-center" style="color:<?= htmlspecialchars($color_secundario) ?>;"><?= htmlspecialchars($menu_contacto) ?></h2>
             <div class="row">
                 <div class="col-md-6">
                     <form>
@@ -367,15 +575,32 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             </div>
         </div>
     </section>
+    <!-- Botón flotante de WhatsApp -->
+     
+    <?php
+$whatsapp_numero = null;
+foreach ($redes_sociales as $red) {
+    if (strtolower($red['nombre']) === 'whatsapp') {
+        $whatsapp_numero = preg_replace('/\D/', '', $red['url']); // Extrae solo números
+        break;
+    }
+}
+?>
+<?php if ($whatsapp_numero): ?>
+    <a href="https://wa.me/<?= $whatsapp_numero ?>" class="whatsapp-float" target="_blank">
+        <i class="bi bi-whatsapp"></i>
+    </a>
+<?php endif; ?>
 
-    <!-- PIE DE PÁGINA -->
+
+    <!-- PIE DE PÁGINA Y SCRIPTS -->
     <footer class="mt-5 py-4 text-center">
         © <?= date('Y') ?> <?= htmlspecialchars($nombre_empresa) ?>. Todos los derechos reservados.
     </footer>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+    <!-- Si tienes otros scripts, agrégalos aquí -->
 </body>
 
 </html>
