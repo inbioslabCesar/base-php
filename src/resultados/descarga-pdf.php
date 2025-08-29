@@ -179,7 +179,7 @@ body, table, td, th {
 .tabla-resultados td {
     font-size: 13px;
     border: none;
-    padding: 7px 8px;
+    padding: 2px 8px;
     text-align: left;
     vertical-align: middle;
 }
@@ -233,11 +233,12 @@ $mpdf->SetHTMLHeader('
     <tr>
         <td colspan="2"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td>
     </tr>
+    
 </table>
 ', 'O', true);
 
 $firma_html = $firma && file_exists($firma)
-    ? '<img src="' . $firma . '" style="height:80px;"><br>'
+    ? '<img src="' . $firma . '" style="height:65px;"><br>'
     : '';
 
 $mpdf->SetHTMLFooter('
