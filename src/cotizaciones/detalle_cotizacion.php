@@ -50,6 +50,25 @@ $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <p><strong>Cliente:</strong> <?= htmlspecialchars($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) ?></p>
                     <p><strong>DNI:</strong> <?= htmlspecialchars($cotizacion['dni']) ?></p>
                     <p><strong>Fecha:</strong> <?= htmlspecialchars($cotizacion['fecha']) ?></p>
+                    <?php
+                    // Mostrar tipo de usuario y nombre de empresa/convenio si aplica
+                    $tipo = $cotizacion['tipo_usuario'] ?? '';
+                    $info = '';
+                    if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
+                        $stmtEmp = $pdo->prepare("SELECT nombre_comercial, razon_social FROM empresas WHERE id = ?");
+                        $stmtEmp->execute([$cotizacion['id_empresa']]);
+                        $emp = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+                        $info = 'Empresa: ' . htmlspecialchars($emp['nombre_comercial'] ?? $emp['razon_social'] ?? '');
+                    } elseif ($tipo === 'convenio' && !empty($cotizacion['id_convenio'])) {
+                        $stmtConv = $pdo->prepare("SELECT nombre FROM convenios WHERE id = ?");
+                        $stmtConv->execute([$cotizacion['id_convenio']]);
+                        $conv = $stmtConv->fetch(PDO::FETCH_ASSOC);
+                        $info = 'Convenio: ' . htmlspecialchars($conv['nombre'] ?? '');
+                    } else {
+                        $info = 'Particular';
+                    }
+                    ?>
+                    <p><strong>Condición:</strong> <?= $info ?></p>
                     <p><strong>Total:</strong> S/. <?= number_format($cotizacion['total'], 2) ?></p>
                     <p><strong>Estado de pago:</strong> <?= htmlspecialchars(ucwords(strtolower($cotizacion['estado_pago']))) ?></p>
                 </div>

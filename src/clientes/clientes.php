@@ -37,8 +37,8 @@ function capitalize($string) {
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-        <h3 class="mb-0">Clientes</h3>
-        <a href="dashboard.php?vista=form_cliente" class="btn btn-primary">Nuevo Cliente</a>
+    <h3 class="mb-0">Pacientes</h3>
+    <a href="dashboard.php?vista=form_cliente" class="btn btn-primary">Nuevo Paciente</a>
     </div>
 
     <!-- Filtro por DNI -->
@@ -97,7 +97,7 @@ function capitalize($string) {
                                     $roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
                                     $rol_mostrar = in_array($rol_creador, $roles_validos) && $rol_creador !== '' 
                                         ? ucfirst($rol_creador) 
-                                        : 'Cliente';
+                                        : 'Paciente';
                                 ?>
                                 <span class="badge bg-info text-dark"><?= $rol_mostrar ?></span>
                             </td>
@@ -127,7 +127,7 @@ function capitalize($string) {
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <tr><td colspan="13" class="text-center">No hay clientes registrados.</td></tr>
+                    <tr><td colspan="13" class="text-center">No hay pacientes registrados.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
@@ -142,6 +142,8 @@ function capitalize($string) {
 <script>
 $(document).ready(function() {
     $('#tablaClientes').DataTable({
+        "pageLength": 5,
+        "lengthMenu": [[5, 10, 25, 50], [5, 10, 25, 50]],
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         }

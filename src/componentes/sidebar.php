@@ -10,7 +10,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=admin"><i class="bi bi-people"></i> Panel Admin</a>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=usuarios"><i class="bi bi-people"></i> Usuarios</a>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresas"><i class="bi bi-building"></i> Empresas</a>
-                <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Clientes</a>
+                <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Pacientes</a>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
             <?php elseif ($_SESSION['rol'] == 'empresa'): ?>
@@ -20,7 +20,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
             <?php elseif ($_SESSION['rol'] == 'laboratorista'): ?>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=laboratorista"><i class="bi bi-eyedropper"></i> Panel Laboratorio</a>
             <?php elseif ($_SESSION['rol'] == 'cliente'): ?>
-                <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=cliente"><i class="bi bi-person"></i> Panel Cliente</a>
+                <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=cliente"><i class="bi bi-person"></i> Panel Paciente</a>
             <?php elseif ($_SESSION['rol'] == 'convenio'): ?>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenio"><i class="bi bi-person"></i> Panel Convenio</a>
             <?php endif; ?>
@@ -40,7 +40,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=admin"><i class="bi bi-people"></i> Panel Admin</a>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=usuarios"><i class="bi bi-people"></i> Usuarios</a>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresas"><i class="bi bi-building"></i> Empresas</a>
-                    <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Clientes</a>
+                    <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Pacientes</a>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
 
@@ -51,7 +51,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                 <?php elseif ($_SESSION['rol'] == 'laboratorista'): ?>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=laboratorista"><i class="bi bi-eyedropper"></i> Panel Laboratorio</a>
                 <?php elseif ($_SESSION['rol'] == 'cliente'): ?>
-                    <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=cliente"><i class="bi bi-person"></i> Panel Cliente</a>
+                    <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=cliente"><i class="bi bi-person"></i> Panel Paciente</a>
                 <?php elseif ($_SESSION['rol'] == 'convenio'): ?>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=convenio"><i class="bi bi-person"></i> Panel Convenio</a>
                 <?php endif; ?>

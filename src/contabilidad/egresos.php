@@ -128,9 +128,11 @@ $egresos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $('#tablaEgresos').DataTable({
             "pageLength": 10,
             "lengthMenu": [5, 10, 25, 50, 100],
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
-            },
+                "pageLength": 5,
+                "lengthMenu": [[5, 10, 25, 50], [5, 10, 25, 50]],
+                "language": {
+                    "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+                },
             dom: 'Bfrtip',
             buttons: [{
                     extend: 'excelHtml5',

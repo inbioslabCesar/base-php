@@ -81,30 +81,45 @@ $html = '
         <strong>Cliente:</strong> ' . mayus($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) . '<br>
         <strong>DNI :</strong> ' . htmlspecialchars($cotizacion['dni_cliente']) . '<br>
         <strong>Cotización:</strong> ' . htmlspecialchars($cotizacion['codigo']) . '<br>
-        <strong>Fecha:</strong> ' . htmlspecialchars($cotizacion['fecha']) . '
-    </div>
+        <strong>Fecha:</strong> ' . htmlspecialchars($cotizacion['fecha']) . '<br>
+        ';
+        // Mostrar condición: Particular, Empresa o Convenio
+        $tipo = $cotizacion['tipo_usuario'] ?? '';
+        if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
+            $stmtEmp = $pdo->prepare("SELECT nombre_comercial, razon_social FROM empresas WHERE id = ?");
+            $stmtEmp->execute([$cotizacion['id_empresa']]);
+            $emp = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+            $html .= '<strong>Condición:</strong> Empresa: ' . htmlspecialchars($emp['nombre_comercial'] ?? $emp['razon_social'] ?? '') . '<br>';
+        } elseif ($tipo === 'convenio' && !empty($cotizacion['id_convenio'])) {
+            $stmtConv = $pdo->prepare("SELECT nombre FROM convenios WHERE id = ?");
+            $stmtConv->execute([$cotizacion['id_convenio']]);
+            $conv = $stmtConv->fetch(PDO::FETCH_ASSOC);
+            $html .= '<strong>Condición:</strong> Convenio: ' . htmlspecialchars($conv['nombre'] ?? '') . '<br>';
+        } else {
+            $html .= '<strong>Condición:</strong> Particular<br>';
+        }
+    $html .= "</div>\n";
 
-    <table class="tabla-campos">
-        <tr>
-            <td><strong>Lugar de toma:</strong></td>
-            <td>' . mayus($cotizacion['tipo_toma'] ?? 'No asignado') . '</td>
-            <td><strong>Dirección de toma:</strong></td>
-            <td>' . mayus($cotizacion['direccion_toma'] ?? 'No asignada') . '</td>
-        </tr>
-        <tr>
-            <td><strong>Fecha de toma:</strong></td>
-            <td>' . htmlspecialchars($cotizacion['fecha_toma'] ?? 'No asignada') . '</td>
-            <td><strong>Hora de toma:</strong></td>
-            <td>' . htmlspecialchars($cotizacion['hora_toma'] ?? 'No asignada') . '</td>
-        </tr>
-        <tr>
-            <td><strong>Rol creador:</strong></td>
-            <td>' . mayus($cotizacion['rol_creador'] ?? 'No asignado') . '</td>
-            <td><strong>Observaciones:</strong></td>
-            <td>' . mayus($cotizacion['observaciones'] ?? 'No asignadas') . '</td>
-        </tr>
-    </table>
-';
+    $html .= '<table class="tabla-campos">'
+        . '<tr>'
+        . '<td><strong>Lugar de toma:</strong></td>'
+        . '<td>' . mayus($cotizacion['tipo_toma'] ?? 'No asignado') . '</td>'
+        . '<td><strong>Dirección de toma:</strong></td>'
+        . '<td>' . mayus($cotizacion['direccion_toma'] ?? 'No asignada') . '</td>'
+        . '</tr>'
+        . '<tr>'
+        . '<td><strong>Fecha de toma:</strong></td>'
+        . '<td>' . htmlspecialchars($cotizacion['fecha_toma'] ?? 'No asignada') . '</td>'
+        . '<td><strong>Hora de toma:</strong></td>'
+        . '<td>' . htmlspecialchars($cotizacion['hora_toma'] ?? 'No asignada') . '</td>'
+        . '</tr>'
+        . '<tr>'
+        . '<td><strong>Rol creador:</strong></td>'
+        . '<td>' . mayus($cotizacion['rol_creador'] ?? 'No asignado') . '</td>'
+        . '<td><strong>Observaciones:</strong></td>'
+        . '<td>' . mayus($cotizacion['observaciones'] ?? 'No asignadas') . '</td>'
+    . '</tr>'
+    . '</table>';
 
 // ... (tabla de exámenes cotizados)
 $html .= '

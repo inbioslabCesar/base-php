@@ -34,7 +34,7 @@ function capitalize($string) {
 }
 ?>
 <div class="container mt-4">
-    <h4><?= $esEdicion ? 'Editar Cliente' : 'Nuevo Cliente' ?></h4>
+    <h4><?= $esEdicion ? 'Editar Paciente' : 'Nuevo Paciente' ?></h4>
 
     <?php if (isset($_GET['error']) && $_GET['error'] === 'dni_duplicado'): ?>
         <div class="alert alert-danger">El DNI ingresado ya está registrado.</div>
@@ -43,7 +43,7 @@ function capitalize($string) {
     <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>">
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label for="codigo_cliente" class="form-label">Código Cliente *</label>
+                <label for="codigo_cliente" class="form-label">Código Paciente *</label>
                 <div class="input-group">
                     <input type="text" class="form-control" name="codigo_cliente" id="codigo_cliente" value="<?= htmlspecialchars($cliente['codigo_cliente']??'') ?>" required>
                     <button class="btn btn-secondary" type="button" onclick="generarCodigo()">Generar</button>

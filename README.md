@@ -1012,6 +1012,22 @@ ADD COLUMN empresa_nombre VARCHAR(100) DEFAULT NULL AFTER rol_creador,
 ADD COLUMN convenio_nombre VARCHAR(100) DEFAULT NULL AFTER empresa_nombre,
 ADD COLUMN tipo_registro VARCHAR(20) DEFAULT 'cliente' AFTER convenio_nombre;
 
+meditech conexion.php
+<?php $host = 'localhost';
+$dbname = 'u330560936_medditechbd';
+$user = 'u330560936_medditech';
+$pass = 'Medditech123';
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION,);
+    $pdo->exec("SET time_zone = '-05:00'");
+} catch (PDOException $e) {
+    // Puedes registrar el error en un archivo y mostrar un mensaje genérico al usuario 
+    error_log('Error de conexión: ' . $e->getMessage());
+    die('No se pudo conectar a la base de datos. Intenta más tarde.');
+}
+
+
 
    <script type="application/ld+json">
         {
@@ -1032,3 +1048,44 @@ ADD COLUMN tipo_registro VARCHAR(20) DEFAULT 'cliente' AFTER convenio_nombre;
             "logo": "https://www.inbioslabstore.com/src/images/empresa/logo_empresa.png"
         }
     </script>
+
+    inbioslab config.php
+    <?php define('BASE_URL', '/src/'); // Para tu entorno local actual 
+
+    conexion.php
+
+    <?php $host = 'localhost';
+$dbname = 'u330560936_laboratorio';
+$user = 'u330560936_inbioslab';
+$pass = '41950361Cesar';
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION,);
+    $pdo->exec("SET time_zone = '-05:00'");
+} catch (PDOException $e) {
+    // Puedes registrar el error en un archivo y mostrar un mensaje genérico al usuario 
+    error_log('Error de conexión: ' . $e->getMessage());
+    die('No se pudo conectar a la base de datos. Intenta más tarde.');
+}
+
+
+tecnolab pagina web
+config.php
+    <?php define('BASE_URL', '/src/'); // Para tu entorno local actual 
+conexion.php
+    <?php $host = 'localhost';
+$dbname = 'u330560936_tecnolabbd';
+$user = 'u330560936_tecnolab';
+$pass = 'Tecnolab07-09-25';
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION,);
+    $pdo->exec("SET time_zone = '-05:00'");
+} catch (PDOException $e) {
+    // Puedes registrar el error en un archivo y mostrar un mensaje genérico al usuario 
+    error_log('Error de conexión: ' . $e->getMessage());
+    die('No se pudo conectar a la base de datos. Intenta más tarde.');
+}
+
+
+utf8mb4_general_ci

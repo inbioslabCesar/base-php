@@ -13,6 +13,17 @@ if (!$cotizacion_id) {
 }
 
 // Obtener resultados y datos del paciente
+
+// Traer datos de referencia de cotización (empresa/convenio/particular)
+$sqlCot = "SELECT c.id_empresa, c.id_convenio, e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
+           FROM cotizaciones c
+           LEFT JOIN empresas e ON c.id_empresa = e.id
+           LEFT JOIN convenios v ON c.id_convenio = v.id
+           WHERE c.id = :cotizacion_id";
+$stmtCot = $pdo->prepare($sqlCot);
+$stmtCot->execute(['cotizacion_id' => $cotizacion_id]);
+$cot = $stmtCot->fetch(PDO::FETCH_ASSOC);
+
 $sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
@@ -36,6 +47,16 @@ $paciente = [
     "fecha"          => $primer_row['fecha_ingreso'],
     "id"             => $primer_row['cliente_id']
 ];
+
+// Lógica de referencia (empresa, convenio, particular)
+$referencia = '';
+if (!empty($cot['id_empresa']) && (!empty($cot['nombre_comercial']) || !empty($cot['razon_social']))) {
+    $referencia = $cot['nombre_comercial'] ?: $cot['razon_social'];
+} elseif (!empty($cot['id_convenio']) && !empty($cot['nombre_convenio'])) {
+    $referencia = $cot['nombre_convenio'];
+} else {
+    $referencia = 'Particular';
+}
 
 // Datos de la empresa
 $sql3 = "SELECT nombre, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
@@ -165,11 +186,11 @@ body, table, td, th {
     width: 100%;
     border-collapse: collapse;
     margin-top: 18px;
-    font-size: 13px;
+    font-size: 11px;
 }
 .tabla-resultados th {
-    background: #d7e3fc;
-    font-size: 13px;
+    background: #d7e3fcff;
+    font-size: 11px;
     color: #1a237e;
     font-weight: bold;
     border: none;
@@ -177,7 +198,7 @@ body, table, td, th {
     height: 32px;
 }
 .tabla-resultados td {
-    font-size: 13px;
+    font-size: 11px;
     border: none;
     padding: 2px 8px;
     text-align: left;
@@ -214,6 +235,7 @@ $direccion_html = '
     Tel: ' . htmlspecialchars($empresa['telefono']) . '<br>
     Celular: ' . htmlspecialchars($empresa['celular']);
 
+
 $mpdf->SetHTMLHeader('
 <table class="encabezado-tabla">
     <tr>
@@ -224,16 +246,18 @@ $mpdf->SetHTMLHeader('
 <table class="datos-cliente-tabla">
     <tr>
         <td><strong>Paciente:</strong> ' . htmlspecialchars($paciente['nombre']) . '</td>
-        <td><strong>Código Cliente:</strong> ' . htmlspecialchars($paciente['codigo_cliente']) . '</td>
+        <td><strong>Código Paciente:</strong> ' . htmlspecialchars($paciente['codigo_cliente']) . '</td>
     </tr>
     <tr>
         <td><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td>
         <td><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td>
     </tr>
     <tr>
+        <td colspan="2"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td>
+    </tr>
+    <tr>
         <td colspan="2"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td>
     </tr>
-    
 </table>
 ', 'O', true);
 

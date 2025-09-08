@@ -87,6 +87,8 @@ function capitalizar($texto) {
 <script>
 $(document).ready(function() {
     $('#tabla-usuarios').DataTable({
+        pageLength: 5,
+        lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
         language: {
             url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         },

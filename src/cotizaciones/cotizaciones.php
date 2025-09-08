@@ -147,7 +147,7 @@ if ($cotizaciones) {
             <thead class="table-dark">
                 <tr>
                     <th>Código</th>
-                    <th>Cliente</th>
+                    <th>Paciente</th>
                     <th>DNI</th>
                     <th>Fecha</th>
                     <th>Total</th>

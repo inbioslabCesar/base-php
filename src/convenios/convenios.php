@@ -77,9 +77,11 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script>
 $(document).ready(function() {
     $('#tabla-convenios').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-        },
+                pageLength: 5,
+                lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+                },
         dom: 'Bfrtip',
         buttons: [
             { extend: 'excel', text: 'Exportar Excel', className: 'btn btn-success' },

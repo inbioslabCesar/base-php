@@ -319,7 +319,8 @@ function renderizarLista() {
     <td>
         <input type="number" min="1" class="form-control cantidadExamen" data-idx="${idx}" value="${ex.cantidad}">
     </td>
-    <td>
+    <td
+    >
         ${
             (rolUsuario === 'admin' || rolUsuario === 'recepcionista')
                 ? `<input type="number" step="0.01" class="form-control precioExamen" data-idx="${idx}" value="${precio.toFixed(2)}">`

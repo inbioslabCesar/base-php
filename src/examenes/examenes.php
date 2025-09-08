@@ -49,25 +49,36 @@ function capitalizar($texto)
                                 </button>
                                 <!-- Modal Detalle -->
                                 <div class="modal fade" id="modalDetalle<?= $examen['id'] ?>" tabindex="-1" aria-labelledby="modalLabel<?= $examen['id'] ?>" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-scrollable">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="modalLabel<?= $examen['id'] ?>">Detalle del Examen</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content shadow-lg border-0">
+                                            <div class="modal-header bg-primary text-white">
+                                                <h5 class="modal-title fw-bold" id="modalLabel<?= $examen['id'] ?>">
+                                                    <i class="fa fa-flask me-2"></i>Detalle del Examen
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                                             </div>
-                                            <div class="modal-body">
-                                                <strong>Codigo:</strong> <?= htmlspecialchars($examen['codigo'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-                                                <strong>Descripción:</strong> <?= nl2br(htmlspecialchars($examen['descripcion'] ?? '', ENT_QUOTES, 'UTF-8')) ?><br>
-                                                <strong>Preanalítica Cliente:</strong> <?= htmlspecialchars($examen['preanalitica_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-                                                <strong>Preanalítica Referencias:</strong> <?= htmlspecialchars($examen['preanalitica_referencias'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-                                                <strong>Tipo de Muestra:</strong> <?= htmlspecialchars($examen['tipo_muestra'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-                                                <strong>Tipo de Tubo:</strong> <?= htmlspecialchars($examen['tipo_tubo'] ?? '', ENT_QUOTES, 'UTF-8') ?><br>
-                                                <strong>Observaciones:</strong> <?= nl2br(htmlspecialchars($examen['observaciones'] ?? '', ENT_QUOTES, 'UTF-8')) ?><br>
-                                                <!-- Aqui iba el campo adicional -->
-                                                <strong>Vigente:</strong> <?= isset($examen['vigente']) && $examen['vigente'] ? 'Sí' : 'No' ?><br>
+                                            <div class="modal-body bg-light">
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Código:</span> <span class="text-dark"><?= htmlspecialchars($examen['codigo'] ?? '', ENT_QUOTES, 'UTF-8') ?></span></div>
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Tipo de Muestra:</span> <span class="text-dark"><?= htmlspecialchars($examen['tipo_muestra'] ?? '', ENT_QUOTES, 'UTF-8') ?></span></div>
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Tipo de Tubo:</span> <span class="text-dark"><?= htmlspecialchars($examen['tipo_tubo'] ?? '', ENT_QUOTES, 'UTF-8') ?></span></div>
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Vigente:</span> <span class="badge bg-<?= (isset($examen['vigente']) && $examen['vigente']) ? 'success' : 'danger' ?> ms-1"><?= isset($examen['vigente']) && $examen['vigente'] ? 'Sí' : 'No' ?></span></div>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Preanalítica Cliente:</span> <span class="text-dark"><?= htmlspecialchars($examen['preanalitica_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?></span></div>
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Preanalítica Referencias:</span> <span class="text-dark"><?= htmlspecialchars($examen['preanalitica_referencias'] ?? '', ENT_QUOTES, 'UTF-8') ?></span></div>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Descripción:</span><br><span class="text-dark small"><?= nl2br(htmlspecialchars($examen['descripcion'] ?? '', ENT_QUOTES, 'UTF-8')) ?></span></div>
+                                                        <div class="mb-2"><span class="fw-semibold text-primary">Observaciones:</span><br><span class="text-dark small"><?= nl2br(htmlspecialchars($examen['observaciones'] ?? '', ENT_QUOTES, 'UTF-8')) ?></span></div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                            <div class="modal-footer bg-white border-0">
+                                                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">
+                                                    <i class="fa fa-times me-1"></i> Cerrar
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -104,6 +115,8 @@ function capitalizar($texto)
 <script>
     $(document).ready(function() {
         $('#tabla-examenes').DataTable({
+            pageLength: 5,
+            lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },

@@ -54,7 +54,13 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" type="image/svg+xml" href="./src/images/inbioslab-logo.svg" />
+    <!-- Favicon para navegadores -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/src/images/empresa/logo_empresa.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/src/images/empresa/logo_empresa.png">
+    <!-- Favicon .ico para máxima compatibilidad -->
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/src/images/empresa/logo_empresa.png">
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -272,13 +278,19 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
         }
     </style>
     <script type="application/ld+json">
-        {
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            "name": "MEDDITECH",
-            "url": "https://www.medditech.es",
-            "logo": "https://www.medditech.es/src/images/empresa/logo_empresa.png"
-        }
+        <?php
+        $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+        $dominio = $protocolo . '://' . $_SERVER['HTTP_HOST'];
+        $logo_url = $dominio . '/' . ltrim($logo, '/');
+        $json_ld = [
+            "@context" => "https://schema.org",
+            "@type" => "Organization",
+            "name" => $nombre_empresa,
+            "url" => $dominio,
+            "logo" => $logo_url
+        ];
+        echo json_encode($json_ld, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        ?>
     </script>
 
 </head>
