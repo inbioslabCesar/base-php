@@ -1,4 +1,4 @@
-<?php $host = 'localhost';
+    <?php $host = 'localhost';
 $dbname = 'laboratorio';
 $user = 'root';
 $pass = '';

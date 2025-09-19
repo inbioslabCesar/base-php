@@ -10,6 +10,8 @@ if (!empty($examenes) && is_array($examenes)) {
     foreach ($examenes as $examen) {
         $id_resultado = $examen['id_resultado'] ?? null;
         $resultados = $examen['resultados'] ?? [];
+    $imprimir_examen = isset($examen['imprimir_examen']) ? 1 : 0;
+    $resultados['imprimir_examen'] = $imprimir_examen;
         if ($id_resultado && is_array($resultados)) {
             $json_resultados = json_encode($resultados, JSON_UNESCAPED_UNICODE);
             // Actualiza los resultados y el estado

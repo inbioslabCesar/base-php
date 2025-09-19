@@ -62,8 +62,28 @@ function capitalize($string) {
                 <input type="text" class="form-control" name="dni" id="dni" value="<?= htmlspecialchars($cliente['dni']??'') ?>" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="edad" class="form-label">Edad *</label>
-                <input type="number" class="form-control" name="edad" id="edad" value="<?= htmlspecialchars($cliente['edad']) ?>" required min="0">
+                <label for="edad" class="form-label">Edad</label>
+                <?php
+                    // Separar valor y unidad si es posible
+                    $edad_valor = '';
+                    $edad_unidad = '';
+                    if (preg_match('/^([0-9]+)\\s*(día|días|mes|meses|año|años)$/iu', trim($cliente['edad']), $m)) {
+                        $edad_valor = $m[1];
+                        $edad_unidad = strtolower($m[2]);
+                    } elseif (is_numeric($cliente['edad'])) {
+                        $edad_valor = $cliente['edad'];
+                        $edad_unidad = 'años';
+                    }
+                ?>
+                <div class="input-group">
+                    <input type="text" class="form-control" name="edad_valor" id="edad_valor" value="<?= htmlspecialchars($edad_valor) ?>" pattern="[0-9]+">
+                    <select class="form-select" name="edad_unidad" id="edad_unidad">
+                        <option value="días" <?= ($edad_unidad==="día"||$edad_unidad==="días")?'selected':'' ?>>Días</option>
+                        <option value="meses" <?= ($edad_unidad==="mes"||$edad_unidad==="meses")?'selected':'' ?>>Meses</option>
+                        <option value="años" <?= ($edad_unidad==="año"||$edad_unidad==="años"||$edad_unidad==="")?'selected':'' ?>>Años</option>
+                    </select>
+                </div>
+                <small class="form-text text-muted">Ejemplo: 15 días, 2 meses, 1 año</small>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="email" class="form-label">Email *</label>

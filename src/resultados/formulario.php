@@ -40,20 +40,25 @@ if ($cotizacion_id) {
                 $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
             ?>
                 <div class="card mb-3">
-                    <div class="card-header">
-                        <?= htmlspecialchars($examen['nombre_examen']) ?>
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <span><?= htmlspecialchars($examen['nombre_examen']) ?></span>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="examenes[<?= $examen['id_resultado'] ?>][imprimir_examen]" id="imprimir_examen_<?= $examen['id_resultado'] ?>" value="1"
+                                <?= (!isset($resultados['imprimir_examen']) || $resultados['imprimir_examen']) ? 'checked' : '' ?>
+                            >
+                            <label class="form-check-label" for="imprimir_examen_<?= $examen['id_resultado'] ?>">Imprimir este examen</label>
+                        </div>
                     </div>
                     <div class="card-body">
                         <input type="hidden" name="examenes[<?= $examen['id_resultado'] ?>][id_resultado]" value="<?= htmlspecialchars($examen['id_resultado']) ?>">
                         <?php foreach ($adicional as $item): ?>
-                            <?php if ($item['tipo'] === 'Título'): ?>
-                                <h3 style="background:<?= $item['color_fondo'] ?>;color:<?= $item['color_texto'] ?>;font-weight:bold;">
+                            <?php if ($item['tipo'] === 'Título' || $item['tipo'] === 'Subtítulo'): ?>
+                                <<?= $item['tipo'] === 'Título' ? 'h3' : 'h5' ?> 
+                                    style="background:<?= $item['color_fondo'] ?>;color:<?= $item['color_texto'] ?>;font-weight:bold;margin-bottom:0;"
+                                    class="<?= $item['tipo'] === 'Título' ? 'text-center' : '' ?>"
+                                >
                                     <?= htmlspecialchars($item['nombre']) ?>
-                                </h3>
-                            <?php elseif ($item['tipo'] === 'Subtítulo'): ?>
-                                <h5 style="background:<?= $item['color_fondo'] ?>;color:<?= $item['color_texto'] ?>;">
-                                    <?= htmlspecialchars($item['nombre']) ?>
-                                </h5>
+                                </<?= $item['tipo'] === 'Título' ? 'h3' : 'h5' ?>>
                             <?php elseif ($item['tipo'] === 'Campo'): ?>
                                 <div class="mb-3">
                                     <label class="form-label"><?= htmlspecialchars($item['nombre']) ?></label>

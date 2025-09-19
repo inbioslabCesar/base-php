@@ -89,6 +89,11 @@ foreach ($rows as $row) {
     $adicional = $examen && $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
     $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
 
+    // Solo imprimir si el examen fue marcado para imprimir
+    if (!isset($resultados_json['imprimir_examen']) || !$resultados_json['imprimir_examen']) {
+        continue;
+    }
+
     // Normaliza valores numéricos (quita comas)
     foreach ($resultados_json as $k => $v) {
         if (is_string($v) && preg_match('/^\d{1,3}(,\d{3})*(\.\d+)?$/', $v)) {
@@ -250,7 +255,7 @@ $mpdf->SetHTMLHeader('
     </tr>
     <tr>
         <td><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td>
-        <td><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td>
+    <td><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td>
     </tr>
     <tr>
         <td colspan="2"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td>
@@ -269,10 +274,8 @@ $mpdf->SetHTMLFooter('
     <div class="firma-footer">
         ' . $firma_html . '
         <hr class="my-3" style="margin:8px 0;">
-        <div style="font-size: 12px; color: #444; text-align:left;">
-            (L) Laboratorio de Referencia<br>
-            * Resultados fuera de los rangos referenciales<br>
-            ** Muestra remitida por un laboratorio externo con convenio
+        <div style="font-size: 11px; color: #555; text-align:left;">
+            Informe confidencial. Prohibida su reproducción total o parcial.
         </div>
     </div>
 ');
@@ -298,11 +301,21 @@ $html = '
 $sinDecimales = ['R_GLOBULOS_BLANCOS', 'PLAQUETAS'];
 
 foreach ($items as $item) {
-    if ($item['tipo'] === "Subtítulo" || $item['tipo'] === "Título") {
+    if ($item['tipo'] === "Título") {
         $color_fondo = $item['color_fondo'] ?? "#e3e8f5";
         $color_texto = $item['color_texto'] ?? "#1a237e";
+        $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
         $html .= '<tr class="subtitulo">
-            <td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:bold;border-radius:6px;">'
+            <td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';border-radius:6px;text-align:center;">'
+            . htmlspecialchars($item['prueba']) .
+            '</td>
+        </tr>';
+    } elseif ($item['tipo'] === "Subtítulo") {
+        $color_fondo = $item['color_fondo'] ?? "#e3e8f5";
+        $color_texto = $item['color_texto'] ?? "#1a237e";
+        $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
+        $html .= '<tr class="subtitulo">
+            <td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';border-radius:6px;">'
             . htmlspecialchars($item['prueba']) .
             '</td>
         </tr>';
@@ -327,18 +340,34 @@ foreach ($items as $item) {
         }
         // Formatea resultado
         $valorFormateado = $item['valor'];
+        $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
         if (in_array($item['prueba'], $sinDecimales) && is_numeric(str_replace(',', '', $valorFormateado))) {
             $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), 0, '', ',');
         } elseif ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric($valorFormateado)) {
             $valorFormateado = number_format($valorFormateado, 1, '.', '');
         }
-        $html .= '<tr>
-            <td>' . htmlspecialchars($item['prueba']) . '</td>
-            <td>' . htmlspecialchars($item['metodologia'] ?? "") . '</td>
-            <td>' . htmlspecialchars($valorFormateado) . '</td>
-            <td>' . htmlspecialchars($item['unidad'] ?? "") . '</td>
-            <td>' . $refHTML . '</td>
-        </tr>';
+        // Si es array (por ejemplo, checkboxes múltiples), mostrar cada valor en una fila con negrita si corresponde
+        if (is_array($valorFormateado)) {
+            foreach ($valorFormateado as $valorSel) {
+                if ($valorSel !== '' && $valorSel !== null) {
+                    $html .= '<tr>';
+                    $html .= '<td style="font-weight:' . $font_weight . '">' . htmlspecialchars($item['prueba']) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+                    $html .= '<td>' . htmlspecialchars($valorSel) . '</td>';
+                    $html .= '<td>' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+                    $html .= '<td>' . $refHTML . '</td>';
+                    $html .= '</tr>';
+                }
+            }
+        } else {
+            $html .= '<tr>';
+            $html .= '<td style="font-weight:' . $font_weight . '">' . htmlspecialchars($item['prueba']) . '</td>';
+            $html .= '<td>' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+            $html .= '<td>' . htmlspecialchars($valorFormateado) . '</td>';
+            $html .= '<td>' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+            $html .= '<td>' . $refHTML . '</td>';
+            $html .= '</tr>';
+        }
     }
 }
 

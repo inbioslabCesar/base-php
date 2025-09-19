@@ -15,7 +15,9 @@ $codigo_cliente = trim($_POST['codigo_cliente'] ?? '');
 $nombre         = trim($_POST['nombre'] ?? '');
 $apellido       = trim($_POST['apellido'] ?? '');
 $dni            = trim($_POST['dni'] ?? '');
-$edad           = trim($_POST['edad'] ?? '');
+$edad_valor     = trim($_POST['edad_valor'] ?? '');
+$edad_unidad    = trim($_POST['edad_unidad'] ?? '');
+$edad = ($edad_valor !== '' && $edad_unidad !== '') ? (intval($edad_valor) . ' ' . $edad_unidad) : '';
 $email          = trim($_POST['email'] ?? '');
 
 // Campos opcionales
@@ -28,7 +30,7 @@ $estado         = $_POST['estado'] ?? 'activo';
 $descuento      = $_POST['descuento'] ?? null;
 
 // Validación de requeridos
-if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$edad || !$email) {
+if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$email) {
     $_SESSION['msg'] = 'Por favor, complete todos los campos obligatorios.';
     header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
     exit;
