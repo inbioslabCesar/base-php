@@ -12,20 +12,20 @@ $dniFiltro = trim($_GET['dni'] ?? '');
 // Consulta principal con JOINs para traer los nombres correctos de empresa y convenio
 $sql = "
 SELECT c.*, 
-    e.nombre_comercial AS nombre_empresa, 
-    v.nombre AS nombre_convenio
+    (SELECT e.nombre_comercial FROM empresa_cliente ec 
+     JOIN empresas e ON ec.empresa_id = e.id 
+     WHERE ec.cliente_id = c.id LIMIT 1) AS nombre_empresa,
+    (SELECT v.nombre FROM convenio_cliente cc 
+     JOIN convenios v ON cc.convenio_id = v.id 
+     WHERE cc.cliente_id = c.id LIMIT 1) AS nombre_convenio
 FROM clientes c
-LEFT JOIN empresa_cliente ec ON c.id = ec.cliente_id
-LEFT JOIN empresas e ON ec.empresa_id = e.id
-LEFT JOIN convenio_cliente cc ON c.id = cc.cliente_id
-LEFT JOIN convenios v ON cc.convenio_id = v.id
 ";
 $params = [];
 if ($dniFiltro !== '') {
     $sql .= " WHERE c.dni LIKE ?";
     $params[] = "%$dniFiltro%";
 }
-$sql .= " ORDER BY c.id DESC";
+$sql .= " ORDER BY c.fecha_registro DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -144,6 +144,7 @@ $(document).ready(function() {
     $('#tablaClientes').DataTable({
         "pageLength": 5,
         "lengthMenu": [[5, 10, 25, 50], [5, 10, 25, 50]],
+        "order": [], // No aplicar ordenamiento inicial, mantener el orden de la consulta
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         }

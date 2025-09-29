@@ -50,7 +50,7 @@ if ($convenioFiltro !== '') {
 if ($condiciones) {
     $sql .= " WHERE " . implode(' AND ', $condiciones);
 }
-$sql .= " ORDER BY c.id DESC";
+$sql .= " ORDER BY c.fecha DESC, c.id DESC";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -271,6 +271,7 @@ if ($cotizaciones) {
         $('#tablaCotizaciones').DataTable({
             "pageLength": 5,
             "lengthMenu": [5, 10, 25, 50],
+            "order": [], // No aplicar ordenamiento inicial, mantener el orden de la consulta
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
             }
