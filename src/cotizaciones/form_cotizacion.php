@@ -210,6 +210,67 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
     background-color: #f8f9fa;
 }
 
+/* Estilos especiales para campos de precio */
+.precioExamen {
+    text-align: right;
+    font-weight: 600;
+    color: #28a745;
+    background: rgba(40, 167, 69, 0.05);
+    border-left: none;
+}
+
+.precioExamen:focus {
+    background: white;
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    color: #2c3e50;
+    border-left: none;
+}
+
+.precioExamen::placeholder {
+    color: #6c757d;
+    font-weight: normal;
+}
+
+.cantidadExamen {
+    text-align: center;
+    font-weight: 600;
+}
+
+/* Estilos para el input-group de precio */
+.input-group .input-group-text {
+    border-radius: 12px 0 0 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.input-group .precioExamen {
+    border-radius: 0 12px 12px 0;
+}
+
+/* Mejorar el grupo completo */
+.input-group:focus-within .input-group-text {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+/* Tooltip para ayuda */
+.precioExamen[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+}
+
 .btn-modern {
     border-radius: 10px;
     padding: 0.5rem 1rem;
@@ -818,12 +879,108 @@ $(document).on('input', '.cantidadExamen', function() {
     renderizarLista();
 });
 
-// Cambiar precio manualmente (solo admin/recep)
-$(document).on('input', '.precioExamen', function() {
+// Cambiar precio manualmente (solo admin/recep) - Optimizado para escritura completa
+$(document).on('keyup blur', '.precioExamen', function(e) {
     let idx = $(this).data('idx');
-    let nuevoPrecio = parseFloat($(this).val());
-    examenesSeleccionados[idx].precio_unitario = isNaN(nuevoPrecio) ? 0 : nuevoPrecio;
-    renderizarLista();
+    let inputValue = $(this).val();
+    
+    // Solo procesar en ciertos eventos para evitar actualizaciones prematuras
+    let shouldUpdate = false;
+    
+    if (e.type === 'blur') {
+        // Siempre actualizar al perder el foco
+        shouldUpdate = true;
+    } else if (e.type === 'keyup') {
+        // Solo actualizar en Enter, Tab, o después de una pausa en la escritura
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            shouldUpdate = true;
+            $(this).blur(); // Quitar foco para confirmar el cambio
+        }
+    }
+    
+    if (shouldUpdate) {
+        // Limpiar el valor: permitir solo números, puntos y hasta 2 decimales
+        let cleanValue = inputValue.replace(/[^\d.]/g, '');
+        
+        // Asegurar que solo haya un punto decimal
+        let parts = cleanValue.split('.');
+        if (parts.length > 2) {
+            cleanValue = parts[0] + '.' + parts.slice(1).join('');
+        }
+        
+        // Limitar a 2 decimales
+        if (parts[1] && parts[1].length > 2) {
+            cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+        }
+        
+        // Actualizar el campo si fue modificado
+        if (inputValue !== cleanValue) {
+            $(this).val(cleanValue);
+        }
+        
+        // Convertir a número para cálculos
+        let nuevoPrecio = parseFloat(cleanValue);
+        if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+            nuevoPrecio = 0;
+        }
+        
+        // Actualizar el precio en el array
+        examenesSeleccionados[idx].precio_unitario = nuevoPrecio;
+        
+        // Re-renderizar para actualizar totales
+        renderizarLista();
+    }
+});
+
+// Validación especial al perder el foco para asegurar formato correcto
+$(document).on('blur', '.precioExamen', function() {
+    let value = parseFloat($(this).val());
+    if (isNaN(value) || value < 0) {
+        value = 0;
+    }
+    $(this).val(value.toFixed(2));
+});
+
+// Seleccionar todo el texto al hacer foco para facilitar edición
+$(document).on('focus', '.precioExamen', function() {
+    $(this).select();
+});
+
+// Agregar debounce para actualización con retraso (alternativa más suave)
+let precioTimeout;
+$(document).on('input', '.precioExamen', function() {
+    let $input = $(this);
+    let idx = $input.data('idx');
+    
+    // Limpiar timeout anterior
+    clearTimeout(precioTimeout);
+    
+    // Establecer nuevo timeout para actualizar después de 1 segundo de inactividad
+    precioTimeout = setTimeout(function() {
+        let inputValue = $input.val();
+        
+        // Limpiar el valor
+        let cleanValue = inputValue.replace(/[^\d.]/g, '');
+        let parts = cleanValue.split('.');
+        if (parts.length > 2) {
+            cleanValue = parts[0] + '.' + parts.slice(1).join('');
+        }
+        if (parts[1] && parts[1].length > 2) {
+            cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+        }
+        
+        if (inputValue !== cleanValue) {
+            $input.val(cleanValue);
+        }
+        
+        let nuevoPrecio = parseFloat(cleanValue);
+        if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+            nuevoPrecio = 0;
+        }
+        
+        examenesSeleccionados[idx].precio_unitario = nuevoPrecio;
+        renderizarLista();
+    }, 1000); // 1 segundo de retraso
 });
 
 // Quitar examen
@@ -953,8 +1110,14 @@ function renderizarLista() {
                 <td>
                     ${
                         (rolUsuario === 'admin' || rolUsuario === 'recepcionista')
-                            ? `<input type="number" step="0.01" class="form-control form-control-modern precioExamen" 
-                                      data-idx="${idx}" value="${precio.toFixed(2)}">`
+                            ? `<div class="input-group">
+                                <span class="input-group-text bg-success text-white">S/.</span>
+                                <input type="text" class="form-control form-control-modern precioExamen" 
+                                      data-idx="${idx}" value="${precio.toFixed(2)}" 
+                                      placeholder="0.00" 
+                                      pattern="[0-9]+(\.[0-9]{1,2})?" 
+                                      title="Ingresa el precio (ej: 25.50)">
+                               </div>`
                             : `<div class="form-control-plaintext fw-bold text-success">S/. ${precio.toFixed(2)}</div>`
                     }
                     <input type="hidden" name="examenes[]" value="${ex.id}">
@@ -991,5 +1154,11 @@ function renderizarLista() {
     } else {
         $('#descuentoInfo').addClass('d-none');
     }
+    
+    // Actualizar los campos hidden con los valores actuales
+    examenesSeleccionados.forEach((ex, idx) => {
+        $(`input[name="cantidades[]"]:eq(${idx})`).val(ex.cantidad);
+        $(`input[name="precios[]"]:eq(${idx})`).val(parseFloat(ex.precio_unitario).toFixed(2));
+    });
 }
 </script>

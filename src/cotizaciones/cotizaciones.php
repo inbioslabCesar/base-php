@@ -98,67 +98,639 @@ if ($cotizaciones) {
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
+<style>
+/* Estilos para cotizaciones responsivas */
+.cotizaciones-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 15px 15px 0 0;
+    margin-bottom: 0;
+}
+
+.cotizaciones-filters {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Vista desktop (tabla normal) */
+.desktop-view {
+    display: block;
+}
+
+.mobile-view {
+    display: none;
+}
+
+/* Vista móvil con cards */
+.cotizacion-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.cotizacion-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.card-header-cotizacion {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+}
+
+.card-header-cotizacion .codigo {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.card-header-cotizacion .fecha {
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+.card-body-cotizacion {
+    padding: 20px;
+}
+
+.patient-info-card {
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.patient-name {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.patient-dni {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-value {
+    font-weight: 600;
+    color: #495057;
+}
+
+.status-section {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 15px 0;
+}
+
+.badge-status {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.actions-card {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-card-action {
+    flex: 0 0 auto;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    font-weight: 500;
+    padding: 0;
+    font-size: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-card-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Mejoras para la tabla en desktop */
+.table-modern {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.table-modern thead th {
+    background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
+    color: white;
+    font-weight: 600;
+    border: none;
+    padding: 15px 12px;
+}
+
+.table-modern tbody td {
+    padding: 12px;
+    border-bottom: 1px solid #f1f3f4;
+    vertical-align: middle;
+}
+
+.table-modern tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+    .cotizaciones-header {
+        text-align: center;
+        padding: 15px;
+    }
+    
+    .cotizaciones-filters {
+        padding: 15px;
+    }
+    
+    .desktop-view {
+        display: none;
+    }
+    
+    .mobile-view {
+        display: block;
+    }
+    
+    .actions-card {
+        justify-content: center;
+    }
+    
+    .btn-card-action {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .btn-card-action {
+        width: 38px;
+        height: 38px;
+        font-size: 0.9rem;
+    }
+    
+    .status-section {
+        justify-content: center;
+    }
+}
+
+/* Animaciones */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cotizacion-card {
+    animation: slideInUp 0.4s ease-out;
+}
+</style>
+
+<style>
+/* Estilos para vista responsiva de cotizaciones */
+.cotizaciones-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+.main-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    border: none;
+    overflow: hidden;
+}
+
+.header-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    position: relative;
+}
+
+.header-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.3;
+}
+
+.header-section h4 {
+    margin: 0;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+}
+
+.header-actions {
+    position: relative;
+    z-index: 1;
+}
+
+.filters-section {
+    background: #f8f9fa;
+    padding: 25px 30px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.filter-card {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    border: 1px solid #e9ecef;
+}
+
+.content-section {
+    padding: 30px;
+}
+
+/* Vista desktop - tabla */
+.desktop-view {
+    display: block;
+}
+
+.mobile-view {
+    display: none;
+}
+
+/* Estilos para cards en móvil */
+.cotizacion-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border: 1px solid #e9ecef;
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.cotizacion-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.card-header-custom {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    position: relative;
+}
+
+.card-header-custom .codigo {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.card-header-custom .fecha {
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+.card-body-custom {
+    padding: 20px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.info-label {
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.info-value {
+    font-weight: 600;
+    color: #495057;
+}
+
+.patient-info {
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.patient-name {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.patient-dni {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.status-badges {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 15px 0;
+}
+
+.badge-custom {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.actions-section {
+    background: #f8f9fa;
+    padding: 15px 20px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    flex: 1;
+    min-width: 100px;
+    border-radius: 20px;
+    font-weight: 500;
+    padding: 8px 15px;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+    .cotizaciones-container {
+        padding: 10px;
+    }
+    
+    .header-section {
+        padding: 20px;
+        text-align: center;
+    }
+    
+    .filters-section {
+        padding: 20px;
+    }
+    
+    .content-section {
+        padding: 20px;
+    }
+    
+    .desktop-view {
+        display: none;
+    }
+    
+    .mobile-view {
+        display: block;
+    }
+    
+    .filter-card {
+        padding: 15px;
+    }
+    
+    .actions-section {
+        justify-content: center;
+    }
+    
+    .btn-action {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .btn-action {
+        flex: 1 1 100%;
+    }
+    
+    .status-badges {
+        justify-content: center;
+    }
+}
+
+/* Mejoras para DataTables */
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 0.5rem 1rem;
+    margin: 0 2px;
+    border-radius: 20px;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border-radius: 20px;
+    padding: 5px 10px;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    border-radius: 20px;
+    padding: 8px 15px;
+    border: 2px solid #e9ecef;
+}
+
+.table-custom {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.table-custom thead th {
+    background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
+    color: white;
+    font-weight: 600;
+    border: none;
+    padding: 15px 12px;
+}
+
+.table-custom tbody td {
+    padding: 12px;
+    border-bottom: 1px solid #f1f3f4;
+    vertical-align: middle;
+}
+
+.table-custom tbody tr:hover {
+    background-color: rgba(102, 126, 234, 0.05);
+}
+
+/* Animaciones */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.cotizacion-card {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.cotizacion-card:nth-child(even) {
+    animation-delay: 0.1s;
+}
+
+.cotizacion-card:nth-child(odd) {
+    animation-delay: 0.2s;
+}
+</style>
+
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
-        <h4 class="mb-2 mb-md-0">Historial de Cotizaciones</h4>
-        <?php if ($botonTexto && $botonUrl): ?>
-            <a href="<?= $botonUrl ?>" class="btn btn-primary"><?= $botonTexto ?></a>
-        <?php endif; ?>
+    <!-- Header mejorado -->
+    <div class="cotizaciones-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <h4 class="mb-2 mb-md-0">📊 Historial de Cotizaciones</h4>
+            <?php if ($botonTexto && $botonUrl): ?>
+                <a href="<?= $botonUrl ?>" class="btn btn-light">
+                    <i class="bi bi-plus-circle me-2"></i><?= $botonTexto ?>
+                </a>
+            <?php endif; ?>
+        </div>
     </div>
 
-    <!-- Filtros combinables -->
-    <form method="get" class="mb-3 row g-2 align-items-end">
-        <input type="hidden" name="vista" value="cotizaciones">
-        <div class="col-auto">
-            <input type="text" name="dni" class="form-control" placeholder="Buscar por DNI" value="<?= htmlspecialchars($dniFiltro) ?>">
-        </div>
-        <div class="col-auto">
-            <select name="empresa" class="form-select">
-                <option value="">Empresa...</option>
-                <?php foreach ($empresas as $emp): ?>
-                    <option value="<?= $emp['id'] ?>" <?= ($empresaFiltro == $emp['id']) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-auto">
-            <select name="convenio" class="form-select">
-                <option value="">Convenio...</option>
-                <?php foreach ($convenios as $conv): ?>
-                    <option value="<?= $conv['id'] ?>" <?= ($convenioFiltro == $conv['id']) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($conv['nombre']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-outline-secondary">
-                <i class="bi bi-search"></i> Buscar
-            </button>
-            <a href="dashboard.php?vista=cotizaciones" class="btn btn-outline-dark">
-                <i class="bi bi-x-circle"></i> Limpiar
-            </a>
-        </div>
-    </form>
+    <!-- Filtros mejorados -->
+    <div class="cotizaciones-filters">
+        <form method="get" class="row g-3 align-items-end">
+            <input type="hidden" name="vista" value="cotizaciones">
+            <div class="col-md-3 col-sm-6">
+                <label class="form-label fw-bold">🔍 DNI</label>
+                <input type="text" name="dni" class="form-control" placeholder="Buscar por DNI" value="<?= htmlspecialchars($dniFiltro) ?>">
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label class="form-label fw-bold">🏢 Empresa</label>
+                <select name="empresa" class="form-select">
+                    <option value="">Seleccionar empresa...</option>
+                    <?php foreach ($empresas as $emp): ?>
+                        <option value="<?= $emp['id'] ?>" <?= ($empresaFiltro == $emp['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label class="form-label fw-bold">🤝 Convenio</label>
+                <select name="convenio" class="form-select">
+                    <option value="">Seleccionar convenio...</option>
+                    <?php foreach ($convenios as $conv): ?>
+                        <option value="<?= $conv['id'] ?>" <?= ($convenioFiltro == $conv['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($conv['nombre']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="d-grid gap-2 d-md-flex">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <i class="bi bi-search"></i> Buscar
+                    </button>
+                    <a href="dashboard.php?vista=cotizaciones" class="btn btn-outline-secondary flex-fill">
+                        <i class="bi bi-x-circle"></i> Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
 
-    <div class="table-responsive">
-        <table id="tablaCotizaciones" class="table table-striped table-bordered align-middle">
-            <thead class="table-dark">
-                <tr>
-                    <th>Código</th>
-                    <th>Paciente</th>
-                    <th>DNI</th>
-                    <th>Fecha</th>
-                    <th>Total</th>
-                    <th>Referencia</th>
-                    <th>Estado Pago</th>
-                    <th>Estado Examen</th>
-                    <th>Rol Creador</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
+    <!-- Vista Desktop - Tabla -->
+    <div class="desktop-view">
+        <div class="table-responsive">
+            <table id="tablaCotizaciones" class="table table-modern align-middle">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Paciente</th>
+                        <th>DNI</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Referencia</th>
+                        <th>Estado Pago</th>
+                        <th>Estado Examen</th>
+                        <th>Rol Creador</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
                 <?php if ($cotizaciones): ?>
                     <?php foreach ($cotizaciones as $cotizacion): ?>
                         <tr>
@@ -261,6 +833,131 @@ if ($cotizaciones) {
         </table>
     </div>
 </div>
+
+<!-- Vista Móvil - Cards -->
+<div class="mobile-view mt-3">
+    <?php if ($cotizaciones): ?>
+        <?php foreach ($cotizaciones as $cotizacion): ?>
+            <?php
+            // Calcular estado de pago
+            $total = floatval($cotizacion['total']);
+            $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
+            $saldo = $total - $pagado;
+
+            if ($saldo <= 0) {
+                $badgeClassPago = 'bg-success';
+                $iconPago = 'bi-check-circle-fill';
+                $textoPago = 'Pagado';
+            } elseif ($pagado > 0) {
+                $badgeClassPago = 'bg-warning text-dark';
+                $iconPago = 'bi-hourglass-split';
+                $textoPago = 'Parcial: S/ ' . number_format($saldo, 2);
+            } else {
+                $badgeClassPago = 'bg-danger';
+                $iconPago = 'bi-x-circle-fill';
+                $textoPago = 'Pendiente: S/ ' . number_format($saldo, 2);
+            }
+
+            // Estado de exámenes
+            $examenes = $examenesPorCotizacion[$cotizacion['id']] ?? [];
+            $pendientes = array_filter($examenes, function ($ex) {
+                return $ex['estado'] === 'pendiente';
+            });
+            ?>
+            <div class="cotizacion-card">
+                <div class="card-header-cotizacion">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="codigo">📋 <?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></div>
+                            <div class="fecha"><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold fs-5">S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></div>
+                            <small><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body-cotizacion">
+                    <!-- Información del paciente -->
+                    <div class="patient-info-card">
+                        <div class="patient-name">👤 <?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></div>
+                        <div class="patient-dni">DNI: <?= htmlspecialchars($cotizacion['dni'] ?? '') ?></div>
+                    </div>
+
+                    <!-- Información adicional -->
+                    <div class="info-row">
+                        <span class="info-label">📋 Tipo:</span>
+                        <span class="info-value">
+                            <?php
+                            if (!empty($cotizacion['id_empresa']) && (!empty($cotizacion['nombre_comercial']) || !empty($cotizacion['razon_social']))) {
+                                echo '<span class="badge bg-info">' .
+                                    htmlspecialchars($cotizacion['nombre_comercial'] ?: $cotizacion['razon_social']) .
+                                    '</span>';
+                            } elseif (!empty($cotizacion['id_convenio']) && !empty($cotizacion['nombre_convenio'])) {
+                                echo '<span class="badge bg-warning">' . htmlspecialchars($cotizacion['nombre_convenio']) . '</span>';
+                            } else {
+                                echo '<span class="badge bg-secondary">Particular</span>';
+                            }
+                            ?>
+                        </span>
+                    </div>
+
+                    <!-- Estados -->
+                    <div class="status-section">
+                        <span class="badge badge-status <?= $badgeClassPago ?>">
+                            <i class="bi <?= $iconPago ?>"></i>
+                            <?= $textoPago ?>
+                        </span>
+                        <span class="badge badge-status <?= $pendientes ? 'bg-warning text-dark' : 'bg-success' ?>">
+                            <i class="bi <?= $pendientes ? 'bi-hourglass-split' : 'bi-check-circle-fill' ?>"></i>
+                            <?= $pendientes ? 'Examen Pendiente' : 'Examen Completado' ?>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Acciones -->
+                <div class="actions-card">
+                    <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
+                        <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-card-action" title="Ver cotización">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista'): ?>
+                        <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-primary btn-card-action" title="Editar o agregar resultados">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (($rol === 'admin' || $rol === 'recepcionista') && $saldo > 0): ?>
+                        <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-warning btn-card-action" title="Registrar pago">
+                            <i class="bi bi-cash-coin"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($rol === 'admin'): ?>
+                        <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-danger btn-card-action" title="Eliminar cotización" onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
+                        <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-success btn-card-action" title="Descargar PDF de todos los resultados" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="text-center py-5">
+            <div class="text-muted">
+                <i class="bi bi-inbox display-1 d-block mb-3"></i>
+                <h5>No hay cotizaciones registradas</h5>
+                <p>Cuando se registren cotizaciones aparecerán aquí.</p>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
+
+</div>
 <!-- DataTables y dependencias -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
@@ -269,12 +966,19 @@ if ($cotizaciones) {
 <script>
     $(document).ready(function() {
         $('#tablaCotizaciones').DataTable({
-            "pageLength": 5,
-            "lengthMenu": [5, 10, 25, 50],
+            "pageLength": 3,
+            "lengthMenu": [3, 5, 10, 25, 50],
             "order": [], // No aplicar ordenamiento inicial, mantener el orden de la consulta
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
-            }
+            },
+            "responsive": true,
+            "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                   '<"row"<"col-sm-12"tr>>' +
+                   '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            "columnDefs": [
+                { "orderable": false, "targets": [9] } // Deshabilitar ordenamiento en columna de acciones
+            ]
         });
     });
 </script>

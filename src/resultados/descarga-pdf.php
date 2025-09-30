@@ -15,7 +15,7 @@ if (!$cotizacion_id) {
 // Obtener resultados y datos del paciente
 
 // Traer datos de referencia de cotización (empresa/convenio/particular)
-$sqlCot = "SELECT c.id_empresa, c.id_convenio, e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
+$sqlCot = "SELECT c.id_empresa, c.id_convenio, c.referencia_personalizada, e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
            FROM cotizaciones c
            LEFT JOIN empresas e ON c.id_empresa = e.id
            LEFT JOIN convenios v ON c.id_convenio = v.id
@@ -50,12 +50,22 @@ $paciente = [
 
 // Lógica de referencia (empresa, convenio, particular)
 $referencia = '';
-if (!empty($cot['id_empresa']) && (!empty($cot['nombre_comercial']) || !empty($cot['razon_social']))) {
-    $referencia = $cot['nombre_comercial'] ?: $cot['razon_social'];
-} elseif (!empty($cot['id_convenio']) && !empty($cot['nombre_convenio'])) {
-    $referencia = $cot['nombre_convenio'];
+
+// Verificar si hay una referencia personalizada en la cotización
+$referencia_personalizada = !empty($cot['referencia_personalizada']) ? trim($cot['referencia_personalizada']) : '';
+
+if (!empty($referencia_personalizada)) {
+    // Si hay referencia personalizada, usarla
+    $referencia = $referencia_personalizada;
 } else {
-    $referencia = 'Particular';
+    // Si no hay referencia personalizada, usar la lógica original
+    if (!empty($cot['id_empresa']) && (!empty($cot['nombre_comercial']) || !empty($cot['razon_social']))) {
+        $referencia = $cot['nombre_comercial'] ?: $cot['razon_social'];
+    } elseif (!empty($cot['id_convenio']) && !empty($cot['nombre_convenio'])) {
+        $referencia = $cot['nombre_convenio'];
+    } else {
+        $referencia = 'Particular';
+    }
 }
 
 // Datos de la empresa
