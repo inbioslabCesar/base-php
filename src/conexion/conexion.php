@@ -3,7 +3,7 @@ $dbname = 'laboratorio';
 $user = 'root';
 $pass = '';
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $pass);
+        $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8", DB_USER, DB_PASS);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION,);
     $pdo->exec("SET time_zone = '-05:00'");
 } catch (PDOException $e) {

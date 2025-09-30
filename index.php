@@ -1,6 +1,7 @@
+
 <?php
-require_once __DIR__ . '/src/conexion/conexion.php';
 require_once __DIR__ . '/src/config/config.php';
+require_once __DIR__ . '/src/conexion/conexion.php';
 
 // Consulta de promociones solo para clientes y todos
 $stmtPromo = $pdo->query("SELECT * FROM promociones WHERE activo = 1 AND (tipo_publico = 'clientes' OR tipo_publico = 'todos') AND (CURDATE() BETWEEN fecha_inicio AND fecha_fin OR vigente = 1) ORDER BY fecha_inicio DESC");

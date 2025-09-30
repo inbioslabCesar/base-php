@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 $rol = $_SESSION['rol'] ?? '';
 
 // Filtro por DNI
@@ -29,6 +30,14 @@ $sql .= " ORDER BY c.fecha_registro DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Paginación para cards móviles
+$pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
+$por_pagina = 3;
+$total_clientes = count($clientes);
+$total_paginas = ceil($total_clientes / $por_pagina);
+$inicio = ($pagina - 1) * $por_pagina;
+$clientes_pagina = array_slice($clientes, $inicio, $por_pagina);
 
 function capitalize($string) {
     return mb_convert_case(strtolower(trim((string)$string)), MB_CASE_TITLE, "UTF-8");
@@ -465,10 +474,11 @@ function capitalize($string) {
         <?php unset($_SESSION['msg']); ?>
     <?php endif; ?>
 
-    <!-- Vista Cards para Móvil -->
+
+    <!-- Vista Cards para Móvil con paginación -->
     <div class="cards-container">
-        <?php if ($clientes): ?>
-            <?php foreach ($clientes as $cliente): ?>
+        <?php if ($clientes_pagina): ?>
+            <?php foreach ($clientes_pagina as $cliente): ?>
                 <div class="cliente-card">
                     <div class="card-header">
                         <h5 class="cliente-nombre">
@@ -566,6 +576,25 @@ function capitalize($string) {
                     </div>
                 </div>
             <?php endforeach; ?>
+
+                        <!-- Paginación para cards -->
+                        <nav class="mt-3">
+                            <ul class="pagination justify-content-center">
+                                <?php
+                                    // Mantener todos los parámetros activos en la URL
+                                    $params = $_GET;
+                                    foreach ($params as $key => $value) {
+                                        if ($key === 'pagina') unset($params[$key]);
+                                    }
+                                    $baseUrl = '?' . http_build_query($params);
+                                ?>
+                                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                                    <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                                        <a class="page-link" href="<?= $baseUrl . ($baseUrl !== '?' ? '&' : '') . 'pagina=' . $i ?>"><?= $i ?></a>
+                                    </li>
+                                <?php endfor; ?>
+                            </ul>
+                        </nav>
         <?php else: ?>
             <div class="text-center py-5">
                 <i class="bi bi-people" style="font-size: 4rem; color: #6c757d;"></i>

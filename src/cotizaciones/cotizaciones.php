@@ -54,7 +54,16 @@ $sql .= " ORDER BY c.fecha DESC, c.id DESC";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
+
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Paginación para cards móviles
+$pagina = isset($_GET['pagina']) ? max(1, (int)$_GET['pagina']) : 1;
+$por_pagina = 3;
+$total_cotizaciones = count($cotizaciones);
+$total_paginas = ceil($total_cotizaciones / $por_pagina);
+$inicio = ($pagina - 1) * $por_pagina;
+$cotizaciones_pagina = array_slice($cotizaciones, $inicio, $por_pagina);
 
 // Consulta para exámenes de cada cotización
 $examenesPorCotizacion = [];
@@ -836,8 +845,8 @@ if ($cotizaciones) {
 
 <!-- Vista Móvil - Cards -->
 <div class="mobile-view mt-3">
-    <?php if ($cotizaciones): ?>
-        <?php foreach ($cotizaciones as $cotizacion): ?>
+    <?php if ($cotizaciones_pagina): ?>
+        <?php foreach ($cotizaciones_pagina as $cotizacion): ?>
             <?php
             // Calcular estado de pago
             $total = floatval($cotizacion['total']);
@@ -945,7 +954,26 @@ if ($cotizaciones) {
                     <?php endif; ?>
                 </div>
             </div>
+
         <?php endforeach; ?>
+        <!-- Paginación para cards -->
+        <nav class="mt-3">
+            <ul class="pagination justify-content-center">
+                <?php
+                    // Mantener todos los parámetros activos en la URL
+                    $params = $_GET;
+                    foreach ($params as $key => $value) {
+                        if ($key === 'pagina') unset($params[$key]);
+                    }
+                    $baseUrl = '?' . http_build_query($params);
+                ?>
+                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                    <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
+                        <a class="page-link" href="<?= $baseUrl . ($baseUrl !== '?' ? '&' : '') . 'pagina=' . $i ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor; ?>
+            </ul>
+        </nav>
     <?php else: ?>
         <div class="text-center py-5">
             <div class="text-muted">

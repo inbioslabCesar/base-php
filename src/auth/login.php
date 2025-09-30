@@ -2,6 +2,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../clases/Auth.php';
 require_once __DIR__ . '/empresa_config.php';
