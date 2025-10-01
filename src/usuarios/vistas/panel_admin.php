@@ -59,11 +59,7 @@ require_once __DIR__ . '/../../config/config.php';
 
             <div class="container mt-5">
                 <!-- Encabezado destacado -->
-                <div class="panel-header mb-4 p-4 text-center text-white">
-                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Admin" style="width: 70px; border-radius: 50%; box-shadow: 0 4px 16px #0002;">
-                    <h2 class="mt-3 mb-1 fw-bold">Panel de Administrador</h2>
-                    <p class="mb-0 fs-5">Gestión centralizada y acceso rápido a todas las funciones</p>
-                </div>
+                <!-- Encabezado destacado eliminado -->
 
                 <!-- Opciones en cards -->
                 <div class="row g-4">

@@ -1,21 +1,22 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 
+
 $idCotizacion = $_GET['id'] ?? null;
 $cotizacion = null;
 $msg = $_GET['msg'] ?? '';
-
 $totalPagado = 0;
 $saldo = 0;
+$isPagada = false;
 if ($idCotizacion) {
     $stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
     $stmt->execute([$idCotizacion]);
     $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
-
     $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
     $stmtPagos->execute([$idCotizacion]);
     $totalPagado = floatval($stmtPagos->fetchColumn());
     $saldo = floatval($cotizacion['total']) - $totalPagado;
+    $isPagada = ($saldo <= 0);
 }
 ?>
 <style>
@@ -154,7 +155,7 @@ if ($idCotizacion) {
                 <i class="bi bi-credit-card me-2"></i>
                 Gestión de Pagos - Cotización #<?= htmlspecialchars($idCotizacion) ?>
             </h2>
-            <button type="button" class="toggle-edit" onclick="toggleEditTotal()">
+            <button type="button" class="toggle-edit" onclick="toggleEditTotal()" <?= $isPagada ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
                 <i class="bi bi-pencil-square me-1"></i>
                 Modificar Monto Total
             </button>
@@ -197,14 +198,15 @@ if ($idCotizacion) {
                                 <label class="form-label text-white">
                                     <strong>Nuevo Monto Total (S/)</strong>
                                 </label>
-                                <input type="number" 
-                                       step="0.01" 
-                                       name="nuevo_total" 
-                                       class="form-control form-control-modern" 
-                                       value="<?= htmlspecialchars($cotizacion['total']) ?>" 
-                                       min="0.01" 
-                                       required
-                                       id="nuevoTotal">
+                       <input type="number" 
+                           step="0.01" 
+                           name="nuevo_total" 
+                           class="form-control form-control-modern" 
+                           value="<?= htmlspecialchars($cotizacion['total']) ?>" 
+                           min="0.01" 
+                           required
+                           id="nuevoTotal"
+                           <?= $isPagada ? 'readonly' : '' ?> >
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-white">
@@ -218,7 +220,7 @@ if ($idCotizacion) {
                             </div>
                         </div>
                         <div class="mt-3 d-flex gap-2">
-                            <button type="submit" class="btn btn-warning-modern">
+                            <button type="submit" class="btn btn-warning-modern" <?= $isPagada ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
                                 <i class="bi bi-save me-1"></i>
                                 Actualizar Monto
                             </button>

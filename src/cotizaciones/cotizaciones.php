@@ -63,6 +63,13 @@ $por_pagina = 3;
 $total_cotizaciones = count($cotizaciones);
 $total_paginas = ceil($total_cotizaciones / $por_pagina);
 $inicio = ($pagina - 1) * $por_pagina;
+
+$saldosPorCotizacion = [];
+foreach ($cotizaciones as &$cotizacion) {
+    $total = floatval($cotizacion['total']);
+    $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
+    $saldosPorCotizacion[$cotizacion['id']] = $total - $pagado;
+}
 $cotizaciones_pagina = array_slice($cotizaciones, $inicio, $por_pagina);
 
 // Consulta para exámenes de cada cotización
@@ -815,11 +822,18 @@ if ($cotizaciones) {
                                         <i class="bi bi-pencil-square"></i>
                                     </a>
                                 <?php endif; ?>
-                                <?php if (($rol === 'admin' || $rol === 'recepcionista') && $saldo > 0): ?>
-                                    <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-warning btn-sm mb-1" title="Registrar pago">
-                                        <i class="bi bi-cash-coin"></i>
-                                    </a>
-                                <?php endif; ?>
+                                <?php
+                                // Mostrar botón según estado de pago
+                                if (($rol === 'admin' || $rol === 'recepcionista')) {
+                                    if ($saldo <= 0) {
+                                        // Pagado: mostrar botón gris historial
+                                        echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-secondary btn-sm mb-1" title="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>';
+                                    } else {
+                                        // Pendiente o parcial: mostrar botón amarillo registrar pago
+                                        echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-warning btn-sm mb-1" title="Registrar pago"><i class="bi bi-cash-coin"></i></a>';
+                                    }
+                                }
+                                ?>
                                 <?php if ($rol === 'admin'): ?>
                                     <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-danger btn-sm mb-1" title="Eliminar cotización" onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
                                         <i class="bi bi-trash"></i>
@@ -927,21 +941,23 @@ if ($cotizaciones) {
 
                 <!-- Acciones -->
                 <div class="actions-card">
-                    <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
-                        <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-card-action" title="Ver cotización">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                    <?php endif; ?>
-                    <?php if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista'): ?>
-                        <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-primary btn-card-action" title="Editar o agregar resultados">
-                            <i class="bi bi-pencil-square"></i>
-                        </a>
-                    <?php endif; ?>
-                    <?php if (($rol === 'admin' || $rol === 'recepcionista') && $saldo > 0): ?>
-                        <a href="dashboard.php?vista=pago_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-warning btn-card-action" title="Registrar pago">
-                            <i class="bi bi-cash-coin"></i>
-                        </a>
-                    <?php endif; ?>
+                    <?php
+                    if ($rol === 'admin' || $rol === 'recepcionista') {
+                        echo '<a href="dashboard.php?vista=detalle_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-info btn-card-action" title="Ver cotización"><i class="bi bi-eye"></i></a>';
+                    }
+                    if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista') {
+                        echo '<a href="dashboard.php?vista=formulario&cotizacion_id=' . $cotizacion['id'] . '" class="btn btn-primary btn-card-action" title="Editar o agregar resultados"><i class="bi bi-pencil-square"></i></a>';
+                    }
+                    if ($rol === 'admin' || $rol === 'recepcionista') {
+                        if ($saldo <= 0) {
+                            // Pagado: mostrar botón gris historial
+                            echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-secondary btn-card-action" title="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>';
+                        } else {
+                            // Pendiente o parcial: mostrar botón amarillo registrar pago
+                            echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-warning btn-card-action" title="Registrar pago"><i class="bi bi-cash-coin"></i></a>';
+                        }
+                    }
+                    ?>
                     <?php if ($rol === 'admin'): ?>
                         <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-danger btn-card-action" title="Eliminar cotización" onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
                             <i class="bi bi-trash"></i>
