@@ -1,25 +1,30 @@
 <style>
-    .panel-btn {
-        font-size: 1.1rem;
-        font-weight: 600;
-        padding: 16px 0;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px #0001;
-        transition: transform 0.08s, box-shadow 0.15s, background 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5em;
-    }
-    .panel-btn i {
-        font-size: 1.3em;
-    }
-    .panel-btn:hover {
-        transform: translateY(-2px) scale(1.03);
-        box-shadow: 0 4px 16px #0002;
-        filter: brightness(1.08);
-        text-decoration: none;
-    }
+.panel-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    box-shadow: 0 4px 24px #764ba233;
+}
+.btn-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.btn-gradient:hover {
+    box-shadow: 0 4px 16px #764ba2aa;
+    transform: translateY(-2px) scale(1.04);
+}
+.panel-card {
+    border-radius: 18px;
+    transition: box-shadow 0.2s, transform 0.2s;
+    box-shadow: 0 2px 8px #667eea22;
+}
+.panel-card:hover {
+    box-shadow: 0 8px 32px #667eea33;
+    transform: translateY(-4px) scale(1.03);
+}
 </style>
 <?php
 require_once __DIR__ . '/../../config/config.php';
@@ -29,66 +34,130 @@ require_once __DIR__ . '/../../config/config.php';
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
 <div class="container mt-5">
+    <!-- Formulario de búsqueda de paciente -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <h4 class="mb-3"><i class="bi bi-search me-2"></i>Buscar Paciente</h4>
+            <form method="get" action="dashboard.php" class="row g-3 align-items-end">
+                <input type="hidden" name="vista" value="buscar_paciente">
+                <div class="col-md-6">
+                    <input type="text" name="busqueda_paciente" class="form-control form-control-lg" placeholder="DNI, código, nombre o apellido" required>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-search"></i> Buscar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     <div class="card shadow-lg">
         <div class="card-body">
             <h2 class="card-title text-center mb-4">
                 <i class="bi bi-person-badge-fill me-2"></i>Panel de Administrador
             </h2>
-            <div class="row justify-content-center mb-4">
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=empresa" class="btn btn-primary w-100 panel-btn">
-                        <i class="bi bi-building"></i> Vista Empresa
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=laboratorista" class="btn btn-warning w-100 text-dark panel-btn">
-                        <i class="bi bi-eyeglasses"></i> Vista Laboratorista
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-success w-100 panel-btn">
-                        <i class="bi bi-person-lines-fill"></i> Vista Recepcionista
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=cliente" class="btn btn-info w-100 panel-btn">
-                        <i class="bi bi-people"></i> Vista Cliente
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=contabilidad" class="btn btn-danger w-100 panel-btn">
-                        <i class="bi bi-cash-stack"></i> Contabilidad (Ingresos/Egresos)
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=convenio" class="btn btn-warning w-100 panel-btn">
-                        <i class="bi bi-file-earmark-medical"></i> Vista Convenio
-                    </a>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <a href="<?= BASE_URL ?>dashboard.php?vista=config_empresa_datos" class="btn btn-outline-primary w-100 panel-btn">
-                        <i class="bi bi-gear-fill"></i> Configuración de Empresa
-                    </a>
-                </div>
-                <?php if ($_SESSION['rol'] === 'admin'): ?>
-                    <div class="col-md-3 mb-3">
-                        <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-warning w-100 panel-btn">
-                            <i class="bi bi-megaphone"></i> Gestionar Promociones
-                        </a>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <a href="<?= BASE_URL ?>dashboard.php?vista=pendientes_toma" class="btn btn-outline-warning w-100 panel-btn">
-                            <i class="bi bi-clock-history"></i> Ver exámenes pendientes de toma de muestra
-                        </a>
-                    </div>
 
-                    <div class="col-md-3 mb-3">
-                        <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary w-100 panel-btn">
-                            <i class="bi bi-file-earmark-text"></i> Mis Cotizaciones
-                        </a>
+            <div class="container mt-5">
+                <!-- Encabezado destacado -->
+                <div class="panel-header mb-4 p-4 text-center text-white">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Admin" style="width: 70px; border-radius: 50%; box-shadow: 0 4px 16px #0002;">
+                    <h2 class="mt-3 mb-1 fw-bold">Panel de Administrador</h2>
+                    <p class="mb-0 fs-5">Gestión centralizada y acceso rápido a todas las funciones</p>
+                </div>
+
+                <!-- Opciones en cards -->
+                <div class="row g-4">
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-building display-4 text-primary mb-2"></i>
+                                <h5 class="card-title mb-2">Vista Empresa</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=empresa" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
                     </div>
-                <?php endif; ?>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-eyeglasses display-4 text-warning mb-2"></i>
+                                <h5 class="card-title mb-2">Vista Laboratorista</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=laboratorista" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-person-lines-fill display-4 text-success mb-2"></i>
+                                <h5 class="card-title mb-2">Vista Recepcionista</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-people display-4 text-info mb-2"></i>
+                                <h5 class="card-title mb-2">Vista Cliente</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=cliente" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-cash-stack display-4 text-danger mb-2"></i>
+                                <h5 class="card-title mb-2">Contabilidad</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=contabilidad" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-file-earmark-medical display-4 text-warning mb-2"></i>
+                                <h5 class="card-title mb-2">Vista Convenio</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=convenio" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <div class="card panel-card h-100 shadow-lg border-0">
+                            <div class="card-body text-center">
+                                <i class="bi bi-gear-fill display-4 text-primary mb-2"></i>
+                                <h5 class="card-title mb-2">Configuración Empresa</h5>
+                                <a href="<?= BASE_URL ?>dashboard.php?vista=config_empresa_datos" class="btn btn-gradient w-100">Ir</a>
+                            </div>
+                        </div>
+                    </div>
+                    <?php if ($_SESSION['rol'] === 'admin'): ?>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-megaphone display-4 text-warning mb-2"></i>
+                                    <h5 class="card-title mb-2">Promociones</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-gradient w-100">Ir</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clock-history display-4 text-warning mb-2"></i>
+                                    <h5 class="card-title mb-2">Pendientes de Toma</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=pendientes_toma" class="btn btn-gradient w-100">Ir</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-file-earmark-text display-4 text-primary mb-2"></i>
+                                    <h5 class="card-title mb-2">Mis Cotizaciones</h5>
+                                    <a href="dashboard.php?vista=cotizaciones" class="btn btn-gradient w-100">Ir</a>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
-        </div>
-    </div>
-</div>

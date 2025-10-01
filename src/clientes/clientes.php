@@ -8,9 +8,10 @@ if (session_status() === PHP_SESSION_NONE) {
 $rol = $_SESSION['rol'] ?? '';
 
 // Filtro por DNI
-$dniFiltro = trim($_GET['dni'] ?? '');
+$busqueda = trim($_GET['dni'] ?? '');
 
 // Consulta principal con JOINs para traer los nombres correctos de empresa y convenio
+// Filtro por DNI, nombre o apellido
 $sql = "
 SELECT c.*, 
     (SELECT e.nombre_comercial FROM empresa_cliente ec 
@@ -22,9 +23,11 @@ SELECT c.*,
 FROM clientes c
 ";
 $params = [];
-if ($dniFiltro !== '') {
-    $sql .= " WHERE c.dni LIKE ?";
-    $params[] = "%$dniFiltro%";
+if ($busqueda !== '') {
+    $sql .= " WHERE c.dni LIKE ? OR c.nombre LIKE ? OR c.apellido LIKE ?";
+    $params[] = "%$busqueda%";
+    $params[] = "%$busqueda%";
+    $params[] = "%$busqueda%";
 }
 $sql .= " ORDER BY c.fecha_registro DESC";
 $stmt = $pdo->prepare($sql);
@@ -436,32 +439,8 @@ function capitalize($string) {
     </div>
 
     <!-- Search Section -->
-    <div class="search-section">
-        <form method="get" class="search-form">
-            <input type="hidden" name="vista" value="clientes">
-            <div class="form-group">
-                <label for="dni" class="form-label fw-bold">
-                    <i class="bi bi-search me-1"></i>
-                    Buscar Paciente
-                </label>
-                <input type="text" 
-                       name="dni" 
-                       id="dni"
-                       class="form-control" 
-                       placeholder="Ingresa el DNI del paciente" 
-                       value="<?= htmlspecialchars($dniFiltro) ?>">
-            </div>
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn-search">
-                    <i class="bi bi-search"></i>
-                    Buscar
-                </button>
-                <a href="dashboard.php?vista=clientes" class="btn-clear">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    Limpiar
-                </a>
-            </div>
-        </form>
+    <div class="search-section d-none d-md-block">
+        <!-- Buscador DataTables integrado en la tabla -->
     </div>
 
     <!-- Mensajes de alerta -->
@@ -476,10 +455,16 @@ function capitalize($string) {
 
 
     <!-- Vista Cards para Móvil con paginación -->
+    <div class="mb-3 d-block d-md-none">
+        <div class="input-group">
+            <input type="text" id="buscadorClienteMovil" class="form-control" placeholder="Buscar por nombre o DNI...">
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('buscadorClienteMovil').value = ''; filtrarCardsClientes('');"><i class="bi bi-x"></i></button>
+        </div>
+    </div>
     <div class="cards-container">
-        <?php if ($clientes_pagina): ?>
-            <?php foreach ($clientes_pagina as $cliente): ?>
-                <div class="cliente-card">
+        <?php if ($clientes): ?>
+            <?php foreach ($clientes as $cliente): ?>
+                <div class="cliente-card" data-nombre="<?= htmlspecialchars($cliente['nombre'] ?? '') ?>" data-apellido="<?= htmlspecialchars($cliente['apellido'] ?? '') ?>" data-dni="<?= htmlspecialchars($cliente['dni'] ?? '') ?>">
                     <div class="card-header">
                         <h5 class="cliente-nombre">
                             <?= capitalize($cliente['nombre'] ?? '') ?> <?= capitalize($cliente['apellido'] ?? '') ?>
@@ -578,22 +563,69 @@ function capitalize($string) {
             <?php endforeach; ?>
 
                         <!-- Paginación para cards -->
-                        <nav class="mt-3">
-                            <ul class="pagination justify-content-center">
-                                <?php
-                                    // Mantener todos los parámetros activos en la URL
-                                    $params = $_GET;
-                                    foreach ($params as $key => $value) {
-                                        if ($key === 'pagina') unset($params[$key]);
-                                    }
-                                    $baseUrl = '?' . http_build_query($params);
-                                ?>
-                                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                                    <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                                        <a class="page-link" href="<?= $baseUrl . ($baseUrl !== '?' ? '&' : '') . 'pagina=' . $i ?>"><?= $i ?></a>
-                                    </li>
-                                <?php endfor; ?>
-                            </ul>
+                        <style>
+                        @media (max-width: 768px) {
+                            .pagination, .pagination ul { display: none !important; }
+                            .mobile-pagination {
+                                display: flex;
+                                justify-content: center;
+                                align-items: center;
+                                gap: 6px;
+                                margin: 1.5rem 0 2rem 0;
+                            }
+                            .mobile-pagination .page-btn {
+                                background: #764ba2;
+                                color: #fff;
+                                border: none;
+                                border-radius: 8px;
+                                min-width: 38px;
+                                min-height: 38px;
+                                font-weight: 700;
+                                font-size: 1.1rem;
+                                box-shadow: 0 2px 8px #764ba233;
+                                transition: background 0.2s, color 0.2s;
+                            }
+                            .mobile-pagination .page-btn.active {
+                                background: #fff;
+                                color: #764ba2;
+                                border: 2px solid #764ba2;
+                            }
+                            .mobile-pagination .page-btn:disabled {
+                                opacity: 0.5;
+                                cursor: not-allowed;
+                            }
+                        }
+                        </style>
+                        <nav class="mobile-pagination" id="paginacionClienteMovil">
+                            <?php
+                            $params = $_GET;
+                            unset($params['pagina']);
+                            $baseUrl = '';
+                            if (!empty($params)) {
+                                foreach ($params as $key => $value) {
+                                    $baseUrl .= '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">';
+                                }
+                            }
+                            ?>
+                            <form method="get" style="display:inline">
+                                <?= $baseUrl ?>
+                                <button class="page-btn" type="submit" name="pagina" value="<?= max(1, $pagina-1) ?>" <?= $pagina <= 1 ? 'disabled' : '' ?>>&#8592;</button>
+                            </form>
+                            <?php
+                            $pages = [];
+                            if ($pagina > 1) $pages[] = $pagina-1;
+                            $pages[] = $pagina;
+                            if ($pagina < $total_paginas) $pages[] = $pagina+1;
+                            foreach ($pages as $p): ?>
+                                <form method="get" style="display:inline">
+                                    <?= $baseUrl ?>
+                                    <button class="page-btn<?= $p == $pagina ? ' active' : '' ?>" type="submit" name="pagina" value="<?= $p ?>"><?= $p ?></button>
+                                </form>
+                            <?php endforeach; ?>
+                            <form method="get" style="display:inline">
+                                <?= $baseUrl ?>
+                                <button class="page-btn" type="submit" name="pagina" value="<?= min($total_paginas, $pagina+1) ?>" <?= $pagina >= $total_paginas ? 'disabled' : '' ?>>&#8594;</button>
+                            </form>
                         </nav>
         <?php else: ?>
             <div class="text-center py-5">
@@ -719,6 +751,56 @@ function capitalize($string) {
 </div>
 
 <!-- DataTables y Bootstrap JS -->
+<script>
+function normalizarTexto(txt) {
+    return txt
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // quita tildes y diacríticos
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+function mostrarPaginaActualClientes() {
+    var cards = document.querySelectorAll('.cliente-card');
+    var inicio = <?= ($pagina - 1) * $por_pagina ?>;
+    var fin = inicio + <?= $por_pagina ?>;
+    cards.forEach(function(card, idx) {
+        if (idx >= inicio && idx < fin) {
+            card.classList.remove('d-none');
+        } else {
+            card.classList.add('d-none');
+        }
+    });
+    document.getElementById('paginacionClienteMovil').style.display = '';
+}
+function filtrarCardsClientes(valor) {
+    var filtro = normalizarTexto(valor);
+    var cards = document.querySelectorAll('.cliente-card');
+    var algunoVisible = false;
+    if (!filtro) {
+        mostrarPaginaActualClientes();
+    } else {
+        cards.forEach(function(card) {
+            var nombre = normalizarTexto(card.getAttribute('data-nombre') || '');
+            var apellido = normalizarTexto(card.getAttribute('data-apellido') || '');
+            var dni = normalizarTexto(card.getAttribute('data-dni') || '');
+            if (nombre.includes(filtro) || apellido.includes(filtro) || dni.includes(filtro)) {
+                card.classList.remove('d-none');
+                algunoVisible = true;
+            } else {
+                card.classList.add('d-none');
+            }
+        });
+        document.getElementById('paginacionClienteMovil').style.display = 'none';
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    mostrarPaginaActualClientes();
+});
+document.getElementById('buscadorClienteMovil').addEventListener('input', function(e) {
+    filtrarCardsClientes(e.target.value);
+});
+</script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>

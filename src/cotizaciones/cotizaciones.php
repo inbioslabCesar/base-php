@@ -958,21 +958,71 @@ if ($cotizaciones) {
         <?php endforeach; ?>
         <!-- Paginación para cards -->
         <nav class="mt-3">
-            <ul class="pagination justify-content-center">
+            <style>
+            @media (max-width: 768px) {
+                .pagination, .pagination ul { display: none !important; }
+                .mobile-pagination {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 6px;
+                    margin: 1.5rem 0 2rem 0;
+                }
+                .mobile-pagination .page-btn {
+                    background: #764ba2;
+                    color: #fff;
+                    border: none;
+                    border-radius: 8px;
+                    min-width: 38px;
+                    min-height: 38px;
+                    font-weight: 700;
+                    font-size: 1.1rem;
+                    box-shadow: 0 2px 8px #764ba233;
+                    transition: background 0.2s, color 0.2s;
+                }
+                .mobile-pagination .page-btn.active {
+                    background: #fff;
+                    color: #764ba2;
+                    border: 2px solid #764ba2;
+                }
+                .mobile-pagination .page-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                }
+            }
+            </style>
+            <nav class="mobile-pagination">
                 <?php
-                    // Mantener todos los parámetros activos en la URL
-                    $params = $_GET;
+                // Mantener todos los parámetros activos en la URL
+                $params = $_GET;
+                unset($params['pagina']);
+                $baseUrl = '';
+                if (!empty($params)) {
                     foreach ($params as $key => $value) {
-                        if ($key === 'pagina') unset($params[$key]);
+                        $baseUrl .= '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">';
                     }
-                    $baseUrl = '?' . http_build_query($params);
+                }
                 ?>
-                <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
-                    <li class="page-item <?= $i == $pagina ? 'active' : '' ?>">
-                        <a class="page-link" href="<?= $baseUrl . ($baseUrl !== '?' ? '&' : '') . 'pagina=' . $i ?>"><?= $i ?></a>
-                    </li>
-                <?php endfor; ?>
-            </ul>
+                <form method="get" style="display:inline">
+                    <?= $baseUrl ?>
+                    <button class="page-btn" type="submit" name="pagina" value="<?= max(1, $pagina-1) ?>" <?= $pagina <= 1 ? 'disabled' : '' ?>>&#8592;</button>
+                </form>
+                <?php
+                $pages = [];
+                if ($pagina > 1) $pages[] = $pagina-1;
+                $pages[] = $pagina;
+                if ($pagina < $total_paginas) $pages[] = $pagina+1;
+                foreach ($pages as $p): ?>
+                    <form method="get" style="display:inline">
+                        <?= $baseUrl ?>
+                        <button class="page-btn<?= $p == $pagina ? ' active' : '' ?>" type="submit" name="pagina" value="<?= $p ?>"><?= $p ?></button>
+                    </form>
+                <?php endforeach; ?>
+                <form method="get" style="display:inline">
+                    <?= $baseUrl ?>
+                    <button class="page-btn" type="submit" name="pagina" value="<?= min($total_paginas, $pagina+1) ?>" <?= $pagina >= $total_paginas ? 'disabled' : '' ?>>&#8594;</button>
+                </form>
+            </nav>
         </nav>
     <?php else: ?>
         <div class="text-center py-5">

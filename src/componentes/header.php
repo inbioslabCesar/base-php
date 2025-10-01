@@ -132,17 +132,35 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 </head>
 
 <body>
-    <header class="bg-white shadow-sm mb-3 position-relative" style="z-index: 1050;">
-        <div class="container-fluid d-flex align-items-center justify-content-between py-2">
+
+    <header class="header-gradient shadow mb-3 position-relative" style="z-index: 1050;">
+        <div class="container-fluid d-flex align-items-center justify-content-between py-3">
             <div class="d-flex align-items-center">
-                <img src="../src/<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:74px; margin-right:24px;">                
-                <span class="fw-bold" style="font-size:1.3rem;">
-                    Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!
-                </span>
+                <div class="header-logo-box me-3">
+                    <img src="../src/<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:64px; border-radius:16px; box-shadow:0 2px 12px #764ba233;">
+                </div>
+                <div>
+                    <span class="fw-bold text-white" style="font-size:1.5rem; letter-spacing:1px;">
+                        <?= htmlspecialchars($config['nombre']) ?>
+                    </span><br>
+                    <span class="text-white-50" style="font-size:1.1rem;">Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!</span>
+                </div>
             </div>
             <!-- Botón solo visible en móvil -->
-            <button class="btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
+            <button class="btn btn-light d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
                 <i class="bi bi-list fs-2"></i>
             </button>
         </div>
     </header>
+    <style>
+        .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 0 0 24px 24px;
+        }
+        .header-logo-box {
+            background: #fff;
+            border-radius: 16px;
+            padding: 6px;
+            box-shadow: 0 2px 12px #667eea22;
+        }
+    </style>
