@@ -1,0 +1,13 @@
+{
+  "name": "inbioslab/pdf-package-sample",
+  "description": "Paquete mínimo para reproducir generación de PDF (mPDF/TCPDF) desde descarga-pdf.php",
+  "require": {
+    "mpdf/mpdf": "^8.2",
+    "tecnickcom/tcpdf": "^6.10"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  }
+}

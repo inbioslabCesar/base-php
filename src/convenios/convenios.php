@@ -42,7 +42,7 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <td><?= htmlspecialchars(capitalizar($c['nombre'])) ?></td>
                     <td><?= htmlspecialchars($c['dni']) ?></td>
                     <td><?= htmlspecialchars(capitalizar($c['especialidad'])) ?></td>
-                    <td><?= htmlspecialchars($c['descuento']) ?></td>
+                    <td><?= htmlspecialchars($c['descuento'] ?? '') ?></td>
                     <td><?= htmlspecialchars(capitalizar($c['descripcion'])) ?></td>
                     <td><?= htmlspecialchars(strtolower($c['email'])) ?></td>
                     <td>

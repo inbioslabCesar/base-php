@@ -1,6 +1,5 @@
 <?php
 // Configuración para TECNOLAB
-define('BASE_URL', '/src/');
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'u330560936_tecnolabbd');
 define('DB_USER', 'u330560936_tecnolab');

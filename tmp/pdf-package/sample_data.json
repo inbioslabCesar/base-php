@@ -1,0 +1,13 @@
+{
+  "examenes": [
+    {
+      "id": 1,
+      "nombre": "Hemograma",
+      "adicional": [
+        {"tipo": "Parámetro", "nombre": "Hemoglobina", "unidad": "g/dL", "orden": 1},
+        {"tipo": "Parámetro", "nombre": "Glóbulos Rojos", "unidad": "/uL", "orden": 2},
+        {"tipo": "Título", "nombre": "Resultados Hemograma", "orden": 0}
+      ]
+    }
+  ]
+}
