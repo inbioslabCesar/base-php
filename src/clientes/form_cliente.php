@@ -42,11 +42,27 @@ if ($esEdicion) {
     ");
     $stmt->execute();
     $ultimoCliente = $stmt->fetch(PDO::FETCH_ASSOC);
-    
     if ($ultimoCliente) {
         $ultimoCodigoCliente = $ultimoCliente['codigo_cliente'];
         $ultimoNombreCliente = trim($ultimoCliente['nombre'] . ' ' . $ultimoCliente['apellido']);
         $fechaUltimoRegistro = $ultimoCliente['fecha_registro'];
+
+        // Generar el siguiente código consecutivo
+        $codigoBase = '';
+        $numeroConsecutivo = '';
+        if (preg_match('/^(CLI-\d{6}-)(\d{6})$/', $ultimoCodigoCliente, $matches)) {
+            $codigoBase = $matches[1];
+            $numeroConsecutivo = str_pad((int)$matches[2] + 1, 6, '0', STR_PAD_LEFT);
+            $cliente['codigo_cliente'] = $codigoBase . $numeroConsecutivo;
+        } else {
+            // Si el formato no coincide, generar uno nuevo con 000001
+            $fecha = date('ymd');
+            $cliente['codigo_cliente'] = 'CLI-' . $fecha . '-000001';
+        }
+    } else {
+        // Primer paciente
+        $fecha = date('ymd');
+        $cliente['codigo_cliente'] = 'CLI-' . $fecha . '-000001';
     }
 }
 
@@ -120,8 +136,12 @@ function capitalize($string) {
                 <input type="text" class="form-control" name="apellido" id="apellido" value="<?= capitalize($cliente['apellido']) ?>" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="dni" class="form-label">DNI *</label>
-                <input type="text" class="form-control" name="dni" id="dni" value="<?= htmlspecialchars($cliente['dni']??'') ?>" required>
+                <label for="dni" class="form-label">DNI</label>
+                <input type="text" class="form-control" name="dni" id="dni" value="<?= htmlspecialchars($cliente['dni']??'') ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="fecha_nacimiento" class="form-label">Fecha Nacimiento</label>
+                <input type="date" class="form-control" name="fecha_nacimiento" id="fecha_nacimiento" value="<?= htmlspecialchars($cliente['fecha_nacimiento']) ?>">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="edad" class="form-label">Edad</label>
@@ -148,22 +168,6 @@ function capitalize($string) {
                 <small class="form-text text-muted">Ejemplo: 15 días, 2 meses, 1 año</small>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="email" class="form-label">Email *</label>
-                <input type="email" class="form-control" name="email" id="email" value="<?= htmlspecialchars($cliente['email']) ?>" required>
-            </div>
-            <div class="col-md-4 mb-3">
-                <label for="password" class="form-label"><?= $esEdicion ? 'Nueva contraseña' : 'Contraseña *' ?></label>
-                <input type="text" class="form-control" name="password" id="password" <?= $esEdicion ? '' : 'required' ?>>
-            </div>
-            <div class="col-md-4 mb-3">
-                <label for="telefono" class="form-label">Teléfono</label>
-                <input type="text" class="form-control" name="telefono" id="telefono" value="<?= htmlspecialchars($cliente['telefono']??'') ?>">
-            </div>
-            <div class="col-md-4 mb-3">
-                <label for="direccion" class="form-label">Dirección</label>
-                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($cliente['direccion']??'') ?>">
-            </div>
-            <div class="col-md-4 mb-3">
                 <label for="sexo" class="form-label">Sexo</label>
                 <select class="form-select" name="sexo" id="sexo">
                     <option value="">Seleccionar</option>
@@ -183,8 +187,28 @@ function capitalize($string) {
                 </small>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="fecha_nacimiento" class="form-label">Fecha Nacimiento</label>
-                <input type="date" class="form-control" name="fecha_nacimiento" id="fecha_nacimiento" value="<?= htmlspecialchars($cliente['fecha_nacimiento']) ?>">
+                <label for="direccion" class="form-label">Dirección</label>
+                <input type="text" class="form-control" name="direccion" id="direccion" value="<?= htmlspecialchars($cliente['direccion']??'') ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="procedencia" class="form-label">Procedencia</label>
+                <input type="text" class="form-control" name="procedencia" id="procedencia" value="<?= htmlspecialchars($cliente['procedencia'] ?? '') ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="password" class="form-label">Contraseña (por defecto es el DNI)</label>
+                <input type="text" class="form-control" name="password" id="password" value="<?= htmlspecialchars($cliente['dni']) ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" name="email" id="email" value="<?= htmlspecialchars($cliente['email']) ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="telefono" class="form-label">Teléfono</label>
+                <input type="text" class="form-control" name="telefono" id="telefono" value="<?= htmlspecialchars($cliente['telefono']??'') ?>">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="descuento" class="form-label">Descuento (%)</label>
+                <input type="number" class="form-control" name="descuento" id="descuento" value="<?= htmlspecialchars($cliente['descuento']) ?>" min="0" max="100">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="estado" class="form-label">Estado</label>
@@ -193,13 +217,12 @@ function capitalize($string) {
                     <option value="inactivo" <?= ($cliente['estado'] === 'inactivo') ? 'selected' : '' ?>>Inactivo</option>
                 </select>
             </div>
-            <div class="col-md-4 mb-3">
-                <label for="descuento" class="form-label">Descuento (%)</label>
-                <input type="number" class="form-control" name="descuento" id="descuento" value="<?= htmlspecialchars($cliente['descuento']) ?>" min="0" max="100">
             </div>
         </div>
-        <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Registrar' ?></button>
-        <a href="dashboard.php?vista=clientes" class="btn btn-secondary">Cancelar</a>
+        <div class="d-flex justify-content-end gap-2 mt-4">
+            <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Registrar' ?></button>
+            <a href="dashboard.php?vista=clientes" class="btn btn-secondary">Cancelar</a>
+        </div>
     </form>
 </div>
 <script>
@@ -212,4 +235,44 @@ function generarCodigo() {
     let codigo = 'CLI-' + año + mes + dia + '-' + aleatorio;
     document.getElementById('codigo_cliente').value = codigo;
 }
+
+// Calcular edad automáticamente al seleccionar fecha de nacimiento
+document.addEventListener('DOMContentLoaded', function() {
+    const fechaNacimiento = document.getElementById('fecha_nacimiento');
+    const edadValor = document.getElementById('edad_valor');
+    const edadUnidad = document.getElementById('edad_unidad');
+    if (fechaNacimiento && edadValor && edadUnidad) {
+        fechaNacimiento.addEventListener('change', function() {
+            if (this.value) {
+                const hoy = new Date();
+                const nacimiento = new Date(this.value);
+                let edadAnios = hoy.getFullYear() - nacimiento.getFullYear();
+                let m = hoy.getMonth() - nacimiento.getMonth();
+                if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) {
+                    edadAnios--;
+                }
+                if (edadAnios < 1) {
+                    // Si es menos de 1 año, calcular meses
+                    let edadMeses = (hoy.getFullYear() - nacimiento.getFullYear()) * 12 + (hoy.getMonth() - nacimiento.getMonth());
+                    if (hoy.getDate() < nacimiento.getDate()) edadMeses--;
+                    if (edadMeses < 1) {
+                        // Si es menos de 1 mes, calcular días
+                        const diffTime = Math.abs(hoy - nacimiento);
+                        const edadDias = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        edadValor.value = edadDias;
+                        edadUnidad.value = 'días';
+                    } else {
+                        edadValor.value = edadMeses;
+                        edadUnidad.value = 'meses';
+                    }
+                } else {
+                    edadValor.value = edadAnios;
+                    edadUnidad.value = 'años';
+                }
+            } else {
+                edadValor.value = '';
+            }
+        });
+    }
+});
 </script>

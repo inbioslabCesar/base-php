@@ -29,7 +29,7 @@ if ($busqueda !== '') {
     $params[] = "%$busqueda%";
     $params[] = "%$busqueda%";
 }
-$sql .= " ORDER BY c.fecha_registro DESC";
+$sql .= " ORDER BY c.fecha_registro DESC, c.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -481,7 +481,7 @@ function capitalize($string) {
                         </div>
                         <div class="info-item">
                             <span class="info-label">Edad</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['edad'] ?? 'No especificada') ?> años</span>
+                            <span class="info-value"><?= htmlspecialchars($cliente['edad'] ?? 'No especificada') ?></span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Email</span>
@@ -654,10 +654,7 @@ function capitalize($string) {
                         <th>Edad</th>
                         <th>Email</th>
                         <th>Teléfono</th>
-                        <th>Dirección</th>
                         <th>Estado</th>
-                        <th>Rol creador</th>
-                        <th>Referencia</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -666,53 +663,16 @@ function capitalize($string) {
                         <?php foreach ($clientes as $cliente): ?>
                             <tr>
                                 <td><strong><?= (int)$cliente['id'] ?></strong></td>
-                                <td>
-                                    <span class="badge bg-primary">
-                                        <?= htmlspecialchars($cliente['codigo_cliente'] ?? $cliente['id']) ?>
-                                    </span>
-                                </td>
+                                <td><span class="badge bg-primary"><?= htmlspecialchars($cliente['codigo_cliente'] ?? $cliente['id']) ?></span></td>
                                 <td><?= capitalize($cliente['nombre'] ?? '') ?></td>
                                 <td><?= capitalize($cliente['apellido'] ?? '') ?></td>
                                 <td><strong><?= htmlspecialchars($cliente['dni'] ?? '') ?></strong></td>
                                 <td><?= htmlspecialchars($cliente['edad'] ?? '') ?></td>
-                                <td>
-                                    <small class="text-muted">
-                                        <?= htmlspecialchars($cliente['email'] ?? 'No especificado') ?>
-                                    </small>
-                                </td>
+                                <td><small class="text-muted"><?= htmlspecialchars($cliente['email'] ?? 'No especificado') ?></small></td>
                                 <td><?= htmlspecialchars($cliente['telefono'] ?? '') ?></td>
+                                <td><span class="badge bg-success"><?= htmlspecialchars($cliente['estado'] ?? 'Activo') ?></span></td>
                                 <td>
-                                    <small class="text-muted">
-                                        <?= htmlspecialchars($cliente['direccion'] ?? 'No especificada') ?>
-                                    </small>
-                                </td>
-                                <td>
-                                    <span class="badge bg-success">
-                                        <?= htmlspecialchars($cliente['estado'] ?? 'Activo') ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php
-                                        $rol_creador = strtolower(trim($cliente['rol_creador'] ?? ''));
-                                        $roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
-                                        $rol_mostrar = in_array($rol_creador, $roles_validos) && $rol_creador !== '' 
-                                            ? ucfirst($rol_creador) 
-                                            : 'Paciente';
-                                    ?>
-                                    <span class="badge bg-info text-dark"><?= $rol_mostrar ?></span>
-                                </td>
-                                <td>
-                                    <?php
-                                        $emp = $cliente['nombre_empresa'] ?? '';
-                                        $conv = $cliente['nombre_convenio'] ?? '';
-                                        $output = [];
-                                        if ($emp) $output[] = '<span class="badge bg-success">' . htmlspecialchars($emp) . '</span>';
-                                        if ($conv) $output[] = '<span class="badge bg-primary">' . htmlspecialchars($conv) . '</span>';
-                                        echo implode(' ', $output) ?: '<span class="text-muted">-</span>';
-                                    ?>
-                                </td>
-                                <td>
-                                    <div class="btn-group" role="group">
+                                    <div class="btn-group gap-2" role="group" style="display: flex;">
                                         <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" 
                                            class="btn btn-warning btn-sm" 
                                            title="Editar">
@@ -737,7 +697,7 @@ function capitalize($string) {
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="13" class="text-center py-4">
+                            <td colspan="10" class="text-center py-4">
                                 <i class="bi bi-people" style="font-size: 2rem; color: #6c757d;"></i>
                                 <br>
                                 <strong>No hay pacientes registrados</strong>
@@ -817,7 +777,7 @@ $(document).ready(function() {
         "responsive": true,
         "columnDefs": [
             { "responsivePriority": 1, "targets": [2, 3, 4] }, // Prioridad alta para nombre, apellido, DNI
-            { "responsivePriority": 2, "targets": [12] }, // Prioridad alta para acciones
+            { "responsivePriority": 2, "targets": [9] }, // Prioridad alta para acciones
             { "responsivePriority": 3, "targets": [0, 1] } // Prioridad media para ID y código
         ]
     });

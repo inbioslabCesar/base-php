@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Solo los campos obligatorios
+
 $codigo_cliente    = trim($_POST['codigo_cliente'] ?? '');
 $nombre            = trim($_POST['nombre'] ?? '');
 $apellido          = trim($_POST['apellido'] ?? '');
@@ -20,6 +21,7 @@ $sexo              = $_POST['sexo'] ?? '';
 $fecha_nacimiento  = $_POST['fecha_nacimiento'] ?? null;
 $estado            = $_POST['estado'] ?? 'activo';
 $descuento         = $_POST['descuento'] ?? null;
+$procedencia       = trim($_POST['procedencia'] ?? '');
 $rol_creador       = $_SESSION['rol'] ?? 'desconocido';
 
 // Nuevos campos para empresa/convenio y tipo_registro
@@ -37,7 +39,25 @@ if ($_SESSION['rol'] === 'convenio' && isset($_SESSION['convenio_nombre'])) {
 }
 
 // Validación de requeridos
-if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$email || !$password) {
+
+// Si el DNI está vacío, generar uno provisional de 8 dígitos
+
+if (!$dni) {
+    $dni = str_pad(strval(mt_rand(0, 99999999)), 8, '0', STR_PAD_LEFT);
+}
+
+// Si el email está vacío, generar uno provisional usando el DNI
+
+if (!$email) {
+    $email = $dni . '@inbioslab.com';
+}
+
+// Si la contraseña está vacía, asignar el DNI como contraseña
+if (!$password) {
+    $password = $dni;
+}
+
+if (!$codigo_cliente || !$nombre || !$apellido || !$email || !$password) {
     $_SESSION['msg'] = 'Por favor, complete todos los campos obligatorios.';
     header('Location: ../dashboard.php?vista=form_cliente');
     exit;
@@ -59,8 +79,8 @@ function capitalize($string) {
 try {
     $stmt = $pdo->prepare(
         "INSERT INTO clientes 
-        (codigo_cliente, nombre, apellido, dni, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, rol_creador, empresa_nombre, convenio_nombre, tipo_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        (codigo_cliente, nombre, apellido, dni, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, procedencia, rol_creador, empresa_nombre, convenio_nombre, tipo_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
         $codigo_cliente,
@@ -76,6 +96,7 @@ try {
         $fecha_nacimiento ?: null,
         $estado,
         $descuento !== '' ? $descuento : null,
+        $procedencia !== '' ? $procedencia : null,
         $rol_creador,
         $empresa_nombre,
         $convenio_nombre,

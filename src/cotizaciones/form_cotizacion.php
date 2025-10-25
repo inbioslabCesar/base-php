@@ -418,7 +418,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
 
 .select2-container--default .select2-results__option--highlighted {
     background-color: rgba(102, 126, 234, 0.1);
-    color: #2c3e50;
+    color: #212529;
 }
 
 .select2-container--default .select2-results__option:hover {
