@@ -10,6 +10,7 @@ $codigo_cliente    = trim($_POST['codigo_cliente'] ?? '');
 $nombre            = trim($_POST['nombre'] ?? '');
 $apellido          = trim($_POST['apellido'] ?? '');
 $dni               = trim($_POST['dni'] ?? '');
+$tipo_documento    = $_POST['tipo_documento'] ?? 'dni';
 $edad_valor        = trim($_POST['edad_valor'] ?? '');
 $edad_unidad       = trim($_POST['edad_unidad'] ?? '');
 $edad = ($edad_valor !== '' && $edad_unidad !== '') ? (intval($edad_valor) . ' ' . $edad_unidad) : '';
@@ -49,7 +50,7 @@ if (!$dni) {
 // Si el email está vacío, generar uno provisional usando el DNI
 
 if (!$email) {
-    $email = $dni . '@inbioslab.com';
+    $email = $dni . '@medditech.com';
 }
 
 // Si la contraseña está vacía, asignar el DNI como contraseña
@@ -79,14 +80,15 @@ function capitalize($string) {
 try {
     $stmt = $pdo->prepare(
         "INSERT INTO clientes 
-        (codigo_cliente, nombre, apellido, dni, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, procedencia, rol_creador, empresa_nombre, convenio_nombre, tipo_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        (codigo_cliente, nombre, apellido, dni, tipo_documento, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, procedencia, rol_creador, empresa_nombre, convenio_nombre, tipo_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
         $codigo_cliente,
         capitalize($nombre),
         capitalize($apellido),
         $dni,
+        $tipo_documento,
         $edad,
         $email,
         password_hash($password, PASSWORD_DEFAULT),

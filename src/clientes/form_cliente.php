@@ -11,6 +11,7 @@ $cliente = [
     'nombre' => '',
     'apellido' => '',
     'dni' => '',
+    'tipo_documento' => 'dni',
     'edad' => '',
     'email' => '',
     'telefono' => '',
@@ -136,8 +137,21 @@ function capitalize($string) {
                 <input type="text" class="form-control" name="apellido" id="apellido" value="<?= capitalize($cliente['apellido']) ?>" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="dni" class="form-label">DNI</label>
-                <input type="text" class="form-control" name="dni" id="dni" value="<?= htmlspecialchars($cliente['dni']??'') ?>">
+                <label for="dni" class="form-label">Documento</label>
+                <div class="input-group">
+                    <?php
+                    // Usar tipo_documento directamente si existe
+                    $tipoDocumento = $cliente['tipo_documento'] ?? 'dni';
+                    $dniValue = htmlspecialchars($cliente['dni'] ?? '');
+                    ?>
+                    <select class="form-select" id="tipo_documento" name="tipo_documento" style="max-width: 180px;">
+                        <option value="dni" <?= $tipoDocumento==='dni'?'selected':'' ?>>DNI</option>
+                        <option value="carnet" <?= $tipoDocumento==='carnet'?'selected':'' ?>>Carnet de extranjería</option>
+                        <option value="sin_dni" <?= $tipoDocumento==='sin_dni'?'selected':'' ?>>Sin DNI</option>
+                    </select>
+                    <input type="text" class="form-control" name="dni" id="dni" value="<?= $dniValue ?>" maxlength="20" pattern="[A-Za-z0-9]{6,20}">
+                </div>
+                <small id="dniHelp" class="form-text text-muted">Selecciona el tipo de documento y completa el campo.</small>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="fecha_nacimiento" class="form-label">Fecha Nacimiento</label>
@@ -226,6 +240,13 @@ function capitalize($string) {
     </form>
 </div>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Poner el foco en el campo nombre al cargar el formulario
+    var nombreInput = document.getElementById('nombre');
+    if (nombreInput) {
+        nombreInput.focus();
+    }
+});
 function generarCodigo() {
     let fecha = new Date();
     let año = fecha.getFullYear().toString().slice(-2); // últimos 2 dígitos del año
@@ -236,8 +257,40 @@ function generarCodigo() {
     document.getElementById('codigo_cliente').value = codigo;
 }
 
-// Calcular edad automáticamente al seleccionar fecha de nacimiento
+// Documento dinámico
 document.addEventListener('DOMContentLoaded', function() {
+    const tipoDocumento = document.getElementById('tipo_documento');
+    const dniInput = document.getElementById('dni');
+    const dniHelp = document.getElementById('dniHelp');
+    if (tipoDocumento && dniInput) {
+        tipoDocumento.addEventListener('change', function() {
+            if (this.value === 'sin_dni') {
+                // Solo generar si el campo está vacío
+                if (!dniInput.value) {
+                    let prov = Math.floor(10000000 + Math.random() * 90000000);
+                    dniInput.value = prov;
+                }
+                dniInput.setAttribute('readonly', 'readonly');
+                dniInput.setAttribute('maxlength', '8');
+                dniInput.setAttribute('pattern', '[0-9]{8}');
+                dniHelp.textContent = 'Se generó un número provisional de 8 dígitos.';
+            } else if (this.value === 'dni') {
+                dniInput.removeAttribute('readonly');
+                dniInput.setAttribute('maxlength', '8');
+                dniInput.setAttribute('pattern', '[0-9]{8}');
+                dniHelp.textContent = 'Ingrese el DNI (8 dígitos numéricos).';
+            } else if (this.value === 'carnet') {
+                dniInput.removeAttribute('readonly');
+                dniInput.setAttribute('maxlength', '20');
+                dniInput.setAttribute('pattern', '[A-Za-z0-9]{6,20}');
+                dniHelp.textContent = 'Ingrese el número de carnet (6 a 20 caracteres alfanuméricos).';
+            }
+        });
+        // Inicializar según valor actual, sin borrar el valor existente
+        tipoDocumento.dispatchEvent(new Event('change'));
+    }
+
+    // Calcular edad automáticamente al seleccionar fecha de nacimiento
     const fechaNacimiento = document.getElementById('fecha_nacimiento');
     const edadValor = document.getElementById('edad_valor');
     const edadUnidad = document.getElementById('edad_unidad');

@@ -25,10 +25,10 @@ $stmtCot = $pdo->prepare($sqlCot);
 $stmtCot->execute(['cotizacion_id' => $cotizacion_id]);
 $cot = $stmtCot->fetch(PDO::FETCH_ASSOC);
 
-$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id
-        FROM resultados_examenes re
-        JOIN clientes c ON re.id_cliente = c.id
-        WHERE re.id_cotizacion = :cotizacion_id";
+$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.tipo_documento, c.id AS cliente_id
+    FROM resultados_examenes re
+    JOIN clientes c ON re.id_cliente = c.id
+    WHERE re.id_cotizacion = :cotizacion_id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute(['cotizacion_id' => $cotizacion_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -42,7 +42,7 @@ $primer_row = $rows[0];
 $paciente = [
     "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
     "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
-    "dni"            => $primer_row['dni'] ?? "",
+    "dni"            => ($primer_row['tipo_documento'] ?? '') === 'sin_dni' ? '--' : ($primer_row['dni'] ?? ""),
     "edad"           => $primer_row['edad'],
     "sexo"           => $primer_row['sexo'],
     "fecha"          => $primer_row['fecha_ingreso'],

@@ -55,10 +55,12 @@ if ($cotizaciones) {
 
 // Consulta pagos por cotización
 $pagosPorCotizacion = [];
+$pagosPorCotizacionDetalle = [];
 if ($cotizaciones) {
     $idsCotizaciones = array_column($cotizaciones, 'id');
     if ($idsCotizaciones) {
         $inQuery = implode(',', array_fill(0, count($idsCotizaciones), '?'));
+        // Total pagado por cotización
         $sqlPagos = "SELECT id_cotizacion, SUM(monto) AS total_pagado
                      FROM pagos
                      WHERE id_cotizacion IN ($inQuery)
@@ -68,6 +70,14 @@ if ($cotizaciones) {
         $pagos = $stmtPagos->fetchAll(PDO::FETCH_ASSOC);
         foreach ($pagos as $pago) {
             $pagosPorCotizacion[$pago['id_cotizacion']] = $pago['total_pagado'];
+        }
+        // Detalle de pagos por cotización (para método de pago)
+        $sqlPagosDetalle = "SELECT id_cotizacion, metodo_pago FROM pagos WHERE id_cotizacion IN ($inQuery)";
+        $stmtPagosDetalle = $pdo->prepare($sqlPagosDetalle);
+        $stmtPagosDetalle->execute($idsCotizaciones);
+        $pagosDetalle = $stmtPagosDetalle->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($pagosDetalle as $pago) {
+            $pagosPorCotizacionDetalle[$pago['id_cotizacion']][] = $pago;
         }
     }
 }

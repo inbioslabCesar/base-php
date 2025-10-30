@@ -46,7 +46,20 @@
                                     $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
                                     $saldo = $total - $pagado;
 
-                                    if ($saldo <= 0) {
+                                    // Detectar si existe pago con método descarga anticipada
+                                    $pagosCot = $pagosPorCotizacionDetalle[$cotizacion['id']] ?? [];
+                                    $descargaAnticipada = false;
+                                    foreach ($pagosCot as $pago) {
+                                        if ($pago['metodo_pago'] === 'descarga_anticipada') {
+                                            $descargaAnticipada = true;
+                                            break;
+                                        }
+                                    }
+                                    if ($descargaAnticipada) {
+                                        $badgeClassPago = 'bg-orange text-dark'; // Clase personalizada para naranja
+                                        $iconPago = 'bi-clock';
+                                        $textoPago = 'Descarga anticipada';
+                                    } elseif ($saldo <= 0) {
                                         $badgeClassPago = 'bg-success';
                                         $iconPago = 'bi-check-circle-fill';
                                         $textoPago = 'Pagado';
@@ -80,6 +93,12 @@
                                     ?>
                                 </td>
                                 <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
+                                <style>
+                                .bg-orange {
+                                    background-color: #ff9800 !important;
+                                    color: #212529 !important;
+                                }
+                                </style>
                                 <td>
                                     <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
                                         <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm mb-1" title="Ver cotización">

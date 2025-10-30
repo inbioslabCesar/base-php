@@ -15,6 +15,7 @@ $codigo_cliente = trim($_POST['codigo_cliente'] ?? '');
 $nombre         = trim($_POST['nombre'] ?? '');
 $apellido       = trim($_POST['apellido'] ?? '');
 $dni            = trim($_POST['dni'] ?? '');
+$tipo_documento = $_POST['tipo_documento'] ?? 'dni';
 $edad_valor     = trim($_POST['edad_valor'] ?? '');
 $edad_unidad    = trim($_POST['edad_unidad'] ?? '');
 $edad = ($edad_valor !== '' && $edad_unidad !== '') ? (intval($edad_valor) . ' ' . $edad_unidad) : '';
@@ -44,13 +45,14 @@ function capitalize($string) {
 try {
     if ($password) {
         $sql = "UPDATE clientes SET 
-            codigo_cliente=?, nombre=?, apellido=?, dni=?, edad=?, email=?, password=?, telefono=?, direccion=?, sexo=?, fecha_nacimiento=?, estado=?, descuento=?, procedencia=?
+            codigo_cliente=?, nombre=?, apellido=?, dni=?, tipo_documento=?, edad=?, email=?, password=?, telefono=?, direccion=?, sexo=?, fecha_nacimiento=?, estado=?, descuento=?, procedencia=?
             WHERE id=?";
         $params = [
             $codigo_cliente,
             capitalize($nombre),
             capitalize($apellido),
             $dni,
+            $tipo_documento,
             $edad,
             $email,
             password_hash($password, PASSWORD_DEFAULT),
@@ -65,13 +67,14 @@ try {
         ];
     } else {
         $sql = "UPDATE clientes SET 
-            codigo_cliente=?, nombre=?, apellido=?, dni=?, edad=?, email=?, telefono=?, direccion=?, sexo=?, fecha_nacimiento=?, estado=?, descuento=?, procedencia=?
+            codigo_cliente=?, nombre=?, apellido=?, dni=?, tipo_documento=?, edad=?, email=?, telefono=?, direccion=?, sexo=?, fecha_nacimiento=?, estado=?, descuento=?, procedencia=?
             WHERE id=?";
         $params = [
             $codigo_cliente,
             capitalize($nombre),
             capitalize($apellido),
             $dni,
+            $tipo_documento,
             $edad,
             $email,
             $telefono ?: null,

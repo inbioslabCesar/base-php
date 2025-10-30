@@ -7,7 +7,20 @@
                 $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
                 $saldo = $total - $pagado;
 
-                if ($saldo <= 0) {
+                // Detectar si existe pago con método descarga anticipada
+                $pagosCot = $pagosPorCotizacionDetalle[$cotizacion['id']] ?? [];
+                $descargaAnticipada = false;
+                foreach ($pagosCot as $pago) {
+                    if ($pago['metodo_pago'] === 'descarga_anticipada') {
+                        $descargaAnticipada = true;
+                        break;
+                    }
+                }
+                if ($descargaAnticipada) {
+                    $badgeClassPago = 'bg-orange text-dark'; // Clase personalizada para naranja
+                    $iconPago = 'bi-clock';
+                    $textoPago = 'Descarga anticipada';
+                } elseif ($saldo <= 0) {
                     $badgeClassPago = 'bg-success';
                     $iconPago = 'bi-check-circle-fill';
                     $textoPago = 'Pagado';

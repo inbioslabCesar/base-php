@@ -274,10 +274,9 @@ if ($idCotizacion) {
                                        class="form-control form-control-modern" 
                                        min="0" 
                                        max="<?= $saldo ?>" 
-                                       required 
                                        id="montoAbonado"
                                        placeholder="0.00">
-                                <div class="form-text">
+                                <div class="form-text" id="montoAbonarInfo">
                                     <i class="bi bi-info-circle me-1"></i>
                                     Máximo disponible: S/ <?= number_format($saldo, 2) ?>
                                 </div>
@@ -453,32 +452,48 @@ function toggleEditTotal() {
 document.addEventListener('DOMContentLoaded', function() {
     const metodoPago = document.getElementById('metodoPago');
     const montoAbonado = document.getElementById('montoAbonado');
-    
+
     if (metodoPago && montoAbonado) {
         metodoPago.addEventListener('change', function() {
             if (this.value === 'descarga_anticipada') {
                 montoAbonado.min = 0;
                 montoAbonado.placeholder = 'Puede ser 0 para descarga anticipada';
+                montoAbonado.removeAttribute('required');
+                document.getElementById('montoAbonarInfo').innerHTML = '<i class="bi bi-info-circle me-1"></i> Puedes dejar vacío para registrar como 0.';
             } else {
                 montoAbonado.min = 0.01;
                 montoAbonado.placeholder = 'Monto mayor a 0';
+                montoAbonado.setAttribute('required', 'required');
+                document.getElementById('montoAbonarInfo').innerHTML = '<i class="bi bi-info-circle me-1"></i> Máximo disponible: S/ <?= number_format($saldo, 2) ?>';
             }
         });
+
+        // Si el método es descarga anticipada y el campo está vacío, poner 0 al enviar
+        const formPago = document.getElementById('formPago');
+        if (formPago) {
+            formPago.addEventListener('submit', function(e) {
+                if (metodoPago.value === 'descarga_anticipada') {
+                    if (!montoAbonado.value || montoAbonado.value === '') {
+                        montoAbonado.value = 0;
+                    }
+                }
+            });
+        }
     }
-    
+
     // Validación del formulario de editar total
     const formEditTotal = document.getElementById('formEditTotal');
     if (formEditTotal) {
         formEditTotal.addEventListener('submit', function(e) {
             const nuevoTotal = parseFloat(document.getElementById('nuevoTotal').value);
             const totalActual = <?= $cotizacion['total'] ?? 0 ?>;
-            
+
             if (nuevoTotal === totalActual) {
                 e.preventDefault();
                 alert('El nuevo monto debe ser diferente al monto actual.');
                 return false;
             }
-            
+
             if (!confirm('¿Está seguro de que desea modificar el monto total de la cotización? Esta acción se registrará en el historial.')) {
                 e.preventDefault();
                 return false;
