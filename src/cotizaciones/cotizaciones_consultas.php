@@ -24,6 +24,17 @@ if ($convenioFiltro !== '') {
     $condiciones[] = "c.id_convenio = ?";
     $params[] = $convenioFiltro;
 }
+if (!empty($_GET['fecha_desde']) && !empty($_GET['fecha_hasta'])) {
+    $condiciones[] = "DATE(c.fecha) BETWEEN ? AND ?";
+    $params[] = $_GET['fecha_desde'];
+    $params[] = $_GET['fecha_hasta'];
+} elseif (!empty($_GET['fecha_desde'])) {
+    $condiciones[] = "DATE(c.fecha) >= ?";
+    $params[] = $_GET['fecha_desde'];
+} elseif (!empty($_GET['fecha_hasta'])) {
+    $condiciones[] = "DATE(c.fecha) <= ?";
+    $params[] = $_GET['fecha_hasta'];
+}
 if ($condiciones) {
     $sql .= " WHERE " . implode(' AND ', $condiciones);
 }
@@ -72,7 +83,7 @@ if ($cotizaciones) {
             $pagosPorCotizacion[$pago['id_cotizacion']] = $pago['total_pagado'];
         }
         // Detalle de pagos por cotización (para método de pago)
-        $sqlPagosDetalle = "SELECT id_cotizacion, metodo_pago FROM pagos WHERE id_cotizacion IN ($inQuery)";
+        $sqlPagosDetalle = "SELECT id_cotizacion, metodo_pago, fecha, id, monto FROM pagos WHERE id_cotizacion IN ($inQuery) ORDER BY fecha DESC, id DESC";
         $stmtPagosDetalle = $pdo->prepare($sqlPagosDetalle);
         $stmtPagosDetalle->execute($idsCotizaciones);
         $pagosDetalle = $stmtPagosDetalle->fetchAll(PDO::FETCH_ASSOC);

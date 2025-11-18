@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Oct 30, 2025 at 03:02 AM
+-- Generation Time: Nov 06, 2025 at 01:12 AM
 -- Server version: 8.0.42
 -- PHP Version: 8.3.16
 
@@ -40,7 +40,8 @@ CREATE TABLE `clientes` (
   `telefono` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `direccion` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `dni` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `sexo` enum('masculino','femenino','otro') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tipo_documento` enum('dni','carnet','sin_dni') COLLATE utf8mb4_unicode_ci DEFAULT 'dni',
+  `sexo` enum('masculino','femenino','macho','hembra','otro') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha_nacimiento` date DEFAULT NULL,
   `referencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `procedencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -164,7 +165,8 @@ CREATE TABLE `cotizaciones` (
   `tipo_toma` enum('laboratorio','domicilio') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `direccion_toma` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `descuento_aplicado` decimal(5,2) DEFAULT '0.00',
-  `estado_muestra` enum('pendiente','realizada') COLLATE utf8mb4_unicode_ci DEFAULT 'pendiente'
+  `estado_muestra` enum('pendiente','realizada') COLLATE utf8mb4_unicode_ci DEFAULT 'pendiente',
+  `referencia_personalizada` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Referencia personalizada para mostrar en PDF en lugar de empresa/convenio/particular'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -353,7 +355,8 @@ CREATE TABLE `pagos` (
   `id_cotizacion` int NOT NULL,
   `monto` decimal(10,2) NOT NULL,
   `fecha` datetime DEFAULT CURRENT_TIMESTAMP,
-  `metodo_pago` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT 'efectivo'
+  `metodo_pago` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT 'efectivo',
+  `observaciones` text COLLATE utf8mb4_unicode_ci COMMENT 'Observaciones adicionales, especialmente para cambios de monto total'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------

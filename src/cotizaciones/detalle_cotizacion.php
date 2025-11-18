@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../auth/empresa_config.php';
 
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -612,6 +613,9 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         <a href="cotizaciones/descargar_cotizacion.php?id=<?= $cotizacion['id'] ?>" class="btn btn-action-detalle btn-success-custom" target="_blank">
                             <i class="bi bi-download"></i> Descargar PDF
                         </a>
+                        <button type="button" class="btn btn-action-detalle btn-info" onclick="imprimirTicketCotizacion()">
+                            <i class="bi bi-printer"></i> Imprimir Ticket
+                        </button>
                         <a href="javascript:history.back()" class="btn btn-action-detalle btn-secondary-custom">
                             <i class="bi bi-arrow-left"></i> Volver
                         </a>
@@ -620,4 +624,63 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
             </div>
         </div>
     </div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function imprimirTicketCotizacion() {
+    var codigo = "<?= htmlspecialchars($cotizacion['codigo']) ?>";
+    var nombre = "<?= htmlspecialchars($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) ?>";
+    var dni = "<?= htmlspecialchars($cotizacion['dni']) ?>";
+    var fecha = "<?= htmlspecialchars($cotizacion['fecha']) ?>";
+    var total = "<?= number_format($cotizacion['total'], 2) ?>";
+    var condicion = "<?= $info_tipo ?>";
+    var examenes = <?php echo json_encode($examenes); ?>;
+    var empresa_nombre = "<?= htmlspecialchars($config['nombre'] ?? '') ?>";
+    var empresa_ruc = "<?= htmlspecialchars($config['ruc'] ?? '') ?>";
+    var empresa_direccion = "<?= htmlspecialchars($config['direccion'] ?? '') ?>";
+    var empresa_celular = "<?= htmlspecialchars($config['celular'] ?? '') ?>";
+
+    var html = `<div style=\"font-family:monospace; width:280px; padding:10px; margin:0 auto; display:block; text-align:center;\">
+        <div style='font-size:1.1em; font-weight:bold;'>${empresa_nombre}</div>
+        <div style='font-size:0.95em;'>RUC: ${empresa_ruc}</div>
+        <div style='font-size:0.95em;'>${empresa_direccion}</div>
+        <div style='font-size:0.95em;'>Celular: ${empresa_celular}</div>
+        <div style='margin-bottom:8px;'>Ticket Cotización</div>
+        <div>Código: <strong>${codigo}</strong></div>
+        <div>Cliente: ${nombre}</div>
+        <div>DNI: ${dni}</div>
+        <div>Condición: ${condicion}</div>
+        <div>Fecha: ${fecha}</div>
+        <hr>
+        <div style='font-weight:bold;'>Exámenes:</div>
+        <table style='width:100%; font-size:0.95em; margin:0 auto; text-align:center;'>
+            <thead><tr><th style='text-align:center;'>Examen</th><th style='text-align:center;'>Cant</th></tr></thead>
+            <tbody>`;
+    examenes.forEach(function(ex) {
+        html += `<tr><td style='text-align:center;'>${ex.nombre_examen}</td><td style='text-align:center;'>${ex.cantidad}</td></tr>`;
+    });
+    html += `</tbody></table>
+        <hr>
+        <div style='font-size:1.2em;'>Total: S/ ${total}</div>
+        <div style='margin-top:10px;'>Gracias por su preferencia</div>
+    </div>`;
+
+    Swal.fire({
+        title: 'Vista previa del ticket',
+        html: html,
+        showCancelButton: true,
+        confirmButtonText: 'Imprimir',
+        cancelButtonText: 'Cerrar',
+        customClass: {
+            popup: 'swal2-ticket-modal'
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Imprimir solo el contenido del ticket
+            var printWin = window.open('', 'PrintTicket', 'width=320,height=600');
+            printWin.document.write('<html><head><title>Ticket Cotización</title></head><body>' + html + '<script>window.print();setTimeout(()=>window.close(),500);<\/script></body></html>');
+            printWin.document.close();
+        }
+    });
+}
+</script>
 </div>

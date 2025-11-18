@@ -391,5 +391,8 @@ $html .= '
 // Aplicar CSS y generar PDF
 $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
 $mpdf->WriteHTML($html, \Mpdf\HTMLParserMode::HTML_BODY);
-$mpdf->Output('reporte-resultados.pdf', 'I');
+$nombrePaciente = strtolower(str_replace([' ', 'á', 'é', 'í', 'ó', 'ú', 'ñ'], ['-', 'a', 'e', 'i', 'o', 'u', 'n'], $paciente['nombre']));
+$fechaReporte = date('d-m-Y', strtotime($paciente['fecha']));
+$nombreArchivo = $nombrePaciente . '-' . $fechaReporte . '.pdf';
+$mpdf->Output($nombreArchivo, 'I');
 exit;
