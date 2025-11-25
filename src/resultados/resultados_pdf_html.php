@@ -11,6 +11,11 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         . '.tabla-resultados { width: 100%; border-collapse: collapse; margin-top: 0.5px; font-size: 11px; }'
         . '.tabla-resultados th { background: #d7e3fcff; font-size: 11px; color: #1a237e; font-weight: bold; border: none; text-align: left; height: 32px; }'
         . '.tabla-resultados td { font-size: 11px; border: none; padding: 2px 8px; text-align: left; vertical-align: middle; }'
+        . '.tabla-resultados th.prueba, .tabla-resultados td.prueba { width: 30%; }'
+        . '.tabla-resultados th.metodologia, .tabla-resultados td.metodologia { width: 15%; }'
+        . '.tabla-resultados th.resultado, .tabla-resultados td.resultado { width: 15%; }'
+        . '.tabla-resultados th.unidades, .tabla-resultados td.unidades { width: 14%; }'
+        . '.tabla-resultados th.referencia, .tabla-resultados td.referencia { width: 26%; }'
         . '.referencia-list { margin: 0; padding-left: 16px; font-size: 0.97em; color: #222; }'
         . '.firma-footer { text-align: right; margin-top: 45px; }'
         . '.subtitulo { background: #e3e8f5 !important; color: #1a237e !important; font-weight: bold !important; border-radius: 6px; }';
@@ -38,7 +43,13 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     $html .= '<div style="height:32px;"></div>';
     $html .= '<table class="tabla-resultados"><thead>';
     $html .= '<tr><th colspan="5" style="text-align:center;" class="titulo-reporte">Reporte de Resultados</th></tr>';
-    $html .= '<tr><th>Prueba</th><th>Metodología</th><th>Resultado</th><th>Unidades</th><th>Valores de Referencia</th></tr></thead><tbody>';
+    $html .= '<tr>';
+    $html .= '<th class="prueba">Prueba</th>';
+    $html .= '<th class="metodologia">Metodología</th>';
+    $html .= '<th class="resultado">Resultado</th>';
+    $html .= '<th class="unidades">Unidades</th>';
+    $html .= '<th class="referencia">Valores de Referencia</th>';
+    $html .= '</tr></thead><tbody>';
 
     $sinDecimales = ['R_GLOBULOS_BLANCOS', 'PLAQUETAS'];
     foreach ($items as $item) {
@@ -98,21 +109,21 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 foreach ($valorFormateado as $valorSel) {
                     if ($valorSel !== '' && $valorSel !== null) {
                         $html .= '<tr>';
-                        $html .= '<td style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td>';
-                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
-                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($valorSel) . '</td>';
-                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
-                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . $refHTML . '</td>';
+                        $html .= '<td class="prueba" style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['prueba']) . '</td>';
+                        $html .= '<td class="metodologia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+                        $html .= '<td class="resultado" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($valorSel) . '</td>';
+                        $html .= '<td class="unidades" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+                        $html .= '<td class="referencia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . $refHTML . '</td>';
                         $html .= '</tr>';
                     }
                 }
             } else {
                 $html .= '<tr>';
-                $html .= '<td style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td>';
-                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
-                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($valorFormateado) . '</td>';
-                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
-                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . $refHTML . '</td>';
+                $html .= '<td class="prueba" style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['prueba']) . '</td>';
+                $html .= '<td class="metodologia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+                $html .= '<td class="resultado" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($valorFormateado) . '</td>';
+                $html .= '<td class="unidades" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+                $html .= '<td class="referencia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . $refHTML . '</td>';
                 $html .= '</tr>';
             }
         }
