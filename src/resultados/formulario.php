@@ -13,14 +13,17 @@ require_once __DIR__ . '/vistas/FormView.php';
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 // Inicializar variables
+
 $examenes = [];
 $referencia_personalizada = '';
+$datos_paciente = [];
 
 if ($cotizacion_id) {
     $examenesService = new ExamenesService($pdo);
     $cotizacionService = new CotizacionService($pdo);
     $examenes = $examenesService->obtenerExamenesPorCotizacion($cotizacion_id);
     $referencia_personalizada = $cotizacionService->obtenerReferenciaPersonalizada($cotizacion_id);
+    $datos_paciente = $cotizacionService->obtenerDatosPaciente($cotizacion_id);
 }
 ?>
 <!DOCTYPE html>
@@ -51,7 +54,7 @@ if ($cotizacion_id) {
 <div class="container mb-5">
     <?php
     if (!empty($examenes)) {
-        echo FormView::render($examenes, $cotizacion_id, $referencia_personalizada);
+        echo FormView::render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente);
     } else {
         echo AlertView::render('No hay exámenes asociados');
     }
@@ -59,5 +62,6 @@ if ($cotizacion_id) {
 </div>
 </script>
 <script src="<?= BASE_URL ?>resultados/recursos/formulario.js"></script>
+<script src="<?= BASE_URL ?>resultados/recursos/validacion-realtime.js"></script>
 </body>
 </html>

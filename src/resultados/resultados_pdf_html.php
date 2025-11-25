@@ -42,16 +42,13 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
 
     $sinDecimales = ['R_GLOBULOS_BLANCOS', 'PLAQUETAS'];
     foreach ($items as $item) {
-        if ($item['tipo'] === "Título") {
+        if ($item['tipo'] === "Título" || $item['tipo'] === "Subtítulo") {
             $color_fondo = $item['color_fondo'] ?? "#e3e8f5";
             $color_texto = $item['color_texto'] ?? "#1a237e";
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
-            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';border-radius:6px;text-align:center;">' . htmlspecialchars($item['prueba']) . '</td></tr>';
-        } elseif ($item['tipo'] === "Subtítulo") {
-            $color_fondo = $item['color_fondo'] ?? "#e3e8f5";
-            $color_texto = $item['color_texto'] ?? "#1a237e";
-            $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
-            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';border-radius:6px;">' . htmlspecialchars($item['prueba']) . '</td></tr>';
+            $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
+            $text_align = isset($item['alineacion']) ? $item['alineacion'] : ($item['tipo'] === "Título" ? 'center' : 'left');
+            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';border-radius:6px;text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td></tr>';
         } elseif ($item['tipo'] === "Parámetro") {
             $referencias = isset($item['referencias']) && is_array($item['referencias'])
                 ? $item['referencias']
@@ -70,32 +67,52 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             } elseif ($referencias) {
                 $refHTML = htmlspecialchars($referencias);
             }
-            $valorFormateado = $item['valor'];
+            $valorOriginal = $item['valor'];
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
+            $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
+            $text_align = isset($item['alineacion']) ? $item['alineacion'] : 'left';
+            // Validación de fuera de rango usando valor original sin formato
+            $fuera_rango = false;
+            if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "" && is_numeric(str_replace(',', '', $valorOriginal))) {
+                $valor_num = floatval(str_replace(',', '', $valorOriginal));
+                foreach ($item['referencias'] as $ref) {
+                    $min = isset($ref['valor_min']) ? floatval($ref['valor_min']) : null;
+                    $max = isset($ref['valor_max']) ? floatval($ref['valor_max']) : null;
+                    if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
+                        $fuera_rango = true;
+                        break;
+                    }
+                }
+            }
+            // Formatear valor para mostrar
+            $valorFormateado = $valorOriginal;
             if (in_array($item['prueba'], $sinDecimales) && is_numeric(str_replace(',', '', $valorFormateado))) {
                 $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), 0, '', ',');
             } elseif ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric($valorFormateado)) {
                 $valorFormateado = number_format($valorFormateado, 1, '.', '');
             }
+            if ($fuera_rango && $valorFormateado !== "") {
+                $valorFormateado = '* ' . $valorFormateado;
+            }
             if (is_array($valorFormateado)) {
                 foreach ($valorFormateado as $valorSel) {
                     if ($valorSel !== '' && $valorSel !== null) {
                         $html .= '<tr>';
-                        $html .= '<td style="font-weight:' . $font_weight . '">' . htmlspecialchars($item['prueba']) . '</td>';
-                        $html .= '<td>' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
-                        $html .= '<td>' . htmlspecialchars($valorSel) . '</td>';
-                        $html .= '<td>' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
-                        $html .= '<td>' . $refHTML . '</td>';
+                        $html .= '<td style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td>';
+                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($valorSel) . '</td>';
+                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+                        $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . $refHTML . '</td>';
                         $html .= '</tr>';
                     }
                 }
             } else {
                 $html .= '<tr>';
-                $html .= '<td style="font-weight:' . $font_weight . '">' . htmlspecialchars($item['prueba']) . '</td>';
-                $html .= '<td>' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
-                $html .= '<td>' . htmlspecialchars($valorFormateado) . '</td>';
-                $html .= '<td>' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
-                $html .= '<td>' . $refHTML . '</td>';
+                $html .= '<td style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td>';
+                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
+                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($valorFormateado) . '</td>';
+                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
+                $html .= '<td style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">' . $refHTML . '</td>';
                 $html .= '</tr>';
             }
         }

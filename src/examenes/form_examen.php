@@ -122,6 +122,8 @@ if ($esEdicion) {
                     <th>Valor(es) Referencia</th>
                     <th>Fórmula</th>
                     <th>Negrita</th>
+                    <th>Cursiva</th>
+                    <th>Alineación</th>
                     <th>Color texto</th>
                     <th>Color fondo</th>
                     <th>Orden</th>
