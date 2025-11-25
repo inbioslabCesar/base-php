@@ -10,8 +10,10 @@ $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 $id = $empresa ? $empresa['id'] : null;
 
 // Recoge los datos del formulario
+// ...existing code...
 $nombre    = trim($_POST['nombre'] ?? '');
 $ruc       = trim($_POST['ruc'] ?? '');
+$dominio   = trim($_POST['dominio'] ?? '');
 $direccion = trim($_POST['direccion'] ?? '');
 $email     = trim($_POST['email'] ?? '');
 $telefono  = trim($_POST['telefono'] ?? '');
@@ -175,14 +177,14 @@ $menu_contacto    = trim($_POST['menu_contacto'] ?? 'Contacto');
 try {
     if ($id) {
         $stmt = $pdo->prepare("UPDATE config_empresa SET 
-            nombre=?, ruc=?, direccion=?, email=?, telefono=?, celular=?, logo=?, firma=?,
+            nombre=?, ruc=?, dominio=?, direccion=?, email=?, telefono=?, celular=?, logo=?, firma=?,
             color_principal=?, color_secundario=?, color_footer=?, color_botones=?, color_texto=?, tamano_letra=?,
             frase_promocion=?, oferta_mes=?,
             imagenes_carrusel=?, imagenes_institucionales=?, servicios=?, testimonios=?, redes_sociales=?,
             menu_inicio=?, menu_servicios=?, menu_testimonios=?, menu_contacto=?
             WHERE id=?");
         $stmt->execute([
-            $nombre, $ruc, $direccion, $email, $telefono, $celular, $logo, $firma,
+            $nombre, $ruc, $dominio, $direccion, $email, $telefono, $celular, $logo, $firma,
             $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto, $tamano_letra,
             $frase_promocion, $oferta_mes,
             json_encode($imagenes_carrusel, JSON_UNESCAPED_UNICODE),
@@ -196,14 +198,14 @@ try {
         $_SESSION['msg'] = 'Datos de la empresa actualizados correctamente.';
     } else {
         $stmt = $pdo->prepare("INSERT INTO config_empresa (
-            nombre, ruc, direccion, email, telefono, celular, logo, firma,
+            nombre, ruc, dominio, direccion, email, telefono, celular, logo, firma,
             color_principal, color_secundario, color_footer, color_botones, color_texto, tamano_letra,
             frase_promocion, oferta_mes,
             imagenes_carrusel, imagenes_institucionales, servicios, testimonios, redes_sociales,
             menu_inicio, menu_servicios, menu_testimonios, menu_contacto
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
-            $nombre, $ruc, $direccion, $email, $telefono, $celular, $logo, $firma,
+            $nombre, $ruc, $dominio, $direccion, $email, $telefono, $celular, $logo, $firma,
             $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto, $tamano_letra,
             $frase_promocion, $oferta_mes,
             json_encode($imagenes_carrusel, JSON_UNESCAPED_UNICODE),

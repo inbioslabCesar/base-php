@@ -15,8 +15,27 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         . '.firma-footer { text-align: right; margin-top: 45px; }'
         . '.subtitulo { background: #e3e8f5 !important; color: #1a237e !important; font-weight: bold !important; border-radius: 6px; }';
 
+    // Generar código QR con datos clave
+    $qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'INBIOSLAB')
+        . ' | Resultado ID: ' . ($paciente['id'] ?? '')
+        . ' | Paciente: ' . ($paciente['nombre'] ?? '')
+        . ' | DNI: ' . ($paciente['dni'] ?? '')
+        . ' | Fecha: ' . ($paciente['fecha'] ?? '');
+    $qrBase64 = '';
+    try {
+        if (class_exists('Endroid\\QrCode\\QrCode')) {
+            $qr = new \Endroid\QrCode\QrCode($qrText);
+            $writer = new \Endroid\QrCode\Writer\PngWriter();
+            $result = $writer->write($qr);
+            $qrBase64 = base64_encode($result->getString());
+        }
+    } catch (\Exception $e) {}
+
+    // Inicializar $html para el contenido principal (sin cabecera)
+    $html = '';
+
     // El título debe ir fuera de la tabla para que se centre correctamente
-    $html = '<div style="height:32px;"></div>';
+    $html .= '<div style="height:32px;"></div>';
     $html .= '<table class="tabla-resultados"><thead>';
     $html .= '<tr><th colspan="5" style="text-align:center;" class="titulo-reporte">Reporte de Resultados</th></tr>';
     $html .= '<tr><th>Prueba</th><th>Metodología</th><th>Resultado</th><th>Unidades</th><th>Valores de Referencia</th></tr></thead><tbody>';

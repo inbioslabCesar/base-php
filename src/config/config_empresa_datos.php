@@ -61,6 +61,11 @@ $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
         <div class="row">
             <!-- Datos básicos -->
             <div class="col-md-6 mb-3">
+                <label for="dominio" class="form-label">Dominio (ej: ejemplo.com)</label>
+                <input type="text" class="form-control" id="dominio" name="dominio"
+                    value="<?= htmlspecialchars($empresa['dominio'] ?? '') ?>">
+            </div>
+            <div class="col-md-6 mb-3">
                 <label for="nombre" class="form-label">Nombre *</label>
                 <input type="text" class="form-control" id="nombre" name="nombre"
                     value="<?= htmlspecialchars($empresa['nombre'] ?? '') ?>" required>

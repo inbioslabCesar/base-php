@@ -136,7 +136,7 @@ if ($cotizaciones) {
                                     title="Ver cotización">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <a href="resultados/descarga-pdf-dompdf.php?cotizacion_id=<?= $cotizacionId ?>"
+                                <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacionId ?>"
                                     class="btn btn-success btn-sm mb-1"
                                     title="Descargar PDF de todos los resultados"
                                     <?= $descargarDisabled ?>>

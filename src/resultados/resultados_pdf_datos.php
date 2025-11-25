@@ -22,19 +22,29 @@ function obtenerResultadosExamenes($pdo, $cotizacion_id) {
 }
 
 function obtenerDatosEmpresa($pdo) {
-    $sql3 = "SELECT nombre, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
+    $dominio_actual = $_SERVER['HTTP_HOST'];
+    $sql3 = "SELECT nombre, ruc, dominio, direccion, telefono, celular, logo, firma FROM config_empresa WHERE dominio = ? LIMIT 1";
     $stmt3 = $pdo->prepare($sql3);
-    $stmt3->execute();
+    $stmt3->execute([$dominio_actual]);
     $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
     if (!$empresa) {
-        $empresa = [
-            "nombre" => "",
-            "direccion" => "",
-            "telefono" => "",
-            "celular" => "",
-            "logo" => "",
-            "firma" => ""
-        ];
+        // Si no hay empresa para el dominio, usar la primera empresa como fallback
+        $sql3 = "SELECT nombre, ruc, dominio, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
+        $stmt3 = $pdo->prepare($sql3);
+        $stmt3->execute();
+        $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
+        if (!$empresa) {
+            $empresa = [
+                "nombre" => "",
+                "ruc" => "",
+                "dominio" => "",
+                "direccion" => "",
+                "telefono" => "",
+                "celular" => "",
+                "logo" => "",
+                "firma" => ""
+            ];
+        }
     }
     return $empresa;
 }
