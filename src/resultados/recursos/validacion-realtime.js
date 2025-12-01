@@ -5,8 +5,6 @@ document.addEventListener('input', function(e) {
   if (e.target.classList.contains('form-control') && e.target.closest('.parameter-section')) {
     const input = e.target;
     const section = input.closest('.parameter-section');
-    // Log para depuración
-    console.log('Validando input:', input.name, 'valor:', input.value);
     // Obtener referencias y datos del paciente desde atributos data
     const referencias = JSON.parse(input.getAttribute('data-referencias') || '[]');
     const edad = parseFloat(document.getElementById('edad-paciente')?.value || input.getAttribute('data-edad') || 0);
@@ -21,11 +19,12 @@ document.addEventListener('input', function(e) {
       if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
     });
     let fuera_rango = false;
-    const valor = parseFloat(input.value);
+    const valor = parseFloat(input.value.replace(/,/g, ''));
     if (referencia_aplicada && !isNaN(valor)) {
-      const min = parseFloat(referencia_aplicada.valor_min);
-      const max = parseFloat(referencia_aplicada.valor_max);
-      if ((min && valor < min) || (max && valor > max)) fuera_rango = true;
+      const min = parseFloat((referencia_aplicada.valor_min || '').toString().replace(/,/g, ''));
+      const max = parseFloat((referencia_aplicada.valor_max || '').toString().replace(/,/g, ''));
+      if (!isNaN(min) && input.value !== '' && valor < min) fuera_rango = true;
+      if (!isNaN(max) && input.value !== '' && valor > max) fuera_rango = true;
     }
     input.classList.toggle('is-invalid', fuera_rango);
     input.classList.toggle('is-valid', !fuera_rango && input.value !== '');

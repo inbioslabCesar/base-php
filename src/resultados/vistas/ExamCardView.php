@@ -1,3 +1,4 @@
+
 <?php
 class ExamCardView {
     public static function render($examen, $index, $datos_paciente = []) {
@@ -127,7 +128,7 @@ class ExamCardView {
                                 ' data-referencias=\'' . json_encode($item['referencias'] ?? []) . '\'' .
                                 ' data-edad="' . htmlspecialchars($edad_paciente ?? '') . '"' .
                                 ' data-sexo="' . htmlspecialchars($sexo_paciente ?? '') . '"' .
-                                '>';
+                                '>';                      
                             echo '</div>';
                         }
                         if (!empty($item['referencias'])) {

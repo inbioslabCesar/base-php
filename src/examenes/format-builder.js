@@ -111,6 +111,10 @@ function addRow(data = {}) {
   const tdColorBg = document.createElement('td');
   tdColorBg.innerHTML = `<input type="color" class="color-input" value="${data.color_fondo || '#ffffff'}">`;
   tr.appendChild(tdColorBg);
+  // Decimales
+  const tdDecimales = document.createElement('td');
+  tdDecimales.innerHTML = `<input type="number" class="form-control form-control-sm decimales-input" value="${data.decimales !== undefined ? data.decimales : ''}" min="0" max="6" style="width:70px;">`;
+  tr.appendChild(tdDecimales);
   // Orden
   const tdOrden = document.createElement('td');
   tdOrden.innerHTML = `<input type="number" class="form-control form-control-sm" value="${data.orden || (tbody.children.length + 1)}" min="1" style="width:70px;">`;
@@ -286,7 +290,8 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
       alineacion: tr.children[9].querySelector('select').value,
       color_texto: tr.children[10].querySelector('input').value,
       color_fondo: tr.children[11].querySelector('input').value,
-      orden: parseInt(tr.children[12].querySelector('input').value) || 0
+      decimales: tr.children[12].querySelector('input').value !== '' ? parseInt(tr.children[12].querySelector('input').value) : undefined,
+      orden: parseInt(tr.children[13].querySelector('input').value) || 0
     };
   });
 

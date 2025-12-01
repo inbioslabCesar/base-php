@@ -17,13 +17,26 @@ foreach ($resultados as $row) {
             if (isset($param['referencias']) && is_array($param['referencias'])) {
                 foreach ($param['referencias'] as &$ref) {
                     if (isset($ref['valor']) && $ref['valor'] !== '') {
-                        if (!isset($ref['valor_min']) || $ref['valor_min'] === '') {
-                            $ref['valor_min'] = $ref['valor'];
-                            $actualizado = true;
-                        }
-                        if (!isset($ref['valor_max']) || $ref['valor_max'] === '') {
-                            $ref['valor_max'] = $ref['valor'];
-                            $actualizado = true;
+                        // Si el valor tiene formato "min-max"
+                        if (strpos($ref['valor'], '-') !== false) {
+                            list($min, $max) = explode('-', $ref['valor'], 2);
+                            $min = trim($min);
+                            $max = trim($max);
+                            if ($ref['valor_min'] != $min || $ref['valor_max'] != $max) {
+                                $ref['valor_min'] = $min;
+                                $ref['valor_max'] = $max;
+                                $actualizado = true;
+                            }
+                        } else {
+                            // Si solo hay un valor, lo pone en ambos si son diferentes
+                            if ($ref['valor_min'] != $ref['valor']) {
+                                $ref['valor_min'] = $ref['valor'];
+                                $actualizado = true;
+                            }
+                            if ($ref['valor_max'] != $ref['valor']) {
+                                $ref['valor_max'] = $ref['valor'];
+                                $actualizado = true;
+                            }
                         }
                     }
                 }

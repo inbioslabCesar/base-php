@@ -59,8 +59,6 @@ require_once __DIR__ . '/../../config/config.php';
 
             <div class="container mt-5">
                 <!-- Encabezado destacado -->
-                <!-- Encabezado destacado eliminado -->
-
                 <!-- Opciones en cards -->
                 <div class="row g-4">
                     <div class="col-md-3 col-sm-6">

@@ -6,11 +6,12 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $id = $_GET['id'] ?? null;
 $esEdicion = !empty($id);
+
 $cliente = [
     'codigo_cliente' => '',
     'nombre' => '',
     'apellido' => '',
-    'dni' => '',
+    'dni' => isset($_GET['dni']) ? $_GET['dni'] : '',
     'tipo_documento' => 'dni',
     'edad' => '',
     'email' => '',

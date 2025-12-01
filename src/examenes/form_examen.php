@@ -111,29 +111,32 @@ if ($esEdicion) {
 
         <!-- Builder visual para parámetros adicionales -->
         <h4>Parámetros del Examen</h4>
-        <table class="table table-bordered table-editable" id="formatTable">
-            <thead>
-                <tr>
-                    <th>Tipo</th>
-                    <th>Nombre</th>
-                    <th>Metodología</th>
-                    <th>Unidad</th>
-                    <th>Opciones</th>
-                    <th>Valor(es) Referencia</th>
-                    <th>Fórmula</th>
-                    <th>Negrita</th>
-                    <th>Cursiva</th>
-                    <th>Alineación</th>
-                    <th>Color texto</th>
-                    <th>Color fondo</th>
-                    <th>Orden</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Filas dinámicas -->
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-bordered table-editable" id="formatTable">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Nombre</th>
+                        <th>Metodología</th>
+                        <th>Unidad</th>
+                        <th>Opciones</th>
+                        <th>Valor(es) Referencia</th>
+                        <th>Fórmula</th>
+                        <th>Negrita</th>
+                        <th>Cursiva</th>
+                        <th>Alineación</th>
+                        <th>Color texto</th>
+                        <th>Color fondo</th>
+                        <th>Decimales</th>
+                        <th>Orden</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Filas dinámicas -->
+                </tbody>
+            </table>
+        </div>
         <input type="hidden" id="adicional" name="adicional">
         <button id="addRow" class="btn btn-success mb-2" type="button">Agregar Fila</button>
         <h4>Vista Previa en Tiempo Real</h4>

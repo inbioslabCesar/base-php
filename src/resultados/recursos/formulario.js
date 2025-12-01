@@ -33,7 +33,11 @@ document.addEventListener('DOMContentLoaded', function () {
             variables.forEach(function(variable) {
                 let nombre = variable.replace(/[\[\]]/g, '').trim();
                 let input = document.querySelector(`[name="examenes[${idResultado}][resultados][${nombre}]"]`);
-                let val = input && input.value ? parseFloat(input.value) : 0;
+                let val = input && input.value ? parseFloat(input.value.replace(/,/g, '')) : 0;
+                // Si el campo es porcentaje y el valor es menor a 1 pero mayor a 0, lo convertimos a entero
+                if (input && input.getAttribute('unidad') === '%' && val > 0 && val < 1) {
+                    val = val * 100;
+                }
                 expr = expr.replaceAll(variable, val);
             });
             try {

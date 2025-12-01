@@ -82,22 +82,38 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
             $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
             $text_align = isset($item['alineacion']) ? $item['alineacion'] : 'left';
-            // Validación de fuera de rango usando valor original sin formato
+            // Discriminación de referencia por sexo y edad igual que en el formulario web
             $fuera_rango = false;
+            $referencia_aplicada = null;
+            $edad_paciente = isset($paciente['edad']) ? floatval($paciente['edad']) : null;
+            $sexo_paciente = isset($paciente['sexo']) ? strtolower(trim($paciente['sexo'])) : '';
             if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "" && is_numeric(str_replace(',', '', $valorOriginal))) {
-                $valor_num = floatval(str_replace(',', '', $valorOriginal));
+                // Seleccionar la referencia correcta
                 foreach ($item['referencias'] as $ref) {
-                    $min = isset($ref['valor_min']) ? floatval($ref['valor_min']) : null;
-                    $max = isset($ref['valor_max']) ? floatval($ref['valor_max']) : null;
+                    $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
+                    $ref_edad_min = isset($ref['edad_min']) ? floatval($ref['edad_min']) : null;
+                    $ref_edad_max = isset($ref['edad_max']) ? floatval($ref['edad_max']) : null;
+                    $sexo_match = ($ref_sexo === 'cualquiera' || $ref_sexo === $sexo_paciente);
+                    $edad_match = ($ref_edad_min === null || $edad_paciente >= $ref_edad_min) && ($ref_edad_max === null || $edad_paciente <= $ref_edad_max);
+                    if ($sexo_match && $edad_match) {
+                        $referencia_aplicada = $ref;
+                        break;
+                    }
+                }
+                $valor_num = floatval(str_replace(',', '', $valorOriginal));
+                if ($referencia_aplicada) {
+                    $min = isset($referencia_aplicada['valor_min']) ? floatval($referencia_aplicada['valor_min']) : null;
+                    $max = isset($referencia_aplicada['valor_max']) ? floatval($referencia_aplicada['valor_max']) : null;
                     if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
                         $fuera_rango = true;
-                        break;
                     }
                 }
             }
             // Formatear valor para mostrar
             $valorFormateado = $valorOriginal;
-            if (in_array($item['prueba'], $sinDecimales) && is_numeric(str_replace(',', '', $valorFormateado))) {
+            if (isset($item['decimales']) && is_numeric($item['decimales']) && $valorFormateado !== "" && is_numeric(str_replace(',', '', $valorFormateado))) {
+                $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), intval($item['decimales']), '.', '');
+            } elseif (in_array($item['prueba'], $sinDecimales) && is_numeric(str_replace(',', '', $valorFormateado))) {
                 $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), 0, '', ',');
             } elseif ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric($valorFormateado)) {
                 $valorFormateado = number_format($valorFormateado, 1, '.', '');
