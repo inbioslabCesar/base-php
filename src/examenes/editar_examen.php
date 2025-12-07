@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         json_decode($adicional);
         if (json_last_error() !== JSON_ERROR_NONE) {
             $_SESSION['error'] = 'El formato de parámetros adicionales no es válido.';
-            header('Location: tu_formulario_edicion.php?id=' . $id);
+            header('Location: dashboard.php?vista=form_examen&id=' . $id);
             exit;
         }
     }

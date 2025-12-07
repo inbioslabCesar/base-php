@@ -21,7 +21,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         . '.subtitulo { background: #e3e8f5 !important; color: #1a237e !important; font-weight: bold !important; border-radius: 6px; }';
 
     // Generar código QR con datos clave
-    $qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'INBIOSLAB')
+    $qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'MEDDITECH')
         . ' | Resultado ID: ' . ($paciente['id'] ?? '')
         . ' | Paciente: ' . ($paciente['nombre'] ?? '')
         . ' | DNI: ' . ($paciente['dni'] ?? '')

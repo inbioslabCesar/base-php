@@ -50,7 +50,7 @@ if (!$dni) {
 // Si el email está vacío, generar uno provisional usando el DNI
 
 if (!$email) {
-    $email = $dni . '@inbioslab.com';
+    $email = $dni . '@medditech.com';
 }
 
 // Si la contraseña está vacía, asignar el DNI como contraseña

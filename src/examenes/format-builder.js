@@ -42,7 +42,16 @@ function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', s
 
 
 function addRow(data = {}) {
-  // ...existing code...
+    // Listener para actualizar vista previa en tiempo real al editar campos
+    setTimeout(() => {
+      [
+        ...tr.querySelectorAll('textarea'),
+        ...tr.querySelectorAll('input'),
+        ...tr.querySelectorAll('select')
+      ].forEach(el => {
+        el.addEventListener('input', updatePreview);
+      });
+    }, 0);
   // ...existing code...
   const tbody = document.querySelector('#formatTable tbody');
   const tr = document.createElement('tr');
@@ -115,22 +124,69 @@ function addRow(data = {}) {
   const tdDecimales = document.createElement('td');
   tdDecimales.innerHTML = `<input type="number" class="form-control form-control-sm decimales-input" value="${data.decimales !== undefined ? data.decimales : ''}" min="0" max="6" style="width:70px;">`;
   tr.appendChild(tdDecimales);
-  // Orden
+  // Orden (solo número, no editable)
   const tdOrden = document.createElement('td');
-  tdOrden.innerHTML = `<input type="number" class="form-control form-control-sm" value="${data.orden || (tbody.children.length + 1)}" min="1" style="width:70px;">`;
+  tdOrden.className = 'orden-fija';
+  tdOrden.textContent = tbody.children.length + 1;
   tr.appendChild(tdOrden);
   // Acciones
   const tdAcc = document.createElement('td');
-  tdAcc.innerHTML = `<button class="btn btn-danger btn-sm remove-row">Eliminar</button>`;
+  tdAcc.innerHTML = `
+    <button type="button" class="btn btn-secondary btn-sm move-up">↑</button>
+    <button type="button" class="btn btn-secondary btn-sm move-down">↓</button>
+    <button type="button" class="btn btn-danger btn-sm remove-row">Eliminar</button>
+  `;
   tr.appendChild(tdAcc);
   tbody.appendChild(tr);
+  actualizarOrdenFilas();
   updatePreview();
+function actualizarOrdenFilas() {
+  const filas = document.querySelectorAll('#formatTable tbody tr');
+  filas.forEach((tr, idx) => {
+    const tdOrden = tr.querySelector('.orden-fija');
+    if (tdOrden) tdOrden.textContent = idx + 1;
+  });
 }
-// Eliminar fila de la tabla
+}
+// Eliminar fila de la tabla y mover filas
 document.addEventListener('click', function(e) {
   if (e.target.classList.contains('remove-row')) {
+    e.preventDefault();
+    e.stopPropagation();
     e.target.closest('tr').remove();
+    actualizarOrdenFilas();
     updatePreview();
+  }
+
+  // Mover fuera de addRow para que esté disponible globalmente
+  function actualizarOrdenFilas() {
+    const filas = document.querySelectorAll('#formatTable tbody tr');
+    filas.forEach((tr, idx) => {
+      const tdOrden = tr.querySelector('.orden-fija');
+      if (tdOrden) tdOrden.textContent = idx + 1;
+    });
+  }
+  if (e.target.classList.contains('move-up')) {
+    e.preventDefault();
+    e.stopPropagation();
+    const tr = e.target.closest('tr');
+    const prev = tr.previousElementSibling;
+    if (prev) {
+      tr.parentNode.insertBefore(tr, prev);
+      actualizarOrdenFilas();
+      updatePreview();
+    }
+  }
+  if (e.target.classList.contains('move-down')) {
+    e.preventDefault();
+    e.stopPropagation();
+    const tr = e.target.closest('tr');
+    const next = tr.nextElementSibling;
+    if (next) {
+      tr.parentNode.insertBefore(next, tr);
+      actualizarOrdenFilas();
+      updatePreview();
+    }
   }
 });
 
@@ -161,19 +217,11 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Actualizar vista previa en tiempo real
-document.getElementById('formatTable').addEventListener('input', updatePreview);
-document.getElementById('formatTable').addEventListener('change', updatePreview);
+
 
 function updatePreview() {
   const tbody = document.querySelector('#formatTable tbody');
   let rows = Array.from(tbody.querySelectorAll('tr'));
-  rows.sort((a, b) => {
-    let aOrden = parseInt(a.children[10].querySelector('input').value) || 0;
-    let bOrden = parseInt(b.children[10].querySelector('input').value) || 0;
-    return aOrden - bOrden;
-  });
-
   // Solo columnas relevantes en la preview
   let html = '<table class="table table-bordered"><thead><tr>' +
     '<th>Nombre</th><th>Metodología</th><th>Unidad</th><th>Opciones</th><th>Valor(es) Referencia</th><th>Negrita</th><th>Cursiva</th><th>Alineación</th>' +
@@ -203,7 +251,12 @@ function updatePreview() {
     let fontStyle = '';
     if (negrita) fontStyle += 'font-weight:bold;';
     if (cursiva) fontStyle += 'font-style:italic;';
-
+      const tdAcc = document.createElement('td');
+      tdAcc.innerHTML = `
+        <button class="btn btn-secondary btn-sm move-up">↑</button>
+        <button class="btn btn-secondary btn-sm move-down">↓</button>
+        <button class="btn btn-danger btn-sm remove-row">Eliminar</button>
+      `;
     // Traducción de alineación
     let alineacionCastellano = 'Izquierda';
     if (alineacion === 'center') alineacionCastellano = 'Centro';
@@ -243,12 +296,6 @@ function updatePreview() {
 document.getElementById('form-examen').addEventListener('submit', function(e) {
   const tbody = document.querySelector('#formatTable tbody');
   let rows = Array.from(tbody.querySelectorAll('tr'));
-  rows.sort((a, b) => {
-    let aOrden = parseInt(a.children[10].querySelector('input').value) || 0;
-    let bOrden = parseInt(b.children[10].querySelector('input').value) || 0;
-    return aOrden - bOrden;
-  });
-
   let formato = rows.map(tr => {
     let referencias = [];
     const refGroups = tr.children[5].querySelectorAll('.valores-ref-group');
@@ -291,7 +338,7 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
       color_texto: tr.children[10].querySelector('input').value,
       color_fondo: tr.children[11].querySelector('input').value,
       decimales: tr.children[12].querySelector('input').value !== '' ? parseInt(tr.children[12].querySelector('input').value) : undefined,
-      orden: parseInt(tr.children[13].querySelector('input').value) || 0
+      orden: parseInt(tr.querySelector('.orden-fija').textContent) || 0
     };
   });
 
