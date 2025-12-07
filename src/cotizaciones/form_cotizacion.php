@@ -1,4 +1,7 @@
+
 <?php
+
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -57,6 +60,18 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
 <style>
+    /* Forzar color de texto en las opciones del dropdown de Select2 al hacer hover */
+.select2-container--default .select2-results__option--highlighted,
+.select2-container--default .select2-results__option--highlighted * {
+    color: red !important; /* Azul oscuro, visible */
+}
+
+
+/* Forzar el color blanco en los badges de precio del dropdown de Select2 */
+.select2-results__option .badge.bg-success {
+    color: #fff !important;
+}
+
 /* Estilos modernos para el formulario de cotización */
 .cotizacion-container {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -207,7 +222,15 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
 }
 
 .examenes-table tbody tr:hover {
-    background-color: #f8f9fa;
+    background-color: #e3f0ff !important; /* Azul claro, visible */
+    color: #1a237e !important; /* Texto azul oscuro, visible */
+    transition: background 0.2s, color 0.2s;
+}
+
+/* Forzar el color de texto de todos los elementos dentro de la fila al hacer hover */
+.examenes-table tbody tr:hover td,
+.examenes-table tbody tr:hover td * {
+    color: #1a237e !important;
 }
 
 /* Estilos especiales para campos de precio */
@@ -725,15 +748,25 @@ $(document).ready(function() {
         setTimeout(function() {
             $('#buscadorExamen').val(null).trigger('change');
             $('.select2-search__field').attr('placeholder', 'Buscar otro examen...');
+                // Enfocar y seleccionar todo el texto para nueva búsqueda
+                var $searchField = $('.select2-search__field');
+                if ($searchField.length) {
+                    $searchField.focus();
+                    $searchField[0].select();
+                }
         }, 100);
     });
 
-    // Enfocar automáticamente el campo de búsqueda al abrir
-    $('#buscadorExamen').on('select2:open', function() {
-        setTimeout(function() {
-            $('.select2-search__field').focus();
-        }, 100);
-    });
+        // Enfocar automáticamente el campo de búsqueda al abrir (reforzado)
+        $('#buscadorExamen').on('select2:open', function() {
+            setTimeout(function() {
+                var $searchField = $('.select2-search__field');
+                if ($searchField.length) {
+                    $searchField.focus();
+                    $searchField[0].select(); // Selecciona el texto si hay
+                }
+            }, 10);
+        });
 
     // Mejorar la experiencia al hacer clic en el campo
     $('.select2-selection').on('click', function() {

@@ -33,6 +33,7 @@ if ($tipo_paciente == 'convenio') {
 }
 
 // Consulta de cotizaciones con SUMA de pagos (puede ser 0)
+
 $stmt = $pdo->prepare("
     SELECT 
         c.id AS id_cotizacion,
@@ -45,18 +46,16 @@ $stmt = $pdo->prepare("
         conv.nombre AS nombre_convenio,
         emp.nombre_comercial AS nombre_empresa,
         cl.nombre, cl.apellido,
-        SUM(p.monto) AS total_pagado,
-        GROUP_CONCAT(DISTINCT p.metodo_pago SEPARATOR ', ') AS metodo_pago
+        (SELECT IFNULL(SUM(p2.monto),0) FROM pagos p2 WHERE p2.id_cotizacion = c.id) AS total_pagado,
+        (SELECT GROUP_CONCAT(DISTINCT p3.metodo_pago SEPARATOR ', ') FROM pagos p3 WHERE p3.id_cotizacion = c.id) AS metodo_pago
     FROM cotizaciones c
     JOIN clientes cl ON c.id_cliente = cl.id
     LEFT JOIN convenios conv ON c.id_convenio = conv.id
     LEFT JOIN empresas emp ON c.id_empresa = emp.id
-    LEFT JOIN pagos p ON c.id = p.id_cotizacion AND DATE(p.fecha) BETWEEN ? AND ?
     $where
     GROUP BY c.id, c.codigo, c.total, c.fecha, c.tipo_usuario, c.id_convenio, c.id_empresa, conv.nombre, emp.nombre_comercial, cl.nombre, cl.apellido
     ORDER BY c.fecha DESC
 ");
-$params = array_merge([$desde, $hasta], $params);
 $stmt->execute($params);
 $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>

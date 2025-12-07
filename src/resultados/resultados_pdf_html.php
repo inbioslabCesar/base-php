@@ -10,7 +10,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         . '.titulo-reporte { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 18px; color: #1a237e; letter-spacing: 1px; width: 100%; }'
         . '.tabla-resultados { width: 100%; border-collapse: collapse; margin-top: 0.5px; font-size: 11px; }'
         . '.tabla-resultados th { background: #d7e3fcff; font-size: 11px; color: #1a237e; font-weight: bold; border: none; text-align: left; height: 32px; }'
-        . '.tabla-resultados td { font-size: 11px; border: none; padding: 2px 8px; text-align: left; vertical-align: middle; }'
+        . '.tabla-resultados td { font-size: 11px; border: none; padding: 2px 8px; text-align: left; vertical-align: top; }'
         . '.tabla-resultados th.prueba, .tabla-resultados td.prueba { width: 30%; }'
         . '.tabla-resultados th.metodologia, .tabla-resultados td.metodologia { width: 15%; }'
         . '.tabla-resultados th.resultado, .tabla-resultados td.resultado { width: 15%; }'
