@@ -34,7 +34,6 @@ require_once __DIR__ . '/cotizaciones_paginacion.php';
     <?php require_once __DIR__ . '/cotizaciones_header.php'; ?>
 
     <!-- Filtros mejorados -->
-    <?php require_once __DIR__ . '/cotizaciones_filtros.php'; ?>
 
     <!-- Vista Desktop - Tabla -->
     <?php require_once __DIR__ . '/cotizaciones_tabla.php'; ?>

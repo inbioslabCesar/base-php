@@ -1,4 +1,76 @@
-   <div class="desktop-view">
+<?php
+require_once __DIR__ . '/../conexion/conexion.php';
+$empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
+$convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+?>
+<style>
+.btn-cotizacion-accion {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+    min-width: 34px;
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    padding: 0.375rem 0.5rem;
+}
+.cotizaciones-filters {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(44,62,80,0.07);
+    padding: 2rem 1.5rem 1.5rem 1.5rem;
+    margin-bottom: 2rem;
+}
+.cotizaciones-filters .form-label {
+    color: #1565c0;
+    font-weight: 600;
+    font-size: 1rem;
+}
+.cotizaciones-filters .form-control, .cotizaciones-filters .form-select {
+    border-radius: 10px;
+    border: 1.5px solid #90caf9;
+    font-size: 1rem;
+}
+</style>
+<div class="cotizaciones-filters">
+    <div class="row">
+        <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">🔍 DNI</label>
+            <input type="text" id="filtroDni" class="form-control" placeholder="Buscar por DNI">
+        </div>
+        <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">🏢 Empresa</label>
+            <select id="filtroEmpresa" class="form-select">
+                <option value="">Seleccionar empresa...</option>
+                <?php foreach ($empresas as $emp): ?>
+                    <option value="<?= $emp['id'] ?>"><?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">🤝 Convenio</label>
+            <select id="filtroConvenio" class="form-select">
+                <option value="">Seleccionar convenio...</option>
+                <?php foreach ($convenios as $conv): ?>
+                    <option value="<?= $conv['id'] ?>"><?= htmlspecialchars($conv['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">📅 Fecha desde</label>
+            <input type="date" id="filtroFechaDesde" class="form-control">
+        </div>
+        <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">📅 Fecha hasta</label>
+            <input type="date" id="filtroFechaHasta" class="form-control">
+        </div>
+        <div class="col-md-2 col-sm-12 d-flex align-items-end mb-2">
+            <button id="btnLimpiarFiltros" class="btn btn-outline-secondary w-100" type="button"><i class="bi bi-x-circle"></i> Limpiar</button>
+        </div>
+    </div>
+</div>
+<div class="desktop-view">
         <div class="table-responsive">
             <table id="tablaCotizaciones" class="table table-modern align-middle">
                 <thead>
@@ -53,6 +125,19 @@
 
 
     $(document).ready(function() {
+    // Forzar ajuste visual de DataTables y botones de acciones al cambiar tamaño de pantalla
+    let lastIsMobile = window.innerWidth <= 768;
+    $(window).on('resize', function() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile !== lastIsMobile) {
+            window.location.reload();
+        } else {
+            if ($.fn.dataTable.isDataTable('#tablaCotizaciones')) {
+                $('#tablaCotizaciones').DataTable().columns.adjust().draw(false);
+            }
+        }
+        lastIsMobile = isMobile;
+    });
         var tabla = $('#tablaCotizaciones').DataTable({
             "serverSide": true,
             "processing": true,
@@ -100,8 +185,23 @@
                 {
                     "data": "referencia",
                     "render": function(data, type, row) {
-                        if (row.referencia) {
-                            return `<span class='badge bg-info text-dark'>${row.referencia}</span>`;
+                        // Color único por empresa/convenio
+                        function stringToColor(str) {
+                            let hash = 0;
+                            for (let i = 0; i < str.length; i++) {
+                                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+                            }
+                            let color = '#';
+                            for (let i = 0; i < 3; i++) {
+                                let value = (hash >> (i * 8)) & 0xFF;
+                                color += ('00' + value.toString(16)).substr(-2);
+                            }
+                            return color;
+                        }
+                        if (row.referencia && row.referencia !== 'Particular') {
+                            const color = stringToColor(row.referencia);
+                            const textColor = '#fff';
+                            return `<span class='badge' style='background:${color};color:${textColor};'>${row.referencia}</span>`;
                         } else {
                             return `<span class='badge bg-secondary'>Particular</span>`;
                         }
@@ -136,23 +236,32 @@
                     "orderable": false,
                     "render": function(data, type, row) {
                         let acciones = '';
-                        acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm mb-1' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
-                        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm mb-1' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm btn-cotizacion-accion' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
                         if (row.modificada == 1) {
                             acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modificada</span>`;
                         }
-                        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm mb-1' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
-                        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm mb-1' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
-                        acciones += `<a href='dashboard.php?action=eliminar_cotizacion&id=${row.id}' class='btn btn-danger btn-sm mb-1' title='Eliminar cotización' onclick='return confirm(\"¿Seguro que deseas eliminar esta cotización?\")'><i class='bi bi-trash'></i></a>`;
-                        acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm mb-1' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+                        acciones += `<a href='dashboard.php?action=eliminar_cotizacion&id=${row.id}' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Eliminar cotización' onclick='return confirm(\"¿Seguro que deseas eliminar esta cotización?\")'><i class='bi bi-trash'></i></a>`;
+                        acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
                         return acciones;
                     }
                 }
             ]
         });
 
-        // Recargar tabla al buscar o limpiar
-        $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
+        // Recargar tabla al cambiar cualquier filtro
+        $('#filtroDni, #filtroEmpresa, #filtroConvenio, #filtroFechaDesde, #filtroFechaHasta').on('change keyup', function() {
+            tabla.ajax.reload();
+        });
+        // Limpiar filtros
+        $('#btnLimpiarFiltros').on('click', function() {
+            $('#filtroDni').val('');
+            $('#filtroEmpresa').val('');
+            $('#filtroConvenio').val('');
+            $('#filtroFechaDesde').val('');
+            $('#filtroFechaHasta').val('');
             tabla.ajax.reload();
         });
     });

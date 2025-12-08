@@ -25,7 +25,7 @@ $orderDir = $_GET['order'][0]['dir'] ?? 'desc';
 $orderBy = $columns[$orderCol] ?? 'id';
 
 try {
-    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total, c.referencia_personalizada AS referencia, c.estado_pago, c.estado_muestra AS estado_examen, c.rol_creador, c.modificada FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id";
+    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total, c.estado_pago, c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id";
     $where = [];
     $params = [];
     if ($search !== '') {
@@ -38,11 +38,11 @@ try {
         $params[] = "%" . trim($_GET['filtro_dni']) . "%";
     }
     if (!empty($_GET['filtro_empresa'])) {
-        $where[] = "id_empresa = ?";
+        $where[] = "c.id_empresa = ?";
         $params[] = $_GET['filtro_empresa'];
     }
     if (!empty($_GET['filtro_convenio'])) {
-        $where[] = "id_convenio = ?";
+        $where[] = "c.id_convenio = ?";
         $params[] = $_GET['filtro_convenio'];
     }
     if (!empty($_GET['filtro_fecha_desde'])) {
@@ -61,7 +61,18 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+    // Procesar referencia para cada fila
+    $dataFinal = [];
+    foreach ($data as $row) {
+        if (!empty($row['id_empresa']) && !empty($row['nombre_comercial'])) {
+            $row['referencia'] = $row['nombre_comercial'];
+        } elseif (!empty($row['id_convenio']) && !empty($row['nombre_convenio'])) {
+            $row['referencia'] = $row['nombre_convenio'];
+        } else {
+            $row['referencia'] = 'Particular';
+        }
+        $dataFinal[] = $row;
+    }
     // Total filtrado
     $totalFiltered = $pdo->query("SELECT FOUND_ROWS()") ->fetchColumn();
     // Total general
@@ -74,7 +85,7 @@ try {
             "draw" => $draw,
             "recordsTotal" => intval($totalRecords),
             "recordsFiltered" => intval($totalFiltered),
-            "data" => $data,
+            "data" => $dataFinal,
             "debug_sql" => $sql,
             "debug_params" => $params,
             "debug_session" => $_SESSION,
@@ -88,7 +99,7 @@ try {
         "draw" => $draw,
         "recordsTotal" => intval($totalRecords),
         "recordsFiltered" => intval($totalFiltered),
-        "data" => $data
+        "data" => $dataFinal
     ]);
     exit;
 } catch (Exception $e) {

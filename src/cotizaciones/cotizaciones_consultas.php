@@ -45,6 +45,16 @@ $stmt->execute($params);
 
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Normalizar campos de empresa/convenio para cada cotización (para cards móviles)
+foreach ($cotizaciones as &$cot) {
+    $cot['id_empresa'] = $cot['id_empresa'] ?? null;
+    $cot['nombre_comercial'] = $cot['nombre_comercial'] ?? null;
+    $cot['razon_social'] = $cot['razon_social'] ?? null;
+    $cot['id_convenio'] = $cot['id_convenio'] ?? null;
+    $cot['nombre_convenio'] = $cot['nombre_convenio'] ?? null;
+}
+unset($cot);
+
 // Consulta para exámenes de cada cotización
 $examenesPorCotizacion = [];
 if ($cotizaciones) {

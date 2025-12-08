@@ -758,10 +758,11 @@ $(document).ready(function() {
                 "render": function(data, type, row) {
                     let btns = `<div class='btn-group gap-2' role='group' style='display: flex;'>`;
                     btns += `<a href='dashboard.php?vista=form_cliente&id=${row.id}' class='btn btn-warning btn-sm' title='Editar'><i class='bi bi-pencil-square'></i></a>`;
-                    btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm("¿Seguro de eliminar este paciente?");'><i class='bi bi-trash'></i></a>`;
-                    if (["recepcionista", "admin"].includes("${rol}")) {
-                        btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
-                    }
+                    btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm(\"¿Seguro de eliminar este paciente?\");'><i class='bi bi-trash'></i></a>`;
+                    // El rol se debe tomar del contexto PHP, no como string literal
+                    <?php if (in_array($rol, ['admin', 'recepcionista'])): ?>
+                    btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
+                    <?php endif; ?>
                     btns += `</div>`;
                     return btns;
                 }
