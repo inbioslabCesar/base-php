@@ -159,20 +159,23 @@
         $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
             tabla.ajax.reload();
         });
-    document.addEventListener('DOMContentLoaded', function() {
-        const selectAll = document.getElementById('selectAllCotizaciones');
-        const checkboxes = document.querySelectorAll('.cotizacion-checkbox');
+    $(function() {
         const btnPagoMasivo = document.getElementById('btnPagoMasivo');
         const totalPagoMasivo = document.getElementById('totalPagoMasivo');
         const modalTotalPago = document.getElementById('modalTotalPago');
         const cantidadSeleccionadas = document.getElementById('cantidadSeleccionadas');
         const confirmarPagoMasivo = document.getElementById('confirmarPagoMasivo');
+        const selectAll = document.getElementById('selectAllCotizaciones');
+
+        function getCheckboxes() {
+            return Array.from(document.querySelectorAll('.cotizacion-checkbox'));
+        }
 
         function actualizarTotal() {
             let total = 0;
             let count = 0;
             let algunoSeleccionado = false;
-            checkboxes.forEach(cb => {
+            getCheckboxes().forEach(cb => {
                 if (cb.checked) {
                     total += parseFloat(cb.getAttribute('data-saldo'));
                     count++;
@@ -185,19 +188,25 @@
             cantidadSeleccionadas.textContent = count;
         }
 
+        // Evento delegado para checkboxes
+        $(document).on('change', '.cotizacion-checkbox', function() {
+            actualizarTotal();
+            if (!this.checked) selectAll.checked = false;
+            if (getCheckboxes().length > 0 && getCheckboxes().every(c => c.checked)) selectAll.checked = true;
+        });
+
+        // Evento para selectAll
         selectAll.addEventListener('change', function() {
-            checkboxes.forEach(cb => {
+            getCheckboxes().forEach(cb => {
                 cb.checked = selectAll.checked;
             });
             actualizarTotal();
         });
 
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', function() {
-                actualizarTotal();
-                if (!cb.checked) selectAll.checked = false;
-                if ([...checkboxes].every(c => c.checked)) selectAll.checked = true;
-            });
+        // Actualizar total cada vez que se dibuja la tabla
+        $('#tablaCotizaciones').on('draw.dt', function() {
+            selectAll.checked = false;
+            actualizarTotal();
         });
 
         // Actualizar datos del modal al abrirlo
@@ -207,12 +216,11 @@
 
         // Lógica para confirmar pago masivo
         confirmarPagoMasivo.addEventListener('click', function() {
-            const seleccionadas = Array.from(checkboxes)
+            const seleccionadas = getCheckboxes()
                 .filter(cb => cb.checked)
                 .map(cb => cb.getAttribute('data-id'));
             if (seleccionadas.length === 0) return;
 
-            // Enviar por AJAX al backend
             fetch('cotizaciones/pago_masivo.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

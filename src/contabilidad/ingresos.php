@@ -34,6 +34,7 @@ if ($tipo_paciente == 'convenio') {
 
 // Consulta de cotizaciones con SUMA de pagos (puede ser 0)
 
+// Consulta de cotizaciones con SUMA de pagos (puede ser 0)
 $stmt = $pdo->prepare("
     SELECT 
         c.id AS id_cotizacion,
@@ -58,6 +59,14 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute($params);
 $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Inicializar totales
+$total_adelanto = 0;
+$total_deuda = 0;
+foreach ($registros as $r) {
+    $total_adelanto += floatval($r['total_pagado']);
+    $total_deuda += floatval($r['total_cotizacion']) - floatval($r['total_pagado']);
+}
 ?>
 <div class="container mt-4">
     <h3 class="mb-4">Reporte de Deudas y Adelantos</h3>
@@ -126,91 +135,7 @@ $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </tr>
             </thead>
             <tbody>
-                <?php
-                $total_deuda = 0;
-                $total_adelanto = 0;
-                foreach ($registros as $row):
-                    $total_cotizacion = floatval($row['total_cotizacion']);
-                    $adelanto = floatval($row['total_pagado'] ?? 0);
-                    $deuda = $total_cotizacion - $adelanto;
-                    $total_deuda += $deuda;
-                    $total_adelanto += $adelanto;
-                ?>
-                    <tr>
-                        <td><?= htmlspecialchars($row['codigo_cotizacion']) ?></td>
-                        <td><?= htmlspecialchars($row['fecha']) ?></td>
-                        <td>
-                            <?php
-                            if (!empty($row['metodo_pago'])) {
-                                $metodos = explode(',', $row['metodo_pago']);
-                                foreach ($metodos as $metodo) {
-                                    $metodo = trim($metodo);
-                                    switch (strtolower($metodo)) {
-                                        case 'efectivo':
-                                            $badge = 'success';
-                                            break;
-                                        case 'transferencia':
-                                            $badge = 'primary';
-                                            break;
-                                        case 'yape':
-                                            $badge = 'info';
-                                            break;
-                                        case 'tarjeta':
-                                            $badge = 'warning text-dark';
-                                            break;
-                                        case 'descarga_anticipada':
-                                            $badge = 'dark';
-                                            break;
-                                        default:
-                                            $badge = 'secondary';
-                                    }
-                                    echo '<span class="badge bg-' . $badge . ' me-1">' . htmlspecialchars(ucfirst($metodo)) . '</span>';
-                                }
-                            } else {
-                                echo '<span class="badge bg-secondary">Sin información</span>';
-                            }
-                            ?>
-                        </td>
-
-                        <td><?= htmlspecialchars($row['nombre'] . ' ' . $row['apellido']) ?></td>
-                        <td>
-                            <?php
-                            if (!empty($row['id_empresa'])) {
-                                echo 'Empresa';
-                            } elseif (!empty($row['id_convenio'])) {
-                                echo 'Convenio';
-                            } else {
-                                echo 'Particular';
-                            }
-                            ?>
-                        </td>
-                        <td>
-                            <?php
-                            if (!empty($row['id_empresa']) && !empty($row['nombre_empresa'])) {
-                                echo '<span class="badge bg-info text-dark">' . htmlspecialchars($row['nombre_empresa']) . '</span>';
-                            } elseif (!empty($row['id_convenio']) && !empty($row['nombre_convenio'])) {
-                                echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($row['nombre_convenio']) . '</span>';
-                            } else {
-                                echo '<span class="badge bg-secondary">Particular</span>';
-                            }
-                            ?>
-                        </td>
-                        <td>S/ <?= number_format($total_cotizacion, 2) ?></td>
-                        <td>S/ <?= number_format($adelanto, 2) ?></td>
-                        <td>
-                            <?php if ($deuda > 0): ?>
-                                <span class="badge bg-danger">S/ <?= number_format($deuda, 2) ?></span>
-                            <?php else: ?>
-                                <span class="badge bg-success">Sin deuda</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php if (!$registros): ?>
-                    <tr>
-                        <td colspan="8" class="text-center">No hay registros en el periodo.</td>
-                    </tr>
-                <?php endif; ?>
+                <!-- El contenido será llenado dinámicamente por DataTables server-side -->
             </tbody>
             <tfoot>
                 <tr class="table-info fw-bold">
@@ -240,14 +165,36 @@ $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Inicialización de DataTables con botones de exportación -->
     <script>
         $(document).ready(function() {
-            $('#tablaIngresos').DataTable({
-                "pageLength": 10,
-                "lengthMenu": [5, 10, 25, 50, 100],
-                "pageLength": 5,
-                "lengthMenu": [[5, 10, 25, 50], [5, 10, 25, 50]],
-                "language": {
-                    "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+            var tabla = $('#tablaIngresos').DataTable({
+                serverSide: true,
+                processing: true,
+                ajax: {
+                    url: 'dashboard.php?action=ingresos_api',
+                    type: 'GET',
+                    data: function(d) {
+                        d.desde = $('input[name="desde"]').val();
+                        d.hasta = $('input[name="hasta"]').val();
+                        d.tipo_paciente = $('select[name="tipo_paciente"]').val();
+                        d.filtro_convenio = $('select[name="filtro_convenio"]').val();
+                        d.filtro_empresa = $('select[name="filtro_empresa"]').val();
+                    }
                 },
+                pageLength: 3,
+                lengthMenu: [3, 5, 10],
+                language: {
+                    url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+                },
+                columns: [
+                    { data: 'codigo_cotizacion' },
+                    { data: 'fecha' },
+                    { data: 'metodo_pago' },
+                    { data: 'cliente' },
+                    { data: 'tipo_paciente' },
+                    { data: 'referencia' },
+                    { data: 'total_cotizacion' },
+                    { data: 'adelanto' },
+                    { data: 'deuda' }
+                ],
                 dom: 'Bfrtip',
                 buttons: [{
                         extend: 'excelHtml5',
@@ -273,6 +220,10 @@ $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         className: 'btn btn-info mb-2'
                     }
                 ]
+            });
+            // Filtros avanzados: recargar tabla al cambiar filtros
+            $('input[name="desde"], input[name="hasta"], select[name="tipo_paciente"], select[name="filtro_convenio"], select[name="filtro_empresa"]').on('change', function() {
+                tabla.ajax.reload();
             });
         });
     </script>

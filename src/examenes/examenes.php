@@ -33,94 +33,7 @@ function capitalizar($texto)
                 </tr>
             </thead>
             <tbody>
-                <?php if ($examenes): ?>
-                    <?php foreach ($examenes as $examen): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($examen['codigo'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars(capitalizar($examen['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars(capitalizar($examen['area'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars(capitalizar($examen['metodologia'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                            <td>S/.<?= htmlspecialchars($examen['precio_publico'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td><?= htmlspecialchars($examen['tiempo_respuesta'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                            <td class="text-center">
-                                <button type="button" class="btn btn-info btn-sm rounded-circle" title="Ver detalle"
-                                    data-bs-toggle="modal" data-bs-target="#modalDetalle<?= $examen['id'] ?>">
-                                    <i class="fa fa-search"></i>
-                                </button>
-                                <!-- Modal Detalle -->
-                                <div class="modal fade" id="modalDetalle<?= $examen['id'] ?>" tabindex="-1" aria-labelledby="modalLabel<?= $examen['id'] ?>" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered modal-lg">
-                                        <div class="modal-content shadow-lg border-0">
-                                            <div class="modal-header bg-primary text-white">
-                                                <h5 class="modal-title fw-bold" id="modalLabel<?= $examen['id'] ?>">
-                                                    <i class="fa fa-flask me-2"></i>Detalle del Examen
-                                                </h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                                            </div>
-                                            <div class="modal-body bg-light">
-                                                <div class="table-responsive">
-                                                    <table class="table table-bordered align-middle mb-4" style="background: #fff; border-radius: 12px; overflow: hidden;">
-                                                        <tbody>
-                                                            <tr>
-                                                                <th class="text-primary">Código</th>
-                                                                <td><?= htmlspecialchars($examen['codigo'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                                                <th class="text-primary">Preanalítica Cliente</th>
-                                                                <td><?= htmlspecialchars($examen['preanalitica_cliente'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <th class="text-primary">Tipo de Muestra</th>
-                                                                <td><?= htmlspecialchars($examen['tipo_muestra'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                                                <th class="text-primary">Preanalítica Referencias</th>
-                                                                <td><?= htmlspecialchars($examen['preanalitica_referencias'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                                            </tr>
-                                                            <tr>
-                                                                <th class="text-primary">Tipo de Tubo</th>
-                                                                <td><?= htmlspecialchars($examen['tipo_tubo'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                                                                <th class="text-primary">Vigente</th>
-                                                                <td><span class="badge bg-<?= (isset($examen['vigente']) && $examen['vigente']) ? 'success' : 'danger' ?> ms-1"><?= isset($examen['vigente']) && $examen['vigente'] ? 'Sí' : 'No' ?></span></td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <span class="fw-semibold text-primary">Descripción:</span><br>
-                                                    <span class="text-dark small"><?= nl2br(htmlspecialchars($examen['descripcion'] ?? '', ENT_QUOTES, 'UTF-8')) ?></span>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <span class="fw-semibold text-primary">Observaciones:</span><br>
-                                                    <span class="text-dark small"><?= nl2br(htmlspecialchars($examen['observaciones'] ?? '', ENT_QUOTES, 'UTF-8')) ?></span>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer bg-white border-0 d-flex justify-content-end">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-dismiss="modal" title="Cerrar">
-                                                    <i class="fa fa-times"></i>
-                                                </button>
-                                                <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm ms-2" title="Editar">
-                                                    <i class="fa fa-edit"></i>
-                                                </a>
-                                                <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm ms-2" title="Eliminar" onclick="return confirm('¿Estás seguro de eliminar este examen?');">
-                                                    <i class="fa fa-trash"></i>
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="d-flex gap-2 justify-content-center">
-                                <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm" title="Editar">
-                                    <i class="fa fa-edit"></i>
-                                </a>
-                                <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm('¿Estás seguro de eliminar este examen?');">
-                                    <i class="fa fa-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="8">No hay exámenes registrados.</td>
-                    </tr>
-                <?php endif; ?>
+                <!-- El contenido de la tabla será llenado dinámicamente por DataTables server-side -->
             </tbody>
         </table>
     </div>
@@ -327,13 +240,50 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
 <script>
     $(document).ready(function() {
         $('#tabla-examenes').DataTable({
+            serverSide: true,
+            processing: true,
+            ajax: {
+                url: 'dashboard.php?action=examenes_api',
+                type: 'GET'
+            },
             pageLength: 5,
             lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
             dom: 'Bfrtip',
-            buttons: [{
+            columns: [
+                { data: 'codigo' },
+                { data: 'nombre', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+                { data: 'area', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+                { data: 'metodologia', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+                { data: 'precio_publico', render: function(data) { return 'S/.' + data; } },
+                { data: 'tiempo_respuesta' },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        return `<button type="button" class="btn btn-info btn-sm rounded-circle" title="Ver detalle"
+                            data-bs-toggle="modal" data-bs-target="#modalDetalle${row.id}">
+                            <i class="fa fa-search"></i>
+                        </button>`;
+                    }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        return `<a href="dashboard.php?vista=form_examen&id=${row.id}" class="btn btn-warning btn-sm" title="Editar">
+                                    <i class="fa fa-edit"></i>
+                                </a>
+                                <a href="dashboard.php?action=eliminar_examen&id=${row.id}" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm('¿Estás seguro de eliminar este examen?');">
+                                    <i class="fa fa-trash"></i>
+                                </a>`;
+                    }
+                }
+            ],
+            buttons: [
+                {
                     extend: 'excelHtml5',
                     text: 'Exportar Excel',
                     className: 'btn btn-success'

@@ -39,33 +39,8 @@ function capitalizar($texto) {
                 </tr>
             </thead>
             <tbody>
-            <?php if ($usuarios): ?>
-                <?php foreach ($usuarios as $usuario): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($usuario['id'], ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($usuario['nombre'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($usuario['apellido'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($usuario['sexo'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['fecha_nacimiento'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['cargo'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars($usuario['profesion'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($usuario['rol'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td><?= htmlspecialchars(capitalizar($usuario['estado'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                        <td>
-                            <a href="dashboard.php?vista=form_usuario&id=<?= $usuario['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                            <a href="dashboard.php?action=eliminar_usuario&id=<?= $usuario['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este usuario?');">Eliminar</a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr>
-                    <td colspan="14">No hay usuarios registrados.</td>
-                </tr>
-            <?php endif; ?>
+            <tbody>
+                <!-- El contenido será llenado dinámicamente por DataTables server-side -->
             </tbody>
         </table>
     </div>
@@ -87,11 +62,46 @@ function capitalizar($texto) {
 <script>
 $(document).ready(function() {
     $('#tabla-usuarios').DataTable({
-        pageLength: 5,
-        lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: 'dashboard.php?action=usuarios_api',
+            type: 'GET'
+        },
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50], [10, 25, 50]],
         language: {
             url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         },
+        columns: [
+            { data: 'id' },
+            { data: 'nombre', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'apellido', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'dni' },
+            { data: 'sexo', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'fecha_nacimiento' },
+            { data: 'email' },
+            { data: 'telefono' },
+            { data: 'direccion' },
+            { data: 'cargo' },
+            { data: 'profesion' },
+            { data: 'rol', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'estado', render: function(data) {
+                if (data === 'activo') {
+                    return `<span class='badge bg-success'>Activo</span>`;
+                } else {
+                    return `<span class='badge bg-danger'>Inactivo</span>`;
+                }
+            } },
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    return `<a href='dashboard.php?vista=form_usuario&id=${row.id}' class='btn btn-warning btn-sm'>Editar</a>
+                            <a href='dashboard.php?action=eliminar_usuario&id=${row.id}' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este usuario?\");'>Eliminar</a>`;
+                }
+            }
+        ],
         dom: 'Bfrtip',
         buttons: [
             {

@@ -2,6 +2,49 @@
 // Incluye la conexión correctamente desde dos carpetas arriba
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../config/config.php';
+// Función para contar usuarios (total y filtrados)
+function usuarios_count($search = '') {
+    global $pdo;
+    if ($search !== '') {
+        $sql = "SELECT COUNT(*) FROM usuarios WHERE nombre LIKE ? OR apellido LIKE ? OR usuario LIKE ? OR rol LIKE ? OR email LIKE ?";
+        $stmt = $pdo->prepare($sql);
+        $searchLike = "%$search%";
+        $stmt->execute([$searchLike, $searchLike, $searchLike, $searchLike, $searchLike]);
+        return (int)$stmt->fetchColumn();
+    } else {
+        $sql = "SELECT COUNT(*) FROM usuarios";
+        return (int)$pdo->query($sql)->fetchColumn();
+    }
+}
+
+// Listar usuarios paginados y ordenados
+function usuarios_listar($orderBy = 'id', $orderDir = 'asc', $start = 0, $length = 10) {
+    global $pdo;
+    $orderBy = in_array($orderBy, ['id','nombre','apellido','usuario','rol','email','estado','fecha_creacion']) ? $orderBy : 'id';
+    $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
+    $sql = "SELECT * FROM usuarios ORDER BY $orderBy $orderDir LIMIT :start, :length";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+    $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Buscar usuarios paginados y ordenados
+function usuarios_buscar($search, $orderBy = 'id', $orderDir = 'asc', $start = 0, $length = 10) {
+    global $pdo;
+    $orderBy = in_array($orderBy, ['id','nombre','apellido','usuario','rol','email','estado','fecha_creacion']) ? $orderBy : 'id';
+    $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
+    $sql = "SELECT * FROM usuarios WHERE nombre LIKE :search OR apellido LIKE :search OR usuario LIKE :search OR rol LIKE :search OR email LIKE :search ORDER BY $orderBy $orderDir LIMIT :start, :length";
+    $stmt = $pdo->prepare($sql);
+    $searchLike = "%$search%";
+    $stmt->bindValue(':search', $searchLike, PDO::PARAM_STR);
+    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+    $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+// ...existing code...
 
 // FUNCIONES CRUD
 function obtenerTodosLosUsuarios() {
@@ -19,7 +62,7 @@ function obtenerUsuarioPorId($id) {
 }
 
 // REGISTRO DE USUARIO
-if (isset($_POST['registrar_usuario'])) {
+if (php_sapi_name() !== 'cli' && isset($_POST['registrar_usuario']) && !isset($_GET['action'])) {
     $nombre = trim($_POST['nombre']);
     $apellido = trim($_POST['apellido']);
     $dni = trim($_POST['dni']);
@@ -75,7 +118,7 @@ if (isset($_POST['registrar_usuario'])) {
 }
 
 // ACTUALIZAR USUARIO
-if (isset($_POST['actualizar_usuario'])) {
+if (php_sapi_name() !== 'cli' && isset($_POST['actualizar_usuario']) && !isset($_GET['action'])) {
     $id = $_POST['id'];
     $nombre = trim($_POST['nombre']);
     $apellido = trim($_POST['apellido']);
@@ -136,7 +179,7 @@ if (isset($_POST['actualizar_usuario'])) {
 }
 
 // ELIMINAR USUARIO
-if (isset($_GET['eliminar_usuario'])) {
+if (php_sapi_name() !== 'cli' && isset($_GET['eliminar_usuario']) && !isset($_GET['action'])) {
     $id = $_GET['eliminar_usuario'];
     $sql = "DELETE FROM usuarios WHERE id=?";
     $stmt = $pdo->prepare($sql);

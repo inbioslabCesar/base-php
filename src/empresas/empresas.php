@@ -37,31 +37,7 @@ function capitalizar($texto) {
     </tr>
 </thead>
 <tbody>
-<?php if ($empresas): ?>
-    <?php foreach ($empresas as $empresa): ?>
-        <tr>
-            <td><?= htmlspecialchars($empresa['id'], ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['ruc'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars(capitalizar($empresa['razon_social'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars(capitalizar($empresa['nombre_comercial'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['direccion'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['telefono'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars(capitalizar($empresa['representante'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['convenio'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars(capitalizar($empresa['estado'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($empresa['descuento'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
-            <td>
-                <a href="dashboard.php?vista=form_empresa&id=<?= $empresa['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                <a href="dashboard.php?action=eliminar_empresa&id=<?= $empresa['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar esta empresa?');">Eliminar</a>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-<?php else: ?>
-    <tr>
-        <td colspan="12">No hay empresas registradas.</td>
-    </tr>
-<?php endif; ?>
+    <!-- El contenido será llenado dinámicamente por DataTables server-side -->
 </tbody>
         </table>
     </div>
@@ -83,11 +59,44 @@ function capitalizar($texto) {
 <script>
 $(document).ready(function() {
     $('#tabla-empresas').DataTable({
-        pageLength: 5,
-        lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: 'dashboard.php?action=empresas_api',
+            type: 'GET'
+        },
+        pageLength: 3,
+        lengthMenu: [[3, 5, 10], [3, 5, 10]],
         language: {
             url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         },
+        columns: [
+            { data: 'id' },
+            { data: 'ruc' },
+            { data: 'razon_social', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'nombre_comercial', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'direccion' },
+            { data: 'telefono' },
+            { data: 'email' },
+            { data: 'representante', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'convenio' },
+            { data: 'estado', render: function(data) {
+                if (data === 'activo') {
+                    return `<span class='badge bg-success'>Activo</span>`;
+                } else {
+                    return `<span class='badge bg-danger'>Inactivo</span>`;
+                }
+            } },
+            { data: 'descuento', render: function(data) { return data ? data + ' %' : '0 %'; } },
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    return `<a href='dashboard.php?vista=form_empresa&id=${row.id}' class='btn btn-warning btn-sm'>Editar</a>
+                            <a href='dashboard.php?action=eliminar_empresa&id=${row.id}' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar esta empresa?\");'>Eliminar</a>`;
+                }
+            }
+        ],
         dom: 'Bfrtip',
         buttons: [
             {

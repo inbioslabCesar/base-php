@@ -36,23 +36,7 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($convenios as $c): ?>
-                <tr>
-                    <td><?= $c['id'] ?></td>
-                    <td><?= htmlspecialchars(capitalizar($c['nombre'])) ?></td>
-                    <td><?= htmlspecialchars($c['dni']) ?></td>
-                    <td><?= htmlspecialchars(capitalizar($c['especialidad'])) ?></td>
-                    <td><?= htmlspecialchars($c['descuento'] ?? '') ?></td>
-                    <td><?= htmlspecialchars(capitalizar($c['descripcion'])) ?></td>
-                    <td><?= htmlspecialchars(strtolower($c['email'])) ?></td>
-                    <td>
-                        <a href="dashboard.php?vista=form_convenio&id=<?= $c['id'] ?>" class="btn btn-primary btn-sm">Editar</a>
-                        <a href="dashboard.php?action=eliminar_convenio&id=<?= $c['id'] ?>"
-                           class="btn btn-danger btn-sm"
-                           onclick="return confirm('¿Estás seguro de eliminar este convenio?')">Eliminar</a>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
+                <!-- El contenido será llenado dinámicamente por DataTables server-side -->
             </tbody>
         </table>
     </div>
@@ -77,11 +61,34 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script>
 $(document).ready(function() {
     $('#tabla-convenios').DataTable({
-                pageLength: 5,
-                lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-                },
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: 'dashboard.php?action=convenios_api',
+            type: 'GET'
+        },
+        pageLength: 3,
+        lengthMenu: [[3, 5, 10], [3, 5, 10]],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+        },
+        columns: [
+            { data: 'id' },
+            { data: 'nombre', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'dni' },
+            { data: 'especialidad', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'descuento', render: function(data) { return data ? data + ' %' : '0 %'; } },
+            { data: 'descripcion', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
+            { data: 'email' },
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    return `<a href='dashboard.php?vista=form_convenio&id=${row.id}' class='btn btn-primary btn-sm'>Editar</a>
+                            <a href='dashboard.php?action=eliminar_convenio&id=${row.id}' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este convenio?\");'>Eliminar</a>`;
+                }
+            }
+        ],
         dom: 'Bfrtip',
         buttons: [
             { extend: 'excel', text: 'Exportar Excel', className: 'btn btn-success' },
