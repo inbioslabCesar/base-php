@@ -101,6 +101,13 @@
                                         <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm mb-1" title="Ver cotización">
                                             <i class="bi bi-eye"></i>
                                         </a>
+                                            <?php if (!defined('BASE_URL')) require_once __DIR__ . '/../config/config.php'; ?>
+                                            <a href="dashboard.php?vista=form_cotizacion&id=<?= $cotizacion['id'] ?>&edit=1" class="btn btn-dark btn-sm mb-1" title="Editar cotización">
+                                                <i class="bi bi-file-earmark-medical"></i> Editar cotización
+                                            </a>
+                                            <?php if (!empty($cotizacion['modificada']) && $cotizacion['modificada'] == 1): ?>
+                                                <span class="badge bg-warning text-dark ms-1" title="Cotización modificada"><i class="bi bi-pencil"></i> Modificada</span>
+                                            <?php endif; ?>
                                     <?php endif; ?>
                                     <?php if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista'): ?>
                                         <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-primary btn-sm mb-1" title="Editar o agregar resultados">

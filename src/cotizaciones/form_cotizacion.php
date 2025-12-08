@@ -1,27 +1,16 @@
 
 <?php
-
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 
-// Rol y cliente
 $rol = $_SESSION['rol'] ?? null;
-if ($rol === 'cliente') {
-    $id_cliente = $_SESSION['cliente_id'] ?? '';
-} else {
-    $id_cliente = isset($_GET['id']) ? intval($_GET['id']) : '';
-}
+$isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
+$cotizacionData = null;
+$examenesCotizacion = [];
 
-// Validar cliente
-if (empty($id_cliente)) {
-    echo "<div class='alert alert-danger mt-4'>No se pudo identificar al cliente. Por favor, vuelve al listado de clientes.</div>";
-    exit;
-}
-
-// Exámenes
+// Exámenes catálogo
 $stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico FROM examenes WHERE vigente = 1 ORDER BY nombre");
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $examenes_json = json_encode($examenes);
@@ -32,9 +21,40 @@ $convenios = [];
 if ($rol === 'admin' || $rol === 'recepcionista') {
     $stmtEmp = $pdo->query("SELECT id, razon_social, nombre_comercial, descuento FROM empresas WHERE estado = 1 ORDER BY nombre_comercial");
     $empresas = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
-
     $stmtConv = $pdo->query("SELECT id, nombre, descuento FROM convenios ORDER BY nombre");
     $convenios = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Si es edición, cargar datos de la cotización y sus exámenes
+if ($isEdit) {
+    $id_cotizacion = intval($_GET['id']);
+    // Cotización principal
+    $stmtCot = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
+    $stmtCot->execute([$id_cotizacion]);
+    $cotizacionData = $stmtCot->fetch(PDO::FETCH_ASSOC);
+    if (!$cotizacionData) {
+        echo "<div class='alert alert-danger mt-4'>No se encontró la cotización a editar.</div>";
+        exit;
+    }
+    // Exámenes de la cotización
+    $stmtDet = $pdo->prepare("SELECT * FROM cotizaciones_detalle WHERE id_cotizacion = ?");
+    $stmtDet->execute([$id_cotizacion]);
+    $examenesCotizacion = $stmtDet->fetchAll(PDO::FETCH_ASSOC);
+    // Cliente asociado
+    $id_cliente = $cotizacionData['id_cliente'];
+} else {
+    // Alta normal
+    if ($rol === 'cliente') {
+        $id_cliente = $_SESSION['cliente_id'] ?? '';
+    } else {
+        $id_cliente = isset($_GET['id']) ? intval($_GET['id']) : '';
+    }
+}
+
+// Validar cliente
+if (empty($id_cliente)) {
+    echo "<div class='alert alert-danger mt-4'>No se pudo identificar al cliente. Por favor, vuelve al listado de clientes.</div>";
+    exit;
 }
 
 // Descuentos
@@ -55,9 +75,12 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
     $descuento_empresa_convenio = $stmtDesc->fetchColumn() ?: 0;
 }
 ?>
+
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<!-- jQuery debe ir antes de cualquier script que use '$' -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 
 <style>
     /* Forzar color de texto en las opciones del dropdown de Select2 al hacer hover */
@@ -495,20 +518,48 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
 /* Responsive */
 @media (max-width: 768px) {
     .cotizacion-container {
-        padding: 1rem 0;
+        padding: 0.5rem 0;
     }
-    
     .cotizacion-body {
-        padding: 1rem;
+        padding: 0.5rem;
     }
-    
     .footer-cotizacion .container {
         flex-direction: column;
         gap: 1rem;
     }
-    
     .total-section {
         text-align: center;
+    }
+    .examenes-table {
+        border-radius: 10px;
+        box-shadow: none;
+        margin-bottom: 0.5rem;
+    }
+    .examenes-table .table {
+        font-size: 0.92rem;
+    }
+    .examenes-table thead th, .examenes-table tbody td {
+        padding: 0.5rem 0.3rem;
+    }
+    .examenes-table thead th:nth-child(2),
+    .examenes-table tbody td:nth-child(2) {
+        width: 65px !important;
+        min-width: 55px !important;
+        max-width: 75px !important;
+        text-align: center;
+    }
+    .examenes-table tbody td {
+        vertical-align: middle;
+    }
+    .btn-remove {
+        min-width: 32px;
+        min-height: 32px;
+        padding: 0.25rem 0.5rem;
+        font-size: 1.1rem;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 }
 </style>
@@ -518,9 +569,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
             <div class="cotizacion-header">
                 <h3>
                     <i class="bi bi-file-earmark-medical"></i>
-                    Nueva Cotización
+                    <?php if ($isEdit): ?>Editar Cotización<?php else: ?>Nueva Cotización<?php endif; ?>
                 </h3>
-                <p class="mb-0 opacity-75">Selecciona los exámenes y configura los detalles de la cotización</p>
+                <p class="mb-0 opacity-75">
+                    <?php if ($isEdit): ?>Modifica los datos y exámenes de la cotización seleccionada<?php else: ?>Selecciona los exámenes y configura los detalles de la cotización<?php endif; ?>
+                </p>
             </div>
             
             <div class="cotizacion-body">
@@ -529,7 +582,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     <strong>Importante:</strong> Después de guardar la cotización, podrás agendar la cita para la toma de muestra.
                 </div>
 
-                <form action="dashboard.php?action=crear_cotizacion" method="POST" id="formCotizacion">
+                <form action="cotizaciones/<?= $isEdit ? 'editar_cotizacion.php' : 'crear_cotizacion.php' ?>" method="POST" id="formCotizacion">
+
+                    <?php if ($isEdit): ?>
+                        <input type="hidden" name="id_cotizacion" value="<?= htmlspecialchars($cotizacionData['id']) ?>">
+                    <?php endif; ?>
                     <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
                     <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="<?= $descuento_empresa_convenio ?: $descuento_cliente ?>">
 
@@ -550,15 +607,15 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                     </label>
                                     <select id="tipoCliente" name="tipo_usuario" class="form-select form-select-modern" required>
                                         <option value="">Seleccione...</option>
-                                        <option value="cliente">
+                                        <option value="cliente" <?= ($isEdit && $cotizacionData['tipo_usuario'] == 'cliente') ? 'selected' : '' ?>>
                                             <i class="bi bi-person"></i>
                                             Particular
                                         </option>
-                                        <option value="empresa">
+                                        <option value="empresa" <?= ($isEdit && $cotizacionData['tipo_usuario'] == 'empresa') ? 'selected' : '' ?>>
                                             <i class="bi bi-building"></i>
                                             Empresa
                                         </option>
-                                        <option value="convenio">
+                                        <option value="convenio" <?= ($isEdit && $cotizacionData['tipo_usuario'] == 'convenio') ? 'selected' : '' ?>>
                                             <i class="bi bi-handshake"></i>
                                             Convenio
                                         </option>
@@ -575,7 +632,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                     <select id="empresa" name="id_empresa" class="form-select form-select-modern">
                                         <option value="">Seleccione empresa...</option>
                                         <?php foreach ($empresas as $emp): ?>
-                                            <option value="<?= $emp['id'] ?>" data-descuento="<?= $emp['descuento'] ?>">
+                                            <option value="<?= $emp['id'] ?>" data-descuento="<?= $emp['descuento'] ?>" <?= ($isEdit && $cotizacionData['id_empresa'] == $emp['id']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
                                                 <?php if ($emp['descuento'] > 0): ?>
                                                     <span class="descuento-badge"><?= $emp['descuento'] ?>% desc.</span>
@@ -595,7 +652,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                     <select id="convenio" name="id_convenio" class="form-select form-select-modern">
                                         <option value="">Seleccione convenio...</option>
                                         <?php foreach ($convenios as $conv): ?>
-                                            <option value="<?= $conv['id'] ?>" data-descuento="<?= $conv['descuento'] ?>">
+                                            <option value="<?= $conv['id'] ?>" data-descuento="<?= $conv['descuento'] ?>" <?= ($isEdit && $cotizacionData['id_convenio'] == $conv['id']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($conv['nombre']) ?>
                                                 <?php if ($conv['descuento'] > 0): ?>
                                                     <span class="descuento-badge"><?= $conv['descuento'] ?>% desc.</span>
@@ -646,6 +703,61 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     </div>
 
                     <div id="examenes-seleccionados" class="fade-in-up"></div>
+                <!-- El bloque de precarga de exámenes en modo edición se movió al final del archivo para asegurar que jQuery esté cargado -->
+                </form>
+                </div>
+                </div>
+                </div>
+                </div>
+                
+                <!-- Footer fijo mejorado -->
+
+
+                <!-- Precarga de exámenes seleccionados en modo edición: debe ir después de todos los scripts externos -->
+                <?php if ($isEdit): ?>
+                <script>
+                const examenesCotizacion = <?php echo json_encode($examenesCotizacion); ?>;
+                $(document).ready(function() {
+                    // Esperar a que examenesData esté disponible
+                    if (typeof examenesData === 'undefined') {
+                        console.error('examenesData no está disponible');
+                        return;
+                    }
+                    console.log('examenesCotizacion:', examenesCotizacion);
+                    console.log('examenesData:', examenesData);
+                    if (Array.isArray(examenesCotizacion) && examenesCotizacion.length > 0) {
+                        examenesSeleccionados = examenesCotizacion.map(function(ex) {
+                            let info = examenesData.find(e => e.id == ex.id_examen);
+                            return {
+                                id: ex.id_examen,
+                                codigo: info ? info.codigo : '',
+                                nombre: ex.nombre_examen || (info ? info.nombre : ''),
+                                precio_unitario: parseFloat(ex.precio_unitario), // SIEMPRE el precio editado
+                                precio_publico: parseFloat(ex.precio_unitario), // Para edición, igual al editado
+                                cantidad: parseInt(ex.cantidad),
+                                descripcion: info ? info.descripcion : '',
+                                tiempo_respuesta: info ? info.tiempo_respuesta : '',
+                                preanalitica_cliente: info ? info.preanalitica_cliente : '',
+                                observaciones: info ? info.observaciones : ''
+                            };
+                        });
+                    } else {
+                        examenesSeleccionados = [];
+                    }
+                    renderizarLista();
+                    // Mostrar empresa/convenio si corresponde
+                    <?php if ($cotizacionData['tipo_usuario'] == 'empresa'): ?>
+                        $('#tipoCliente').val('empresa').trigger('change');
+                        $('#empresa').val('<?= $cotizacionData['id_empresa'] ?>').trigger('change');
+                    <?php elseif ($cotizacionData['tipo_usuario'] == 'convenio'): ?>
+                        $('#tipoCliente').val('convenio').trigger('change');
+                        $('#convenio').val('<?= $cotizacionData['id_convenio'] ?>').trigger('change');
+                    <?php else: ?>
+                        $('#tipoCliente').val('cliente').trigger('change');
+                    <?php endif; ?>
+                });
+                </script>
+                <?php endif; ?>
                 </form>
             </div>
         </div>
@@ -673,7 +785,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
         <div class="d-flex gap-2">
             <button type="submit" form="formCotizacion" class="btn btn-success-modern btn-modern">
                 <i class="bi bi-check-circle"></i>
-                Guardar Cotización
+                <?php echo $isEdit ? 'Actualizar Cotización' : 'Guardar Cotización'; ?>
             </button>
             <a href="javascript:history.back()" class="btn btn-secondary-modern btn-modern">
                 <i class="bi bi-x-circle"></i>
@@ -709,6 +821,7 @@ let examenesData = <?= $examenes_json ?>;
 let examenesSeleccionados = [];
 let descuentoCliente = <?= $descuento_cliente ?>;
 let descuentoActual = <?= $descuento_empresa_convenio ?: $descuento_cliente ?>;
+let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
 
 // Inicializar descuento y precios al cargar como empresa/convenio
 $(document).ready(function() {
@@ -868,11 +981,17 @@ function actualizarDescuento() {
         }
     }
     $('#descuento_aplicado').val(descuentoActual);
-    // Aplicar descuento a todos los precios
-    examenesSeleccionados.forEach((ex, idx) => {
-        ex.precio_unitario = aplicarDescuento(ex.precio_publico, descuentoActual);
-    });
-    renderizarLista();
+    // Solo aplicar descuento si NO estamos en modo edición
+    if (isEdit) {
+        // En edición, los precios ya están descontados, no recalcular
+        renderizarLista();
+    } else {
+        // En creación, sí aplicar descuento
+        examenesSeleccionados.forEach((ex, idx) => {
+            ex.precio_unitario = aplicarDescuento(ex.precio_publico, descuentoActual);
+        });
+        renderizarLista();
+    }
 }
 
 function aplicarDescuento(precio, descuento) {
@@ -889,10 +1008,12 @@ $('#buscadorExamen').select2({
     width: '100%'
 });
 
+
 $('#buscadorExamen').on('select2:select', function(e) {
     let id = e.params.data.id;
     let examen = examenesData.find(ex => ex.id == id);
-    if (!examenesSeleccionados.find(ex => ex.id == id)) {
+    let existente = examenesSeleccionados.find(ex => ex.id == id);
+    if (!existente) {
         let precioPublico = Number(examen.precio_publico);
         let precioConDescuento = aplicarDescuento(precioPublico, descuentoActual);
         examenesSeleccionados.push({
@@ -900,8 +1021,10 @@ $('#buscadorExamen').on('select2:select', function(e) {
             precio_unitario: precioConDescuento,
             cantidad: 1
         });
-        renderizarLista();
+    } else {
+        existente.cantidad += 1;
     }
+    renderizarLista();
     $(this).val('').trigger('change');
 });
 

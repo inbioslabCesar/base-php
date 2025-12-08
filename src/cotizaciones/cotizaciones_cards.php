@@ -53,6 +53,9 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                         <div>
                             <div class="codigo">📋 <?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></div>
                             <div class="fecha"><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></div>
+                            <?php if (!empty($cotizacion['modificada']) && $cotizacion['modificada'] == 1): ?>
+                                <span class="badge bg-warning text-dark ms-1" title="Cotización modificada"><i class="bi bi-pencil"></i> Modificada</span>
+                            <?php endif; ?>
                         </div>
                         <div class="text-end">
                             <div class="fw-bold fs-5">S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></div>
@@ -102,6 +105,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                     <?php
                     if ($rol === 'admin' || $rol === 'recepcionista') {
                         echo '<a href="dashboard.php?vista=detalle_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-info btn-card-action" title="Ver cotización"><i class="bi bi-eye"></i></a>';
+                        echo '<a href="dashboard.php?vista=form_cotizacion&id=' . $cotizacion['id'] . '&edit=1" class="btn btn-dark btn-card-action" title="Editar cotización"><i class="bi bi-file-earmark-medical"></i></a>';
                     }
                     if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista') {
                         echo '<a href="dashboard.php?vista=formulario&cotizacion_id=' . $cotizacion['id'] . '" class="btn btn-primary btn-card-action" title="Editar o agregar resultados"><i class="bi bi-pencil-square"></i></a>';

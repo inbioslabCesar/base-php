@@ -76,7 +76,6 @@ if ($rol_creador === 'empresa' && !empty($_SESSION['empresa_id'])) {
     $stmtDesc->execute([$id_convenio]);
     $descuento = $stmtDesc->fetchColumn() ?: 0;
 }
-
 // Si el rol es admin/recepcionista y selecciona empresa/convenio en el formulario
 elseif ($tipo_usuario === 'empresa' && $id_empresa) {
     $stmtDesc = $pdo->prepare("SELECT descuento FROM empresas WHERE id = ?");
@@ -90,7 +89,6 @@ elseif ($tipo_usuario === 'empresa' && $id_empresa) {
     // Particular/cliente
     $descuento = 0;
 }
-
 
 // Procesar cada examen y calcular totales
 $total = 0;
@@ -128,63 +126,69 @@ for ($i = 0; $i < count($examenes); $i++) {
     ];
 }
 
-
-
-// SOLO CREAR NUEVA COTIZACION
-$codigo = 'COT-' . strtoupper(uniqid());
-$estado_pago = 'pendiente';
-$fecha = null;
-if (!empty($_POST['fecha_toma']) && !empty($_POST['hora_toma'])) {
-    // Usar la fecha y hora seleccionadas por el usuario
-    $fecha = $_POST['fecha_toma'] . ' ' . $_POST['hora_toma'] . ':00';
+// MODO EDICIÓN: actualizar cotización existente
+if (!empty($_POST['id_cotizacion'])) {
+    $id_cotizacion = intval($_POST['id_cotizacion']);
+    // Si el usuario envía nueva fecha/hora, actualízala; si no, mantén la original
+    $fecha_update = null;
+    if (!empty($_POST['fecha_toma']) && !empty($_POST['hora_toma'])) {
+        $fecha_update = $_POST['fecha_toma'] . ' ' . $_POST['hora_toma'] . ':00';
+    }
+    if ($fecha_update) {
+        $stmt = $pdo->prepare("UPDATE cotizaciones SET id_cliente=?, id_empresa=?, id_convenio=?, tipo_usuario=?, total=?, total_bruto=?, descuento_aplicado=?, fecha=?, modificada=1 WHERE id=?");
+        $stmt->execute([
+            $id_cliente,
+            $id_empresa !== '' ? $id_empresa : null,
+            $id_convenio !== '' ? $id_convenio : null,
+            $tipo_usuario,
+            $total,
+            $total_bruto,
+            $descuento,
+            $fecha_update,
+            $id_cotizacion
+        ]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE cotizaciones SET id_cliente=?, id_empresa=?, id_convenio=?, tipo_usuario=?, total=?, total_bruto=?, descuento_aplicado=?, modificada=1 WHERE id=?");
+        $stmt->execute([
+            $id_cliente,
+            $id_empresa !== '' ? $id_empresa : null,
+            $id_convenio !== '' ? $id_convenio : null,
+            $tipo_usuario,
+            $total,
+            $total_bruto,
+            $descuento,
+            $id_cotizacion
+        ]);
+    }
+    // Eliminar exámenes anteriores
+    $pdo->prepare("DELETE FROM cotizaciones_detalle WHERE id_cotizacion = ?")->execute([$id_cotizacion]);
+    // Insertar nuevos exámenes
+    $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
+    foreach ($detalles as $detalle) {
+        $stmt->execute([
+            $id_cotizacion,
+            $detalle['id_examen'],
+            $detalle['nombre_examen'],
+            $detalle['precio_unitario'],
+            $detalle['cantidad'],
+            $detalle['subtotal']
+        ]);
+    }
+    // Opcional: actualizar resultados_examenes (eliminar e insertar solo los nuevos)
+    $pdo->prepare("DELETE FROM resultados_examenes WHERE id_cotizacion = ?")->execute([$id_cotizacion]);
+    foreach ($detalles as $detalle) {
+        $id_examen = $detalle['id_examen'];
+        $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
+        $stmtRes = $pdo->prepare($sql);
+        $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+    }
+    // Redirigir según el rol
+    $rol = $_SESSION['rol'] ?? null;
+    // Redirigir siempre a la tabla de cotizaciones después de editar
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones");
+    exit;
 } else {
-    // Usar la fecha y hora actual del servidor (zona horaria Lima)
-    date_default_timezone_set('America/Lima');
-    $fecha = date('Y-m-d H:i:s');
+    echo '<div class="alert alert-danger">No se recibió el ID de la cotización a editar.</div>';
+    exit;
 }
-$stmt = $pdo->prepare("INSERT INTO cotizaciones
-    (codigo, id_cliente, id_empresa, id_convenio, tipo_usuario, fecha, total, total_bruto, estado_pago, creado_por, rol_creador, tipo_toma, fecha_toma, hora_toma, direccion_toma, descuento_aplicado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-$stmt->execute([
-    $codigo, 
-    $id_cliente, 
-    $id_empresa !== '' ? $id_empresa : null,
-    $id_convenio !== '' ? $id_convenio : null,
-    $tipo_usuario,
-    $fecha, 
-    $total, 
-    $total_bruto,
-    $estado_pago, 
-    $creado_por, 
-    $rol_creador,
-    $_POST['tipo_toma'] ?? null,
-    $_POST['fecha_toma'] ?? null,
-    $_POST['hora_toma'] ?? null,
-    $_POST['direccion_toma'] ?? null,
-    $descuento
-]);
-$id_cotizacion = $pdo->lastInsertId();
-$stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
-foreach ($detalles as $detalle) {
-    $stmt->execute([
-        $id_cotizacion,
-        $detalle['id_examen'],
-        $detalle['nombre_examen'],
-        $detalle['precio_unitario'],
-        $detalle['cantidad'],
-        $detalle['subtotal']
-    ]);
-}
-foreach ($detalles as $detalle) {
-    $id_examen = $detalle['id_examen'];
-    $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-    $stmtRes = $pdo->prepare($sql);
-    $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
-}
-
-// Redirigir según el rol
-$rol = $_SESSION['rol'] ?? null;
-// Redirigir a agendar cita después de crear cotización
-$base = defined('BASE_URL') ? BASE_URL : '../';
-header("Location: {$base}dashboard.php?vista=agendar_cita&id_cotizacion=" . $id_cotizacion);
-exit;

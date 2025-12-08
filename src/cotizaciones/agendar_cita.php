@@ -1,4 +1,7 @@
+
 <?php
+// Asegurar zona horaria Perú
+date_default_timezone_set('America/Lima');
 $id_cotizacion = isset($_GET['id_cotizacion']) ? intval($_GET['id_cotizacion']) : 0;
 
 // Obtener información de la cotización para contexto
@@ -295,26 +298,26 @@ $hora_actual = date('H:i'); // Hora exacta actual
           </div>
 
           <div class="datetime-grid">
-            <div class="form-floating">
-              <input type="date" 
-                     name="fecha_toma" 
-                     id="fecha_toma" 
-                     class="form-control" 
-                     value="<?php echo $fecha_actual; ?>"
-                     min="<?php echo date('Y-m-d'); ?>"
-                     required>
-              <label for="fecha_toma">📅 Fecha de toma</label>
-            </div>
+                        <div class="form-floating">
+                            <input type="date" 
+                                         name="fecha_toma" 
+                                         id="fecha_toma" 
+                                         class="form-control" 
+                                         value="<?php echo $fecha_actual; ?>"
+                                         min="<?php echo date('Y-m-d'); ?>"
+                                         required>
+                            <label for="fecha_toma">📅 Fecha de toma</label>
+                        </div>
 
-            <div class="form-floating">
-              <input type="time" 
-                     name="hora_toma" 
-                     id="hora_toma" 
-                     class="form-control" 
-                     value="<?php echo $hora_actual; ?>"
-                     required>
-              <label for="hora_toma">🕐 Hora de toma</label>
-            </div>
+                        <div class="form-floating">
+                            <input type="time" 
+                                         name="hora_toma" 
+                                         id="hora_toma" 
+                                         class="form-control" 
+                                         value="<?php echo $hora_actual; ?>"
+                                         required>
+                            <label for="hora_toma">🕐 Hora de toma</label>
+                        </div>
           </div>
 
           <div class="quick-times">
@@ -369,60 +372,43 @@ document.addEventListener('DOMContentLoaded', function() {
     const horaInput = document.getElementById('hora_toma');
     const form = document.getElementById('agendarForm');
 
+
     // Manejar cambio de tipo de toma
     tipoRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             const esDomicilio = this.value === 'domicilio';
             const esLaboratorio = this.value === 'laboratorio';
-            
             if (esDomicilio) {
-                // Mostrar campo de dirección
                 direccionField.classList.add('show');
                 direccionInput.setAttribute('required', 'required');
-                
-                // Habilitar cambio de fecha y hora para domicilio
+                // Permitir editar fecha y hora
                 fechaInput.removeAttribute('readonly');
                 horaInput.removeAttribute('readonly');
                 fechaInput.style.backgroundColor = '';
                 horaInput.style.backgroundColor = '';
-                
-                // Animar la aparición
                 setTimeout(() => {
                     direccionInput.focus();
                 }, 300);
-                
                 mostrarNotificacion('Para domicilio puedes programar fecha y hora', 'info');
-                
             } else if (esLaboratorio) {
-                // Ocultar campo de dirección
                 direccionField.classList.remove('show');
                 direccionInput.removeAttribute('required');
                 direccionInput.value = '';
-                
                 // Para laboratorio: mantener fecha y hora actual (toma inmediata)
                 const fechaActual = new Date();
                 fechaInput.value = fechaActual.toISOString().split('T')[0];
                 horaInput.value = fechaActual.toTimeString().slice(0, 5);
-                
-                // Hacer readonly para evitar cambios (toma inmediata)
-                fechaInput.setAttribute('readonly', 'readonly');
-                horaInput.setAttribute('readonly', 'readonly');
-                fechaInput.style.backgroundColor = '#f8f9fa';
-                horaInput.style.backgroundColor = '#f8f9fa';
-                
+                // Permitir editar fecha y hora (no readonly)
+                fechaInput.removeAttribute('readonly');
+                horaInput.removeAttribute('readonly');
+                fechaInput.style.backgroundColor = '';
+                horaInput.style.backgroundColor = '';
                 mostrarNotificacion('En laboratorio: toma inmediata con fecha y hora actual', 'success');
             }
         });
     });
 
-    // Inicializar estado para laboratorio (por defecto)
-    const fechaActual = new Date();
-    fechaInput.value = fechaActual.toISOString().split('T')[0];
-    horaInput.value = fechaActual.toTimeString().slice(0, 5);
-    fechaInput.setAttribute('readonly', 'readonly');
-    horaInput.setAttribute('readonly', 'readonly');
-    fechaInput.style.backgroundColor = '#f8f9fa';
-    horaInput.style.backgroundColor = '#f8f9fa';
+    // No inicializar fecha/hora en JS, solo usar la generada por PHP
 
     // Validación inteligente de fecha (solo para domicilio)
     fechaInput.addEventListener('change', function() {
