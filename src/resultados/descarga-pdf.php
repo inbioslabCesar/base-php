@@ -55,7 +55,7 @@ $mpdf = new Mpdf([
 ]);
 
 // Generar código QR con datos clave para el header
-$qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'INBIOSLAB')
+$qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'MEDDITECH')
     . ' | Resultado ID: ' . ($paciente['id'] ?? '')
     . ' | Paciente: ' . ($paciente['nombre'] ?? '')
     . ' | DNI: ' . ($paciente['dni'] ?? '')

@@ -17,130 +17,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($cotizaciones): ?>
-                        <?php foreach ($cotizaciones as $cotizacion): ?>
-                            <tr>
-                                <td>
-                                    <input type="checkbox" class="cotizacion-checkbox" data-id="<?= $cotizacion['id'] ?>" data-saldo="<?= floatval($cotizacion['total']) - floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0) ?>">
-                                </td>
-                                <!-- ...existing code... -->
-                                <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($cotizacion['dni'] ?? '') ?></td>
-                                <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
-                                <td>S/ <?= number_format($cotizacion['total'] ?? 0, 2) ?></td>
-                                <!-- ...existing code... -->
-                                <td>
-                                    <?php
-                                    if (!empty($cotizacion['id_empresa']) && (!empty($cotizacion['nombre_comercial']) || !empty($cotizacion['razon_social']))) {
-                                        echo '<span class="badge bg-info text-dark">' .
-                                            htmlspecialchars(!empty($cotizacion['nombre_comercial']) ? $cotizacion['nombre_comercial'] : $cotizacion['razon_social']) .
-                                            '</span>';
-                                    } elseif (!empty($cotizacion['id_convenio']) && !empty($cotizacion['nombre_convenio'])) {
-                                        echo '<span class="badge bg-warning text-dark">' . htmlspecialchars($cotizacion['nombre_convenio']) . '</span>';
-                                    } else {
-                                        echo '<span class="badge bg-secondary">Particular</span>';
-                                    }
-                                    ?>
-                                </td>
-                                <!-- ...existing code... -->
-                                <td>
-                                    <?php
-                                    $total = floatval($cotizacion['total']);
-                                    $pagado = floatval($pagosPorCotizacion[$cotizacion['id']] ?? 0);
-                                    $saldo = $total - $pagado;
-                                    $pagosCot = $pagosPorCotizacionDetalle[$cotizacion['id']] ?? [];
-                                    $ultimoPago = !empty($pagosCot) ? $pagosCot[0] : null;
-                                    if ($ultimoPago && $ultimoPago['metodo_pago'] === 'descarga_anticipada') {
-                                        $badgeClassPago = 'bg-orange text-dark';
-                                        $iconPago = 'bi-clock';
-                                        $textoPago = 'Descarga anticipada';
-                                    } elseif ($saldo <= 0) {
-                                        $badgeClassPago = 'bg-success';
-                                        $iconPago = 'bi-check-circle-fill';
-                                        $textoPago = 'Pagado';
-                                    } elseif ($pagado > 0) {
-                                        $badgeClassPago = 'bg-warning text-dark';
-                                        $iconPago = 'bi-hourglass-split';
-                                        $textoPago = 'Parcial: S/ ' . number_format($saldo, 2);
-                                    } else {
-                                        $badgeClassPago = 'bg-danger';
-                                        $iconPago = 'bi-x-circle-fill';
-                                        $textoPago = 'Pendiente: S/ ' . number_format($saldo, 2);
-                                    }
-                                    ?>
-                                    <span class="badge <?= $badgeClassPago ?>">
-                                        <i class="bi <?= $iconPago ?>"></i>
-                                        <?= $textoPago ?>
-                                    </span>
-                                </td>
-                                <!-- ...existing code... -->
-                                <td>
-                                    <?php
-                                    $examenes = $examenesPorCotizacion[$cotizacion['id']] ?? [];
-                                    $pendientes = array_filter($examenes, function ($ex) {
-                                        return $ex['estado'] === 'pendiente';
-                                    });
-                                    if ($pendientes) {
-                                        echo "<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>";
-                                    } else {
-                                        echo "<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>";
-                                    }
-                                    ?>
-                                </td>
-                                <td><?= htmlspecialchars($cotizacion['rol_creador'] ?? '') ?></td>
-                                <style>
-                                .bg-orange {
-                                    background-color: #ff9800 !important;
-                                    color: #212529 !important;
-                                }
-                                </style>
-                                <!-- ...existing code... -->
-                                <td>
-                                    <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
-                                        <a href="dashboard.php?vista=detalle_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-info btn-sm mb-1" title="Ver cotización">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                            <?php if (!defined('BASE_URL')) require_once __DIR__ . '/../config/config.php'; ?>
-                                            <a href="dashboard.php?vista=form_cotizacion&id=<?= $cotizacion['id'] ?>&edit=1" class="btn btn-dark btn-sm mb-1" title="Editar cotización">
-                                                <i class="bi bi-file-earmark-medical"></i> Editar cotización
-                                            </a>
-                                            <?php if (!empty($cotizacion['modificada']) && $cotizacion['modificada'] == 1): ?>
-                                                <span class="badge bg-warning text-dark ms-1" title="Cotización modificada"><i class="bi bi-pencil"></i> Modificada</span>
-                                            <?php endif; ?>
-                                    <?php endif; ?>
-                                    <?php if ($rol === 'admin' || $rol === 'recepcionista' || $rol === 'laboratorista'): ?>
-                                        <a href="dashboard.php?vista=formulario&cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-primary btn-sm mb-1" title="Editar o agregar resultados">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                    <?php
-                                    if (($rol === 'admin' || $rol === 'recepcionista')) {
-                                        if ($saldo <= 0) {
-                                            echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-secondary btn-sm mb-1" title="Ver historial de pagos"><i class="bi bi-clock-history"></i></a>';
-                                        } else {
-                                            echo '<a href="dashboard.php?vista=pago_cotizacion&id=' . $cotizacion['id'] . '" class="btn btn-warning btn-sm mb-1" title="Registrar pago"><i class="bi bi-cash-coin"></i></a>';
-                                        }
-                                    }
-                                    ?>
-                                    <?php if ($rol === 'admin'): ?>
-                                        <a href="dashboard.php?action=eliminar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-danger btn-sm mb-1" title="Eliminar cotización" onclick="return confirm('¿Seguro que deseas eliminar esta cotización?')">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                    <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
-                                        <a href="resultados/descarga-pdf.php?cotizacion_id=<?= $cotizacion['id'] ?>" class="btn btn-success btn-sm mb-1" title="Descargar PDF de todos los resultados" target="_blank">
-                                            <i class="bi bi-file-earmark-pdf"></i>
-                                        </a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="11" class="text-center">No hay cotizaciones registradas.</td>
-                        </tr>
-                    <?php endif; ?>
+                    <!-- El contenido de la tabla será llenado dinámicamente por DataTables server-side -->
                 </tbody>
             </table>
                         <div class="mt-3">
@@ -168,9 +45,120 @@
                         </div>
         </div>
     </div>
+    <!-- jQuery (requerido por DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+
+
+    $(document).ready(function() {
+        var tabla = $('#tablaCotizaciones').DataTable({
+            "serverSide": true,
+            "processing": true,
+            "ajax": {
+                "url": "dashboard.php?action=cotizaciones_api&debug=1",
+                "type": "GET",
+                "data": function(d) {
+                    d.filtro_dni = $('#filtroDni').val();
+                    d.filtro_empresa = $('#filtroEmpresa').val();
+                    d.filtro_convenio = $('#filtroConvenio').val();
+                    d.filtro_fecha_desde = $('#filtroFechaDesde').val();
+                    d.filtro_fecha_hasta = $('#filtroFechaHasta').val();
+                }
+            },
+            "pageLength": 3,
+            "lengthMenu": [[3, 5, 10], [3, 5, 10]],
+            "order": [],
+            "language": {
+                "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
+            },
+            "responsive": true,
+            "columns": [
+                {
+                    "data": null,
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        return `<input type='checkbox' class='cotizacion-checkbox' data-id='${row.id}' data-saldo='${parseFloat(row.total) || 0}'>`;
+                    }
+                },
+                { "data": "codigo" },
+                {
+                    "data": null,
+                    "render": function(data, type, row) {
+                        return `${row.nombre_cliente || ''} ${row.apellido_cliente || ''}`;
+                    }
+                },
+                { "data": "dni" },
+                { "data": "fecha" },
+                {
+                    "data": "total",
+                    "render": function(data) {
+                        return 'S/ ' + parseFloat(data).toFixed(2);
+                    }
+                },
+                {
+                    "data": "referencia",
+                    "render": function(data, type, row) {
+                        if (row.referencia) {
+                            return `<span class='badge bg-info text-dark'>${row.referencia}</span>`;
+                        } else {
+                            return `<span class='badge bg-secondary'>Particular</span>`;
+                        }
+                    }
+                },
+                {
+                    "data": "estado_pago",
+                    "render": function(data, type, row) {
+                        // Personaliza según tu lógica de pagos
+                        if (data === 'pagado') {
+                            return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
+                        } else if (data === 'parcial') {
+                            return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Parcial</span>`;
+                        } else {
+                            return `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente</span>`;
+                        }
+                    }
+                },
+                {
+                    "data": "estado_examen",
+                    "render": function(data) {
+                        if (data === 'pendiente') {
+                            return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>`;
+                        } else {
+                            return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>`;
+                        }
+                    }
+                },
+                { "data": "rol_creador" },
+                {
+                    "data": null,
+                    "orderable": false,
+                    "render": function(data, type, row) {
+                        let acciones = '';
+                        acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm mb-1' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm mb-1' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+                        if (row.modificada == 1) {
+                            acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modificada</span>`;
+                        }
+                        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm mb-1' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+                        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm mb-1' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+                        acciones += `<a href='dashboard.php?action=eliminar_cotizacion&id=${row.id}' class='btn btn-danger btn-sm mb-1' title='Eliminar cotización' onclick='return confirm(\"¿Seguro que deseas eliminar esta cotización?\")'><i class='bi bi-trash'></i></a>`;
+                        acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm mb-1' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
+                        return acciones;
+                    }
+                }
+            ]
+        });
+
+        // Recargar tabla al buscar o limpiar
+        $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
+            tabla.ajax.reload();
+        });
+    });
+        $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
+            tabla.ajax.reload();
+        });
     document.addEventListener('DOMContentLoaded', function() {
         const selectAll = document.getElementById('selectAllCotizaciones');
         const checkboxes = document.querySelectorAll('.cotizacion-checkbox');
@@ -257,3 +245,4 @@
         });
     });
     </script>
+</div>

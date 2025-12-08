@@ -659,51 +659,7 @@ function capitalize($string) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($clientes): ?>
-                        <?php foreach ($clientes as $cliente): ?>
-                            <tr>
-                                <td><strong><?= (int)$cliente['id'] ?></strong></td>
-                                <td><span class="badge bg-primary"><?= htmlspecialchars($cliente['codigo_cliente'] ?? $cliente['id']) ?></span></td>
-                                <td><?= capitalize($cliente['nombre'] ?? '') ?></td>
-                                <td><?= capitalize($cliente['apellido'] ?? '') ?></td>
-                                <td><strong><?= htmlspecialchars($cliente['dni'] ?? '') ?></strong></td>
-                                <td><?= htmlspecialchars($cliente['edad'] ?? '') ?></td>
-                                <td><small class="text-muted"><?= htmlspecialchars($cliente['email'] ?? 'No especificado') ?></small></td>
-                                <td><?= htmlspecialchars($cliente['telefono'] ?? '') ?></td>
-                                <td><span class="badge bg-success"><?= htmlspecialchars($cliente['estado'] ?? 'Activo') ?></span></td>
-                                <td>
-                                    <div class="btn-group gap-2" role="group" style="display: flex;">
-                                        <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" 
-                                           class="btn btn-warning btn-sm" 
-                                           title="Editar">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                        <a href="clientes/eliminar.php?id=<?= $cliente['id'] ?>" 
-                                           class="btn btn-danger btn-sm" 
-                                           title="Eliminar" 
-                                           onclick="return confirm('¿Seguro de eliminar este paciente?');">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                        <?php if ($rol === 'recepcionista' || $rol === 'admin'): ?>
-                                            <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" 
-                                               class="btn btn-primary btn-sm" 
-                                               title="Cotizar">
-                                                <i class="bi bi-file-earmark-plus"></i>
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="10" class="text-center py-4">
-                                <i class="bi bi-people" style="font-size: 2rem; color: #6c757d;"></i>
-                                <br>
-                                <strong>No hay pacientes registrados</strong>
-                            </td>
-                        </tr>
-                    <?php endif; ?>
+                    <!-- El contenido de la tabla será llenado dinámicamente por DataTables server-side -->
                 </tbody>
             </table>
         </div>
@@ -768,17 +724,48 @@ document.getElementById('buscadorClienteMovil').addEventListener('input', functi
 <script>
 $(document).ready(function() {
     $('#tablaClientes').DataTable({
-        "pageLength": 3, // Por defecto mostrar 3 filas
-        "lengthMenu": [[3, 5, 10, 25, 50], [3, 5, 10, 25, 50]], // Agregado opción de 3 filas
-        "order": [], // No aplicar ordenamiento inicial, mantener el orden de la consulta
+        "serverSide": true,
+        "processing": true,
+        "ajax": {
+            "url": "dashboard.php?action=clientes_api",
+            "type": "GET"
+        },
+        "pageLength": 3,
+        "lengthMenu": [[3, 5, 10, 25, 50], [3, 5, 10, 25, 50]],
+        "order": [],
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
         },
         "responsive": true,
         "columnDefs": [
-            { "responsivePriority": 1, "targets": [2, 3, 4] }, // Prioridad alta para nombre, apellido, DNI
-            { "responsivePriority": 2, "targets": [9] }, // Prioridad alta para acciones
-            { "responsivePriority": 3, "targets": [0, 1] } // Prioridad media para ID y código
+            { "responsivePriority": 1, "targets": [2, 3, 4] },
+            { "responsivePriority": 2, "targets": [9] },
+            { "responsivePriority": 3, "targets": [0, 1] }
+        ],
+        "columns": [
+            { "data": "id" },
+            { "data": "codigo_cliente" },
+            { "data": "nombre" },
+            { "data": "apellido" },
+            { "data": "dni" },
+            { "data": "edad" },
+            { "data": "email" },
+            { "data": "telefono" },
+            { "data": "estado" },
+            {
+                "data": null,
+                "orderable": false,
+                "render": function(data, type, row) {
+                    let btns = `<div class='btn-group gap-2' role='group' style='display: flex;'>`;
+                    btns += `<a href='dashboard.php?vista=form_cliente&id=${row.id}' class='btn btn-warning btn-sm' title='Editar'><i class='bi bi-pencil-square'></i></a>`;
+                    btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm("¿Seguro de eliminar este paciente?");'><i class='bi bi-trash'></i></a>`;
+                    if (["recepcionista", "admin"].includes("${rol}")) {
+                        btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
+                    }
+                    btns += `</div>`;
+                    return btns;
+                }
+            }
         ]
     });
 });
