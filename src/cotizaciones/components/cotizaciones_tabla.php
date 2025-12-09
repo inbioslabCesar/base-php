@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -70,7 +70,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
         </div>
     </div>
 </div>
-<div class="desktop-view">
+<div>
         <div class="table-responsive">
             <table id="tablaCotizaciones" class="table table-modern align-middle">
                 <thead>
@@ -158,7 +158,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
-            "responsive": true,
+            // "responsive": true,
             "columns": [
                 {
                     "data": null,
@@ -208,12 +208,14 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                     }
                 },
                 {
-                    "data": "estado_pago",
+                    "data": null,
                     "render": function(data, type, row) {
-                        // Personaliza según tu lógica de pagos
-                        if (data === 'pagado') {
+                        // Calcular estado de pago usando total pagado
+                        const total = parseFloat(row.total) || 0;
+                        const pagado = parseFloat(row.total_pagado) || 0;
+                        if (pagado >= total && total > 0) {
                             return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
-                        } else if (data === 'parcial') {
+                        } else if (pagado > 0 && pagado < total) {
                             return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Parcial</span>`;
                         } else {
                             return `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente</span>`;
@@ -279,6 +281,23 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
         function getCheckboxes() {
             return Array.from(document.querySelectorAll('.cotizacion-checkbox'));
         }
+        // Array global de IDs seleccionados manualmente
+        function getSeleccionadasManual() {
+            try {
+                return JSON.parse(localStorage.getItem('cotizacionesManualSeleccionadasDesktop') || '[]');
+            } catch(e) { return []; }
+        }
+        function setSeleccionadasManual(arr) {
+            localStorage.setItem('cotizacionesManualSeleccionadasDesktop', JSON.stringify(arr));
+        }
+        // Restaurar selección manual al cargar página
+        function restaurarSeleccionManual() {
+            const seleccionadas = getSeleccionadasManual();
+            getCheckboxes().forEach(cb => {
+                cb.checked = seleccionadas.includes(cb.getAttribute('data-id'));
+            });
+        }
+        
 
         function actualizarTotal() {
             let total = 0;
@@ -299,6 +318,15 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
 
         // Evento delegado para checkboxes
         $(document).on('change', '.cotizacion-checkbox', function() {
+            // Actualizar array global de seleccionadas manualmente
+            let seleccionadas = getSeleccionadasManual();
+            const id = $(this).attr('data-id');
+            if (this.checked) {
+                if (!seleccionadas.includes(id)) seleccionadas.push(id);
+            } else {
+                seleccionadas = seleccionadas.filter(x => x !== id);
+            }
+            setSeleccionadasManual(seleccionadas);
             actualizarTotal();
             if (!this.checked) selectAll.checked = false;
             if (getCheckboxes().length > 0 && getCheckboxes().every(c => c.checked)) selectAll.checked = true;
@@ -309,12 +337,20 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
             getCheckboxes().forEach(cb => {
                 cb.checked = selectAll.checked;
             });
+            // Si se selecciona todo, guardar todos los IDs visibles; si se deselecciona, limpiar
+            if (selectAll.checked) {
+                const ids = getCheckboxes().map(cb => cb.getAttribute('data-id'));
+                setSeleccionadasManual(ids);
+            } else {
+                setSeleccionadasManual([]);
+            }
             actualizarTotal();
         });
 
         // Actualizar total cada vez que se dibuja la tabla
         $('#tablaCotizaciones').on('draw.dt', function() {
             selectAll.checked = false;
+            restaurarSeleccionManual();
             actualizarTotal();
         });
 
@@ -325,9 +361,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
 
         // Lógica para confirmar pago masivo
         confirmarPagoMasivo.addEventListener('click', function() {
-            const seleccionadas = getCheckboxes()
-                .filter(cb => cb.checked)
-                .map(cb => cb.getAttribute('data-id'));
+            const seleccionadas = getSeleccionadasManual();
             if (seleccionadas.length === 0) return;
 
             fetch('cotizaciones/pago_masivo.php', {
@@ -344,6 +378,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                         showConfirmButton: false,
                         timer: 1800
                     });
+                    setSeleccionadasManual([]);
                     setTimeout(() => location.reload(), 1800);
                 } else {
                     Swal.fire({

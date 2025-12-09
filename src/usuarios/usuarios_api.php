@@ -1,6 +1,17 @@
 <?php
+// Mostrar errores para depuración
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Endpoint server-side para DataTables usuarios
-require_once __DIR__ . '/funciones/usuarios_crud.php';
+try {
+    require_once __DIR__ . '/funciones/usuarios_crud.php';
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
+}
 header('Content-Type: application/json');
 
 $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;

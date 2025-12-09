@@ -1,9 +1,8 @@
-
 <?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 
 $rol = $_SESSION['rol'] ?? null;
 $isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
@@ -582,7 +581,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     <strong>Importante:</strong> Después de guardar la cotización, podrás agendar la cita para la toma de muestra.
                 </div>
 
-                <form action="cotizaciones/<?= $isEdit ? 'editar_cotizacion.php' : 'crear_cotizacion.php' ?>" method="POST" id="formCotizacion">
+                <form action="<?= BASE_URL ?>dashboard.php?action=<?= $isEdit ? 'editar_cotizacion' : 'crear_cotizacion' ?>" method="POST" id="formCotizacion">
 
                     <?php if ($isEdit): ?>
                         <input type="hidden" name="id_cotizacion" value="<?= htmlspecialchars($cotizacionData['id']) ?>">

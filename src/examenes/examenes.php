@@ -246,12 +246,12 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                 url: 'dashboard.php?action=examenes_api',
                 type: 'GET'
             },
-            pageLength: 5,
-            lengthMenu: [[5, 10, 25, 50], [5, 10, 25, 50]],
+            pageLength: 3,
+            lengthMenu: [[3, 5, 10], [3, 5, 10]],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
-            dom: 'Bfrtip',
+            dom: 'lBfrtip',
             columns: [
                 { data: 'codigo' },
                 { data: 'nombre', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },

@@ -5,7 +5,7 @@ date_default_timezone_set('America/Lima');
 $id_cotizacion = isset($_GET['id_cotizacion']) ? intval($_GET['id_cotizacion']) : 0;
 
 // Obtener información de la cotización para contexto
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 $cotizacion = null;
 if ($id_cotizacion > 0) {
     $stmt = $pdo->prepare("SELECT c.*, cl.nombre, cl.apellido FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id WHERE c.id = ?");

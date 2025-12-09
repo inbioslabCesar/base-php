@@ -1,13 +1,13 @@
 <?php
 // Helpers para badges de estado
-require_once __DIR__ . '/cotizaciones_badges.php';
+require_once __DIR__ . '/../components/cotizaciones_badges.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 
 // Botón según rol
-require_once __DIR__ . '/cotizaciones_boton.php';
+require_once __DIR__ . '/../components/cotizaciones_boton.php';
 
 // Filtros recibidos por GET
 $dniFiltro      = trim($_GET['dni'] ?? '');
@@ -17,10 +17,10 @@ $convenioFiltro = trim($_GET['convenio'] ?? '');
 
 
 // Consultas para cotizaciones
-require_once __DIR__ . '/cotizaciones_consultas.php';
+require_once __DIR__ . '/../api/cotizaciones_consultas.php';
 
 // Paginación para cards móviles
-require_once __DIR__ . '/cotizaciones_paginacion.php';
+//require_once __DIR__ . '/cotizaciones_paginacion.php';
 
 
 ?>
@@ -31,15 +31,13 @@ require_once __DIR__ . '/cotizaciones_paginacion.php';
 
 <div class="container mt-4">
     <!-- BLOQUE COMPONENTE: cotizaciones_header.php -->
-    <?php require_once __DIR__ . '/cotizaciones_header.php'; ?>
+    <?php require_once __DIR__ . '/../components/cotizaciones_header.php'; ?>
 
     <!-- Filtros mejorados -->
 
-    <!-- Vista Desktop - Tabla -->
-    <?php require_once __DIR__ . '/cotizaciones_tabla.php'; ?>
 
-    <!-- Vista Móvil - Cards -->
-    <?php require_once __DIR__ . '/cotizaciones_cards.php'; ?>
+    <!-- Tabla de cotizaciones (única para desktop y móvil) -->
+    <?php require_once __DIR__ . '/../components/cotizaciones_tabla.php'; ?>
 
 </div>
 <!-- DataTables y dependencias -->

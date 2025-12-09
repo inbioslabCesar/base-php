@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -25,7 +25,10 @@ $orderDir = $_GET['order'][0]['dir'] ?? 'desc';
 $orderBy = $columns[$orderCol] ?? 'id';
 
 try {
-    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total, c.estado_pago, c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id";
+    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
+        (SELECT IFNULL(SUM(p.monto),0) FROM pagos p WHERE p.id_cotizacion = c.id) AS total_pagado,
+        c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada
+        FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id";
     $where = [];
     $params = [];
     if ($search !== '') {

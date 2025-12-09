@@ -1,8 +1,9 @@
 
 
+
 <?php
 // API para DataTables server-side: listado de clientes
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/funciones/clientes_crud.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -23,28 +24,20 @@ $search = trim($_GET['search']['value'] ?? '');
 $orderCol = $_GET['order'][0]['column'] ?? 0;
 $orderDir = $_GET['order'][0]['dir'] ?? 'desc';
 
+
 // Mapeo de columnas permitidas
 $columns = ['id', 'codigo_cliente', 'nombre', 'apellido', 'dni', 'edad', 'email', 'telefono', 'estado'];
 $orderBy = $columns[$orderCol] ?? 'id';
 
 try {
-    // Consulta base
-    $sql = "SELECT SQL_CALC_FOUND_ROWS id, codigo_cliente, nombre, apellido, dni, edad, email, telefono, estado FROM clientes";
-    $params = [];
     if ($search !== '') {
-        $sql .= " WHERE dni LIKE ? OR nombre LIKE ? OR apellido LIKE ?";
-        $params = ["%$search%", "%$search%", "%$search%"];
+        $data = clientes_buscar($search, $orderBy, $orderDir, $start, $length);
+        $totalFiltered = clientes_count($search);
+    } else {
+        $data = clientes_listar($orderBy, $orderDir, $start, $length);
+        $totalFiltered = clientes_count();
     }
-    $sql .= " ORDER BY $orderBy $orderDir LIMIT $start, $length";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Total filtrado
-    $totalFiltered = $pdo->query("SELECT FOUND_ROWS()") ->fetchColumn();
-    // Total general
-    $totalRecords = $pdo->query("SELECT COUNT(*) FROM clientes") ->fetchColumn();
+    $totalRecords = clientes_count();
 
     header('Content-Type: application/json');
     echo json_encode([

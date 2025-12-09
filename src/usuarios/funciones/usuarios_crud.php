@@ -6,10 +6,14 @@ require_once __DIR__ . '/../../config/config.php';
 function usuarios_count($search = '') {
     global $pdo;
     if ($search !== '') {
-        $sql = "SELECT COUNT(*) FROM usuarios WHERE nombre LIKE ? OR apellido LIKE ? OR usuario LIKE ? OR rol LIKE ? OR email LIKE ?";
+        $sql = "SELECT COUNT(*) FROM usuarios WHERE nombre LIKE ? OR apellido LIKE ? OR rol LIKE ? OR email LIKE ? OR dni LIKE ? OR sexo LIKE ? OR fecha_nacimiento LIKE ? OR telefono LIKE ? OR direccion LIKE ? OR cargo LIKE ? OR profesion LIKE ?";
         $stmt = $pdo->prepare($sql);
         $searchLike = "%$search%";
-        $stmt->execute([$searchLike, $searchLike, $searchLike, $searchLike, $searchLike]);
+        $stmt->execute([
+            $searchLike, $searchLike, $searchLike, $searchLike,
+            $searchLike, $searchLike, $searchLike, $searchLike, $searchLike,
+            $searchLike, $searchLike
+        ]);
         return (int)$stmt->fetchColumn();
     } else {
         $sql = "SELECT COUNT(*) FROM usuarios";
@@ -20,7 +24,7 @@ function usuarios_count($search = '') {
 // Listar usuarios paginados y ordenados
 function usuarios_listar($orderBy = 'id', $orderDir = 'asc', $start = 0, $length = 10) {
     global $pdo;
-    $orderBy = in_array($orderBy, ['id','nombre','apellido','usuario','rol','email','estado','fecha_creacion']) ? $orderBy : 'id';
+    $orderBy = in_array($orderBy, ['id','nombre','apellido','rol','email','estado','fecha_creacion','dni','sexo','fecha_nacimiento','telefono','direccion','cargo','profesion']) ? $orderBy : 'id';
     $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
     $sql = "SELECT * FROM usuarios ORDER BY $orderBy $orderDir LIMIT :start, :length";
     $stmt = $pdo->prepare($sql);
@@ -33,9 +37,9 @@ function usuarios_listar($orderBy = 'id', $orderDir = 'asc', $start = 0, $length
 // Buscar usuarios paginados y ordenados
 function usuarios_buscar($search, $orderBy = 'id', $orderDir = 'asc', $start = 0, $length = 10) {
     global $pdo;
-    $orderBy = in_array($orderBy, ['id','nombre','apellido','usuario','rol','email','estado','fecha_creacion']) ? $orderBy : 'id';
+    $orderBy = in_array($orderBy, ['id','nombre','apellido','rol','email','estado','fecha_creacion','dni','sexo','fecha_nacimiento','telefono','direccion','cargo','profesion']) ? $orderBy : 'id';
     $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
-    $sql = "SELECT * FROM usuarios WHERE nombre LIKE :search OR apellido LIKE :search OR usuario LIKE :search OR rol LIKE :search OR email LIKE :search ORDER BY $orderBy $orderDir LIMIT :start, :length";
+    $sql = "SELECT * FROM usuarios WHERE nombre LIKE :search OR apellido LIKE :search OR rol LIKE :search OR email LIKE :search OR dni LIKE :search OR sexo LIKE :search OR fecha_nacimiento LIKE :search OR telefono LIKE :search OR direccion LIKE :search OR cargo LIKE :search OR profesion LIKE :search ORDER BY $orderBy $orderDir LIMIT :start, :length";
     $stmt = $pdo->prepare($sql);
     $searchLike = "%$search%";
     $stmt->bindValue(':search', $searchLike, PDO::PARAM_STR);

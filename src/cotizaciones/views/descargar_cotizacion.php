@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 
 // Ajustar zona horaria a Perú
 date_default_timezone_set('America/Lima');
@@ -44,7 +44,7 @@ $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Traer datos de la empresa
 $stmtEmpresa = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
 $empresa = $stmtEmpresa->fetch(PDO::FETCH_ASSOC);
-$logo = '../images/empresa/logo_empresa.png'; // Ruta relativa
+$logo = BASE_URL . 'images/empresa/logo_empresa.png'; // Ruta pública para mPDF
 
 $html = '
 <html>
@@ -154,6 +154,7 @@ $html .= '
 // ... (código para generar el PDF con mPDF)
 $mpdf = new \Mpdf\Mpdf();
 $mpdf->WriteHTML($html);
+$mpdf->SetDisplayMode('fullpage');
+if (ob_get_length()) ob_end_clean();
 $mpdf->Output('cotizacion_' . $cotizacion['codigo'] . '.pdf', 'D');
 exit;
-?>

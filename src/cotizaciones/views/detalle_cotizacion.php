@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../conexion/conexion.php';
-require_once __DIR__ . '/../auth/empresa_config.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../auth/empresa_config.php';
 
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -610,7 +610,7 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                     <?php endif; ?>
                     
                     <div class="action-buttons">
-                        <a href="cotizaciones/descargar_cotizacion.php?id=<?= $cotizacion['id'] ?>" class="btn btn-action-detalle btn-success-custom" target="_blank">
+                        <a href="<?= BASE_URL ?>dashboard.php?action=descargar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-action-detalle btn-success-custom" target="_blank">
                             <i class="bi bi-download"></i> Descargar PDF
                         </a>
                         <button type="button" class="btn btn-action-detalle btn-info" onclick="imprimirTicketCotizacion()">

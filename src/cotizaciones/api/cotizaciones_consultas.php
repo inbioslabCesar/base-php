@@ -4,8 +4,10 @@ $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
 
 // Consulta principal con LEFT JOIN para empresa y convenio
+// Solo cotizaciones con saldo pendiente
 $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni,
-        e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
+        e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio,
+        (c.total - IFNULL((SELECT SUM(monto) FROM pagos WHERE id_cotizacion = c.id), 0)) AS saldo_pendiente
         FROM cotizaciones c
         JOIN clientes cl ON c.id_cliente = cl.id
         LEFT JOIN empresas e ON c.id_empresa = e.id
@@ -13,8 +15,8 @@ $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente
 $condiciones = [];
 $params = [];
 if ($dniFiltro !== '') {
-    $condiciones[] = "cl.dni = ?";
-    $params[] = $dniFiltro;
+    $condiciones[] = "cl.dni LIKE ?";
+    $params[] = "%$dniFiltro%";
 }
 if ($empresaFiltro !== '') {
     $condiciones[] = "c.id_empresa = ?";
@@ -24,36 +26,36 @@ if ($convenioFiltro !== '') {
     $condiciones[] = "c.id_convenio = ?";
     $params[] = $convenioFiltro;
 }
-if (!empty($_GET['fecha_desde']) && !empty($_GET['fecha_hasta'])) {
+// Filtro de fechas: si no se selecciona, filtrar por mes actual
+if (empty($_GET['fecha_desde']) && empty($_GET['fecha_hasta'])) {
+    $primerDia = date('Y-m-01');
+    $ultimoDia = date('Y-m-t');
+    $condiciones[] = "DATE(c.fecha) BETWEEN ? AND ?";
+    $params[] = $primerDia;
+    $params[] = $ultimoDia;
+} else if (!empty($_GET['fecha_desde']) && !empty($_GET['fecha_hasta'])) {
     $condiciones[] = "DATE(c.fecha) BETWEEN ? AND ?";
     $params[] = $_GET['fecha_desde'];
     $params[] = $_GET['fecha_hasta'];
-} elseif (!empty($_GET['fecha_desde'])) {
-    $condiciones[] = "DATE(c.fecha) >= ?";
+} else if (!empty($_GET['fecha_desde'])) {
+   $condiciones[] = "DATE(c.fecha) >= ?";
     $params[] = $_GET['fecha_desde'];
-} elseif (!empty($_GET['fecha_hasta'])) {
+} else if (!empty($_GET['fecha_hasta'])) {
     $condiciones[] = "DATE(c.fecha) <= ?";
     $params[] = $_GET['fecha_hasta'];
 }
 if ($condiciones) {
     $sql .= " WHERE " . implode(' AND ', $condiciones);
+} else {
+    $sql .= " WHERE 1=1";
 }
+$sql .= "";
 $sql .= " ORDER BY c.fecha DESC, c.id DESC";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Normalizar campos de empresa/convenio para cada cotización (para cards móviles)
-foreach ($cotizaciones as &$cot) {
-    $cot['id_empresa'] = $cot['id_empresa'] ?? null;
-    $cot['nombre_comercial'] = $cot['nombre_comercial'] ?? null;
-    $cot['razon_social'] = $cot['razon_social'] ?? null;
-    $cot['id_convenio'] = $cot['id_convenio'] ?? null;
-    $cot['nombre_convenio'] = $cot['nombre_convenio'] ?? null;
-}
-unset($cot);
 
 // Consulta para exámenes de cada cotización
 $examenesPorCotizacion = [];

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../../conexion/conexion.php';
 
 // Recibe id de cotización y rol del usuario
 $id_cotizacion = $_GET['id'] ?? $_POST['id'] ?? null;

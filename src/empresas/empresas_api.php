@@ -1,6 +1,17 @@
 <?php
+// Mostrar errores para depuración
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Endpoint server-side para DataTables empresas
-require_once __DIR__ . '/funciones/empresas_crud.php';
+try {
+    require_once __DIR__ . '/funciones/empresas_crud.php';
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
+}
 header('Content-Type: application/json');
 
 $draw = isset($_GET['draw']) ? intval($_GET['draw']) : 1;
@@ -11,7 +22,7 @@ $orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['colum
 $orderDir = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'asc';
 
 $columns = [
-    'id', 'nombre', 'ruc', 'direccion', 'telefono', 'email', 'estado', 'fecha_creacion'
+    'id', 'ruc', 'razon_social', 'nombre_comercial', 'direccion', 'telefono', 'email', 'representante', 'convenio', 'estado', 'descuento'
 ];
 $orderBy = $columns[$orderCol] ?? 'id';
 

@@ -653,13 +653,14 @@ function capitalize($string) {
                         <th>DNI</th>
                         <th>Edad</th>
                         <th>Email</th>
-                        <th>Teléfono</th>
-                        <th>Estado</th>
+                        <th class="d-none d-md-table-cell">Teléfono</th>
+                        <th class="d-none d-md-table-cell">Estado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <!-- El contenido de la tabla será llenado dinámicamente por DataTables server-side -->
+                    <!-- Las columnas Teléfono y Estado se ocultarán en desktop por la clase d-none d-md-table-cell -->
                 </tbody>
             </table>
         </div>
@@ -740,7 +741,8 @@ $(document).ready(function() {
         "columnDefs": [
             { "responsivePriority": 1, "targets": [2, 3, 4] },
             { "responsivePriority": 2, "targets": [9] },
-            { "responsivePriority": 3, "targets": [0, 1] }
+            { "responsivePriority": 3, "targets": [0, 1] },
+            { "targets": [7,8], "visible": false } // Oculta teléfono (7) y estado (8) en desktop
         ],
         "columns": [
             { "data": "id" },
@@ -759,7 +761,6 @@ $(document).ready(function() {
                     let btns = `<div class='btn-group gap-2' role='group' style='display: flex;'>`;
                     btns += `<a href='dashboard.php?vista=form_cliente&id=${row.id}' class='btn btn-warning btn-sm' title='Editar'><i class='bi bi-pencil-square'></i></a>`;
                     btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm(\"¿Seguro de eliminar este paciente?\");'><i class='bi bi-trash'></i></a>`;
-                    // El rol se debe tomar del contexto PHP, no como string literal
                     <?php if (in_array($rol, ['admin', 'recepcionista'])): ?>
                     btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
                     <?php endif; ?>
