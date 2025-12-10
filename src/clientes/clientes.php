@@ -377,6 +377,15 @@ function capitalize($string) {
         font-size: 1.5rem;
         margin-bottom: 1rem;
     }
+    
+    .mobile-pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        margin: 1.5rem 0 2rem 0;
+        width: 100%;
+    }
 }
 
 @media (max-width: 576px) {
@@ -461,183 +470,8 @@ function capitalize($string) {
             <button class="btn btn-primary" type="button" onclick="document.getElementById('buscadorClienteMovil').value = ''; filtrarCardsClientes('');"><i class="bi bi-x"></i></button>
         </div>
     </div>
-    <div class="cards-container">
-        <?php if ($clientes): ?>
-            <?php foreach ($clientes as $cliente): ?>
-                <div class="cliente-card" data-nombre="<?= htmlspecialchars($cliente['nombre'] ?? '') ?>" data-apellido="<?= htmlspecialchars($cliente['apellido'] ?? '') ?>" data-dni="<?= htmlspecialchars($cliente['dni'] ?? '') ?>">
-                    <div class="card-header">
-                        <h5 class="cliente-nombre">
-                            <?= capitalize($cliente['nombre'] ?? '') ?> <?= capitalize($cliente['apellido'] ?? '') ?>
-                        </h5>
-                        <span class="cliente-codigo">
-                            #<?= htmlspecialchars($cliente['codigo_cliente'] ?? $cliente['id']) ?>
-                        </span>
-                    </div>
-
-                    <div class="card-body">
-                        <div class="info-item">
-                            <span class="info-label">DNI</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['dni'] ?? 'No especificado') ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Edad</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['edad'] ?? 'No especificada') ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Email</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['email'] ?? 'No especificado') ?></span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Teléfono</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['telefono'] ?? 'No especificado') ?></span>
-                        </div>
-                        <div class="info-item" style="grid-column: span 2;">
-                            <span class="info-label">Dirección</span>
-                            <span class="info-value"><?= htmlspecialchars($cliente['direccion'] ?? 'No especificada') ?></span>
-                        </div>
-                    </div>
-
-                    <div class="badges-section">
-                        <?php
-                            $rol_creador = strtolower(trim($cliente['rol_creador'] ?? ''));
-                            $roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
-                            $rol_mostrar = in_array($rol_creador, $roles_validos) && $rol_creador !== '' 
-                                ? ucfirst($rol_creador) 
-                                : 'Paciente';
-                        ?>
-                        <span class="badge-custom badge-rol">
-                            <i class="bi bi-person-badge me-1"></i>
-                            <?= $rol_mostrar ?>
-                        </span>
-
-                        <span class="badge-custom badge-estado">
-                            <i class="bi bi-circle-fill me-1"></i>
-                            <?= htmlspecialchars($cliente['estado'] ?? 'Activo') ?>
-                        </span>
-
-                        <?php
-                            $emp = $cliente['nombre_empresa'] ?? '';
-                            $conv = $cliente['nombre_convenio'] ?? '';
-                            if ($emp): ?>
-                                <span class="badge-custom badge-empresa">
-                                    <i class="bi bi-building me-1"></i>
-                                    <?= htmlspecialchars($emp) ?>
-                                </span>
-                            <?php endif; ?>
-                            
-                            <?php if ($conv): ?>
-                                <span class="badge-custom badge-convenio">
-                                    <i class="bi bi-handshake me-1"></i>
-                                    <?= htmlspecialchars($conv) ?>
-                                </span>
-                            <?php endif; ?>
-                    </div>
-
-                    <div class="card-actions">
-                        <div class="d-flex gap-2">
-                            <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" 
-                               class="action-btn btn-edit" 
-                               title="Editar">
-                                <i class="bi bi-pencil-square"></i>
-                                Editar
-                            </a>
-                            <a href="clientes/eliminar.php?id=<?= $cliente['id'] ?>" 
-                               class="action-btn btn-delete" 
-                               title="Eliminar" 
-                               onclick="return confirm('¿Estás seguro de eliminar este paciente?');">
-                                <i class="bi bi-trash"></i>
-                                Eliminar
-                            </a>
-                        </div>
-                        
-                        <?php if ($rol === 'recepcionista' || $rol === 'admin'): ?>
-                            <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" 
-                               class="action-btn btn-cotizar" 
-                               title="Crear Cotización">
-                                <i class="bi bi-file-earmark-plus me-1"></i>
-                                Cotizar
-                            </a>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-
-                        <!-- Paginación para cards -->
-                        <style>
-                        @media (max-width: 768px) {
-                            .pagination, .pagination ul { display: none !important; }
-                            .mobile-pagination {
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                gap: 6px;
-                                margin: 1.5rem 0 2rem 0;
-                            }
-                            .mobile-pagination .page-btn {
-                                background: #764ba2;
-                                color: #fff;
-                                border: none;
-                                border-radius: 8px;
-                                min-width: 38px;
-                                min-height: 38px;
-                                font-weight: 700;
-                                font-size: 1.1rem;
-                                box-shadow: 0 2px 8px #764ba233;
-                                transition: background 0.2s, color 0.2s;
-                            }
-                            .mobile-pagination .page-btn.active {
-                                background: #fff;
-                                color: #764ba2;
-                                border: 2px solid #764ba2;
-                            }
-                            .mobile-pagination .page-btn:disabled {
-                                opacity: 0.5;
-                                cursor: not-allowed;
-                            }
-                        }
-                        </style>
-                        <nav class="mobile-pagination" id="paginacionClienteMovil">
-                            <?php
-                            $params = $_GET;
-                            unset($params['pagina']);
-                            $baseUrl = '';
-                            if (!empty($params)) {
-                                foreach ($params as $key => $value) {
-                                    $baseUrl .= '<input type="hidden" name="' . htmlspecialchars($key) . '" value="' . htmlspecialchars($value) . '">';
-                                }
-                            }
-                            ?>
-                            <form method="get" style="display:inline">
-                                <?= $baseUrl ?>
-                                <button class="page-btn" type="submit" name="pagina" value="<?= max(1, $pagina-1) ?>" <?= $pagina <= 1 ? 'disabled' : '' ?>>&#8592;</button>
-                            </form>
-                            <?php
-                            $pages = [];
-                            if ($pagina > 1) $pages[] = $pagina-1;
-                            $pages[] = $pagina;
-                            if ($pagina < $total_paginas) $pages[] = $pagina+1;
-                            foreach ($pages as $p): ?>
-                                <form method="get" style="display:inline">
-                                    <?= $baseUrl ?>
-                                    <button class="page-btn<?= $p == $pagina ? ' active' : '' ?>" type="submit" name="pagina" value="<?= $p ?>"><?= $p ?></button>
-                                </form>
-                            <?php endforeach; ?>
-                            <form method="get" style="display:inline">
-                                <?= $baseUrl ?>
-                                <button class="page-btn" type="submit" name="pagina" value="<?= min($total_paginas, $pagina+1) ?>" <?= $pagina >= $total_paginas ? 'disabled' : '' ?>>&#8594;</button>
-                            </form>
-                        </nav>
-        <?php else: ?>
-            <div class="text-center py-5">
-                <i class="bi bi-people" style="font-size: 4rem; color: #6c757d;"></i>
-                <h4 class="mt-3 text-muted">No hay pacientes registrados</h4>
-                <p class="text-muted">Comienza agregando tu primer paciente</p>
-                <a href="dashboard.php?vista=form_cliente" class="btn-nuevo">
-                    <i class="bi bi-person-plus"></i>
-                    Agregar Paciente
-                </a>
-            </div>
-        <?php endif; ?>
+    <div class="cards-container" id="cardsClientesAjax">
+        <!-- Cards de clientes se llenarán por AJAX aquí -->
     </div>
 
     <!-- Vista Tabla para Desktop -->
@@ -713,6 +547,19 @@ function filtrarCardsClientes(valor) {
 }
 document.addEventListener('DOMContentLoaded', function() {
     mostrarPaginaActualClientes();
+    const buscador = document.getElementById('buscadorClienteMovil');
+    const btnClear = buscador && buscador.nextElementSibling && buscador.nextElementSibling.tagName === 'BUTTON' ? buscador.nextElementSibling : null;
+    if (buscador) {
+        buscador.addEventListener('input', function(e) {
+            cargarCardsClientes(1, e.target.value);
+        });
+        if (btnClear) {
+            btnClear.addEventListener('click', function() {
+                buscador.value = '';
+                cargarCardsClientes(1, '');
+            });
+        }
+    }
 });
 document.getElementById('buscadorClienteMovil').addEventListener('input', function(e) {
     filtrarCardsClientes(e.target.value);
@@ -771,4 +618,148 @@ $(document).ready(function() {
         ]
     });
 });
+</script>
+<script>
+// --- AJAX para cards móviles ---
+const rolUsuario = <?= json_encode($rol) ?>;
+function renderClienteCard(cliente) {
+    // Utiliza la misma estructura visual que antes, pero en JS
+    let badges = '';
+    // Rol
+    const rol_creador = (cliente.rol_creador || '').toLowerCase().trim();
+    const roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
+    const rol_mostrar = roles_validos.includes(rol_creador) && rol_creador !== '' ? rol_creador.charAt(0).toUpperCase() + rol_creador.slice(1) : 'Paciente';
+    badges += `<span class='badge-custom badge-rol'><i class='bi bi-person-badge me-1'></i>${rol_mostrar}</span>`;
+    // Estado
+    badges += `<span class='badge-custom badge-estado'><i class='bi bi-circle-fill me-1'></i>${cliente.estado || 'Activo'}</span>`;
+    // Empresa
+    if (cliente.nombre_empresa) {
+        badges += `<span class='badge-custom badge-empresa'><i class='bi bi-building me-1'></i>${cliente.nombre_empresa}</span>`;
+    }
+    // Convenio
+    if (cliente.nombre_convenio) {
+        badges += `<span class='badge-custom badge-convenio'><i class='bi bi-handshake me-1'></i>${cliente.nombre_convenio}</span>`;
+    }
+    // Acciones
+    let acciones = `<div class='d-flex gap-2'>`;
+    acciones += `<a href='dashboard.php?vista=form_cliente&id=${cliente.id}' class='action-btn btn-edit' title='Editar'><i class='bi bi-pencil-square'></i>Editar</a>`;
+    acciones += `<a href='clientes/eliminar.php?id=${cliente.id}' class='action-btn btn-delete' title='Eliminar' onclick='return confirm(\'¿Estás seguro de eliminar este paciente?\');'><i class='bi bi-trash'></i>Eliminar</a>`;
+    acciones += `</div>`;
+    if (rolUsuario === 'admin' || rolUsuario === 'recepcionista') {
+        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${cliente.id}' class='action-btn btn-cotizar' title='Crear Cotización'><i class='bi bi-file-earmark-plus me-1'></i>Cotizar</a>`;
+    }
+    return `
+    <div class='cliente-card' data-nombre='${cliente.nombre || ''}' data-apellido='${cliente.apellido || ''}' data-dni='${cliente.dni || ''}'>
+        <div class='card-header'>
+            <h5 class='cliente-nombre'>${capitalize(cliente.nombre)} ${capitalize(cliente.apellido)}</h5>
+            <span class='cliente-codigo'>#${cliente.codigo_cliente || cliente.id}</span>
+        </div>
+        <div class='card-body'>
+            <div class='info-item'><span class='info-label'>DNI</span><span class='info-value'>${cliente.dni || 'No especificado'}</span></div>
+            <div class='info-item'><span class='info-label'>Edad</span><span class='info-value'>${cliente.edad || 'No especificada'}</span></div>
+            <div class='info-item'><span class='info-label'>Email</span><span class='info-value'>${cliente.email || 'No especificado'}</span></div>
+            <div class='info-item'><span class='info-label'>Teléfono</span><span class='info-value'>${cliente.telefono || 'No especificado'}</span></div>
+            <div class='info-item' style='grid-column: span 2;'><span class='info-label'>Dirección</span><span class='info-value'>${cliente.direccion || 'No especificada'}</span></div>
+        </div>
+        <div class='badges-section'>${badges}</div>
+        <div class='card-actions'>${acciones}</div>
+    </div>`;
+}
+function capitalize(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+function cargarCardsClientes(pagina = 1, busqueda = '') {
+    const porPagina = 3;
+    const params = {
+        draw: 1,
+        start: (pagina - 1) * porPagina,
+        length: porPagina,
+        search: { value: busqueda }
+    };
+    $.ajax({
+        url: 'dashboard.php?action=clientes_api',
+        data: params,
+        dataType: 'json',
+        success: function(resp) {
+            const cont = document.getElementById('cardsClientesAjax');
+            cont.innerHTML = '';
+            if (resp.data && resp.data.length > 0) {
+                resp.data.forEach(cliente => {
+                    cont.innerHTML += renderClienteCard(cliente);
+                });
+                renderPaginacionMovil(pagina, Math.ceil(resp.recordsFiltered / porPagina), busqueda);
+            } else {
+                cont.innerHTML = `<div class='text-center py-5'><i class='bi bi-people' style='font-size: 4rem; color: #6c757d;'></i><h4 class='mt-3 text-muted'>No hay pacientes registrados</h4><p class='text-muted'>Comienza agregando tu primer paciente</p><a href='dashboard.php?vista=form_cliente' class='btn-nuevo'><i class='bi bi-person-plus'></i>Agregar Paciente</a></div>`;
+                renderPaginacionMovil(1, 1, busqueda);
+            }
+        },
+        error: function() {
+            document.getElementById('cardsClientesAjax').innerHTML = '<div class="alert alert-danger">Error al cargar los pacientes.</div>';
+        }
+    });
+}
+function renderPaginacionMovil(pagina, totalPaginas, busqueda) {
+    let nav = document.getElementById('paginacionClienteMovil');
+    if (!nav) {
+        nav = document.createElement('nav');
+        nav.className = 'mobile-pagination';
+        nav.id = 'paginacionClienteMovil';
+        document.getElementById('cardsClientesAjax').after(nav);
+    }
+    let html = '';
+    html += `<button class='page-btn' onclick='cargarCardsClientes(${pagina - 1}, ${JSON.stringify(busqueda)})' ${pagina <= 1 ? 'disabled' : ''}>&#8592;</button>`;
+    for (let p = Math.max(1, pagina - 1); p <= Math.min(totalPaginas, pagina + 1); p++) {
+        html += `<button class='page-btn${p === pagina ? ' active' : ''}' onclick='cargarCardsClientes(${p}, ${JSON.stringify(busqueda)})'>${p}</button>`;
+    }
+    html += `<button class='page-btn' onclick='cargarCardsClientes(${pagina + 1}, ${JSON.stringify(busqueda)})' ${pagina >= totalPaginas ? 'disabled' : ''}>&#8594;</button>`;
+    nav.innerHTML = html;
+}
+(function() {
+    let lastMode = window.innerWidth < 768 ? 'mobile' : 'desktop';
+    let lastBusqueda = '';
+    function isMobile() { return window.innerWidth < 768; }
+    function cargarSiMovil(force = false) {
+        if (isMobile()) {
+            const buscador = document.getElementById('buscadorClienteMovil');
+            let busqueda = buscador ? buscador.value : '';
+            // Siempre cargar los cards al entrar a móvil o si cambia la búsqueda
+            if (force || lastMode !== 'mobile' || lastBusqueda !== busqueda) {
+                cargarCardsClientes(1, busqueda);
+                lastMode = 'mobile';
+                lastBusqueda = busqueda;
+            }
+            // Si la paginación móvil fue eliminada en desktop, se volverá a crear en renderPaginacionMovil
+        } else {
+            // Eliminar paginación móvil si existe
+            const nav = document.getElementById('paginacionClienteMovil');
+            if (nav && nav.parentNode) nav.parentNode.removeChild(nav);
+            lastMode = 'desktop';
+            // Forzar ajuste de columnas DataTables al volver a desktop
+            if ($.fn.DataTable && $('#tablaClientes').length && $('#tablaClientes').hasClass('dataTable')) {
+                $('#tablaClientes').DataTable().columns.adjust().responsive.recalc();
+            }
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        cargarSiMovil(true);
+        // Buscador móvil
+        const buscador = document.getElementById('buscadorClienteMovil');
+        const btnClear = buscador && buscador.nextElementSibling && buscador.nextElementSibling.tagName === 'BUTTON' ? buscador.nextElementSibling : null;
+        if (buscador) {
+            buscador.addEventListener('input', function(e) {
+                cargarCardsClientes(1, e.target.value);
+            });
+            if (btnClear) {
+                btnClear.addEventListener('click', function() {
+                    buscador.value = '';
+                    cargarCardsClientes(1, '');
+                });
+            }
+        }
+    });
+    window.addEventListener('resize', function() {
+        cargarSiMovil();
+    });
+})();
 </script>

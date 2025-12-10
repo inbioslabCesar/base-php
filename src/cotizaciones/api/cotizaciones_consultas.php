@@ -57,7 +57,35 @@ $stmt->execute($params);
 
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Consulta para exámenes de cada cotización
+// Calcular total de deuda pendiente y obtener IDs de cotizaciones pendientes
+$sqlPendientes = "SELECT c.id, (c.total - IFNULL((SELECT SUM(monto) FROM pagos WHERE id_cotizacion = c.id), 0)) AS saldo_pendiente
+FROM cotizaciones c
+JOIN clientes cl ON c.id_cliente = cl.id
+LEFT JOIN empresas e ON c.id_empresa = e.id
+LEFT JOIN convenios v ON c.id_convenio = v.id";
+if ($condiciones) {
+    $sqlPendientes .= " WHERE " . implode(' AND ', $condiciones);
+} else {
+    $sqlPendientes .= " WHERE 1=1";
+}
+$stmtPendientes = $pdo->prepare($sqlPendientes);
+$stmtPendientes->execute($params);
+$idsPendientes = [];
+$totalDeuda = 0;
+foreach ($stmtPendientes->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    if (floatval($row['saldo_pendiente']) > 0) {
+        $idsPendientes[] = $row['id'];
+        $totalDeuda += floatval($row['saldo_pendiente']);
+    }
+}
+
+// Al final del archivo, incluir los datos en la respuesta JSON si corresponde
+// Ejemplo:
+// echo json_encode([
+//     'cotizaciones' => $cotizaciones,
+//     'totalDeuda' => $totalDeuda,
+//     'idsPendientes' => $idsPendientes
+// ]);
 $examenesPorCotizacion = [];
 if ($cotizaciones) {
     $idsCotizaciones = array_column($cotizaciones, 'id');

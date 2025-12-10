@@ -1,7 +1,8 @@
 <?php
 // src/cotizaciones/pago_masivo.php
 header('Content-Type: application/json');
-require_once '../conexion/conexion.php'; // Incluye $pdo
+require_once __DIR__ . '/../../conexion/conexion.php'; // Incluye $pdo
+require_once __DIR__ . '/../funciones/cotizaciones_utils.php'; // Función utilitaria
 
 // Solo aceptar POST y JSON
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -25,17 +26,12 @@ try {
     $pdo->beginTransaction();
     $pagosRegistrados = 0;
     foreach ($cotizaciones as $idCotizacion) {
-        // Obtener saldo pendiente de la cotización
-    $stmt = $pdo->prepare('SELECT total, (SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = c.id) AS pagado FROM cotizaciones c WHERE c.id = ?');
-    $stmt->execute([$idCotizacion]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) continue;
-    $saldo = floatval($row['total']) - floatval($row['pagado']);
-    if ($saldo <= 0) continue; // Ya pagado
-    // Registrar pago por el saldo pendiente
-    $stmtPago = $pdo->prepare('INSERT INTO pagos (id_cotizacion, monto, fecha, metodo_pago) VALUES (?, ?, NOW(), ?)');
-    $stmtPago->execute([$idCotizacion, $saldo, 'masivo']);
-    $pagosRegistrados++;
+        $saldo = obtenerSaldoCotizacion($pdo, $idCotizacion);
+        if ($saldo <= 0) continue; // Ya pagado
+        // Registrar pago por el saldo pendiente
+        $stmtPago = $pdo->prepare('INSERT INTO pagos (id_cotizacion, monto, fecha, metodo_pago) VALUES (?, ?, NOW(), ?)');
+        $stmtPago->execute([$idCotizacion, $saldo, 'masivo']);
+        $pagosRegistrados++;
     }
     $pdo->commit();
     echo json_encode(['success' => true, 'pagos' => $pagosRegistrados]);
