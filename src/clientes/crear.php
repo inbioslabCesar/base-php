@@ -47,10 +47,15 @@ if (!$dni) {
     $dni = str_pad(strval(mt_rand(0, 99999999)), 8, '0', STR_PAD_LEFT);
 }
 
-// Si el email está vacío, generar uno provisional usando el DNI
-
+// Si el email está vacío, generar uno provisional usando el DNI y el nombre de la empresa (en minúsculas)
 if (!$email) {
-    $email = $dni . '@medditech.com';
+    $stmt = $pdo->query("SELECT nombre FROM config_empresa LIMIT 1");
+    $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+    $nombre_empresa = 'inbioslab';
+    if ($empresa && !empty($empresa['nombre'])) {
+        $nombre_empresa = strtolower(preg_replace('/\s+/', '', $empresa['nombre']));
+    }
+    $email = $dni . '@' . $nombre_empresa . '.com';
 }
 
 // Si la contraseña está vacía, asignar el DNI como contraseña

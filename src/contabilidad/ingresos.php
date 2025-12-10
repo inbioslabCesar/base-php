@@ -545,7 +545,8 @@ function cargarCardsIngresos(pagina = 1, busqueda = '') {
         hasta: $('input[name="hasta"]').val(),
         tipo_paciente: $('select[name="tipo_paciente"]').val(),
         filtro_convenio: $('select[name="filtro_convenio"]').val(),
-        filtro_empresa: $('select[name="filtro_empresa"]').val()
+        filtro_empresa: $('select[name="filtro_empresa"]').val(),
+        order: [{ column: 1, dir: 'desc' }] // columna 1 = fecha, descendente
     };
     $.ajax({
         url: 'dashboard.php?action=ingresos_api',

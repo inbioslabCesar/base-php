@@ -260,6 +260,14 @@
      </div>
  </section>
 
+  <!-- Ubicación del Laboratorio -->
+ <div class="container mt-4">
+    <h4>Ubicación del Laboratorio</h4>
+    <div style="width:100%;max-width:600px;margin:auto;">
+        <iframe src="https://www.google.com/maps?q=INBIOSLAB+LABORATORIO+CLINICO&output=embed" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+</div>
+
  <!-- Botón flotante de WhatsApp -->
 
  <?php
