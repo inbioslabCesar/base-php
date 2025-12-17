@@ -128,7 +128,9 @@ class ExamCardView {
                                 ' data-referencias=\'' . json_encode($item['referencias'] ?? []) . '\'' .
                                 ' data-edad="' . htmlspecialchars($edad_paciente ?? '') . '"' .
                                 ' data-sexo="' . htmlspecialchars($sexo_paciente ?? '') . '"' .
+                                ' data-decimales="' . htmlspecialchars(isset($item['decimales']) ? $item['decimales'] : '') . '"' .
                                 '>';                      
+                            // Checkbox "Sin .0" eliminado: el sistema ahora formatea de forma natural
                             echo '</div>';
                         }
                         if (!empty($item['referencias'])) {

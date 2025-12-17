@@ -109,14 +109,24 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                     }
                 }
             }
-            // Formatear valor para mostrar
+            // Formatear valor para mostrar, respetando decimales configurados
+            // y evitando añadir ".0" automáticamente cuando no corresponde.
             $valorFormateado = $valorOriginal;
-            if (isset($item['decimales']) && is_numeric($item['decimales']) && $valorFormateado !== "" && is_numeric(str_replace(',', '', $valorFormateado))) {
-                $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), intval($item['decimales']), '.', '');
-            } elseif (in_array($item['prueba'], $sinDecimales) && is_numeric(str_replace(',', '', $valorFormateado))) {
-                $valorFormateado = number_format(floatval(str_replace(',', '', $valorFormateado)), 0, '', ',');
-            } elseif ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric($valorFormateado)) {
-                $valorFormateado = number_format($valorFormateado, 1, '.', '');
+            if ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric(str_replace(',', '', $valorFormateado))) {
+                $numVal = floatval(str_replace(',', '', $valorFormateado));
+                if (isset($item['decimales']) && $item['decimales'] !== '' && is_numeric($item['decimales'])) {
+                    // Respetar decimales definidos en el parámetro
+                    $valorFormateado = number_format($numVal, intval($item['decimales']), '.', '');
+                } elseif (in_array($item['prueba'], $sinDecimales)) {
+                    // Forzar sin decimales para pruebas específicas
+                    $valorFormateado = number_format($numVal, 0, '.', '');
+                } elseif (floor($numVal) == $numVal) {
+                    // Si es entero y no hay decimales definidos, mostrar sin ".0"
+                    $valorFormateado = (string) intval($numVal);
+                } else {
+                    // Mantener el valor tal como viene (formateado previamente)
+                    $valorFormateado = (string) $valorFormateado;
+                }
             }
             if ($fuera_rango && $valorFormateado !== "") {
                 $valorFormateado = '* ' . $valorFormateado;

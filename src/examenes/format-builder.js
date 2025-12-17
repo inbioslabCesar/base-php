@@ -367,7 +367,7 @@ function createFormulaPanel(paramNames, formulaInput) {
   });
 
   // Botones de operadores
-  ['+', '-', '*', '/', '(', ')'].forEach(op => {
+  ['+', '-', '*', '/','^', '(', ')'].forEach(op => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'btn btn-outline-primary btn-sm';

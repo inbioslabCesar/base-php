@@ -3,6 +3,24 @@
 require_once __DIR__ . '/src/config/config.php';
 require_once __DIR__ . '/src/conexion/conexion.php';
 
+// Redirección canónica por empresa (opcional)
+// Define CANONICAL_HOST en src/config/empresas/<empresa>.php, ej.: 'jeycolab.com' o 'www.inbioslabstore.com'
+// No aplica en entornos locales
+$hostActual = $_SERVER['HTTP_HOST'] ?? '';
+$isLocalHost = in_array($hostActual, ['localhost', '127.0.0.1'], true);
+$canonicalHost = defined('CANONICAL_HOST') ? constant('CANONICAL_HOST') : null;
+if ($canonicalHost && !$isLocalHost && strcasecmp($hostActual, $canonicalHost) !== 0) {
+    $esHttps = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
+        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    );
+    $scheme = $esHttps ? 'https' : 'http';
+    $uri = $_SERVER['REQUEST_URI'] ?? '/';
+    header('Location: ' . $scheme . '://' . $canonicalHost . $uri, true, 301);
+    exit;
+}
+
 // Consulta de promociones solo para clientes y todos
 $stmtPromo = $pdo->query("SELECT * FROM promociones WHERE activo = 1 AND (tipo_publico = 'clientes' OR tipo_publico = 'todos') AND (CURDATE() BETWEEN fecha_inicio AND fecha_fin OR vigente = 1) ORDER BY fecha_inicio DESC");
 $promociones = $stmtPromo->fetchAll(PDO::FETCH_ASSOC);
@@ -13,6 +31,7 @@ $config_empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 $nombre_empresa    = $config_empresa['nombre'] ?? 'Laboratorio Ejemplo';
 $color_principal   = $config_empresa['color_principal'] ?? '#0d6efd';
 $color_secundario  = $config_empresa['color_secundario'] ?? '#f8f9fa';
+
 $color_footer      = $config_empresa['color_footer'] ?? '#343a40';
 $color_botones     = $config_empresa['color_botones'] ?? '#198754'; // Nuevo campo
 $color_texto       = $config_empresa['color_texto'] ?? '#212529';   // Nuevo campo
@@ -55,6 +74,8 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
 <head>
     <meta charset="UTF-8">
+    <!-- Fuerza upgrade a HTTPS en clientes modernos -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <!-- Favicon para navegadores -->
     <link rel="icon" type="image/png" sizes="32x32" href="/src/images/empresa/logo_empresa.png">
     <link rel="icon" type="image/png" sizes="48x48" href="/src/images/empresa/logo_empresa.png">
@@ -64,6 +85,18 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <link rel="apple-touch-icon" sizes="180x180" href="/src/images/empresa/logo_empresa.png">
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <?php
+    // Detección robusta del esquema (útil detrás de proxies/CDN)
+    $esHttps = (
+        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+        (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
+        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    );
+    $protocolo = $esHttps ? 'https' : 'http';
+    $dominio   = $protocolo . '://' . $_SERVER['HTTP_HOST'];
+    $canonical = $dominio . $_SERVER['REQUEST_URI'];
+    ?>
+    <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -121,7 +154,8 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
 
         .logo-navbar {
-            max-width: 100px;
+           height: 150px; /* o el tamaño que prefieras */
+           width: auto;
         }
 
         .institucional-img {
@@ -277,11 +311,14 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
             background-color: #0056b3 !important;
             color: #fff !important;
         }
+
+        /* Título de la sección de ubicación */
+        .titulo-ubicacion {
+            color: #fff;
+        }
     </style>
     <script type="application/ld+json">
         <?php
-        $protocolo = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
-        $dominio = $protocolo . '://' . $_SERVER['HTTP_HOST'];
         $logo_url = $dominio . '/' . ltrim($logo, '/');
         $json_ld = [
             "@context" => "https://schema.org",

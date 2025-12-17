@@ -96,6 +96,20 @@ foreach ($rows as $row) {
         if ($item['tipo'] === 'Parámetro' && empty($item['formula'])) {
             $nombre = $item['nombre'];
             $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
+            // Formateo para valores ingresados (sin fórmula): respeta decimales; sin decimales, formateo natural
+            if ($valor !== '' && is_numeric($valor)) {
+                $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
+                if ($dec !== null) {
+                    $valor = number_format($valor, $dec, '.', '');
+                } else {
+                    // Sin decimales configurados: entero sin .0, fracción como valor natural
+                    if (floor($valor) == $valor) {
+                        $valor = (string) intval($valor);
+                    } else {
+                        $valor = (string) $valor;
+                    }
+                }
+            }
             $valores[$nombre] = $valor;
             $examen_items[] = array_merge($item, [
                 "prueba" => $nombre,
@@ -117,9 +131,23 @@ foreach ($rows as $row) {
             }, $formula);
             $valor = '';
             try {
-                $valor = eval('return ' . $formula_eval . ';');
+                $expr = $formula_eval;
+                if (strpos($expr, '^') !== false) {
+                    $expr = str_replace('^', '**', $expr);
+                }
+                $valor = eval('return ' . $expr . ';');
                 if (is_numeric($valor)) {
-                    $valor = number_format($valor, 1, '.', '');
+                    $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
+                    if ($dec !== null) {
+                        $valor = number_format($valor, $dec, '.', '');
+                    } else {
+                        // Sin decimales configurados: entero sin .0; fracción como valor natural
+                        if (floor($valor) == $valor) {
+                            $valor = (string) intval($valor);
+                        } else {
+                            $valor = (string) $valor;
+                        }
+                    }
                 }
             } catch (Throwable $e) {
                 $valor = '';

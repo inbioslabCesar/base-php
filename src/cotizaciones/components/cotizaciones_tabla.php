@@ -333,10 +333,12 @@ function getSeleccionGlobal() {
                 {
                     "data": null,
                     "render": function(data, type, row) {
-                        // Calcular estado de pago usando total pagado
+                        // Calcular estado de pago usando total pagado y descarga anticipada
                         const total = parseFloat(row.total) || 0;
                         const pagado = parseFloat(row.total_pagado) || 0;
-                        if (pagado >= total && total > 0) {
+                        if (row.tiene_descarga_anticipada == 1) {
+                            return `<span class='badge bg-warning text-dark'><i class='bi bi-clock'></i> Descarga anticipada</span>`;
+                        } else if (pagado >= total && total > 0) {
                             return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
                         } else if (pagado > 0 && pagado < total) {
                             return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Parcial</span>`;
@@ -346,12 +348,18 @@ function getSeleccionGlobal() {
                     }
                 },
                 {
-                    "data": "estado_examen",
-                    "render": function(data) {
-                        if (data === 'pendiente') {
-                            return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>`;
+                    "data": null,
+                    "render": function(row) {
+                        const estado = row.estado_examen;
+                        const porcentaje = row.porcentaje_examen;
+                        if (estado === 'completado_100' || estado === 'pendiente_100') {
+                            return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado 100%</span>`;
+                        } else if (estado === 'pendiente_0') {
+                            return `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente 0%</span>`;
+                        } else if (estado && estado.startsWith('pendiente_')) {
+                            return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente ${porcentaje}%</span>`;
                         } else {
-                            return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>`;
+                            return `<span class='badge bg-secondary'>Sin datos</span>`;
                         }
                     }
                 },
@@ -646,19 +654,27 @@ function renderCotizacionCard(row) {
     const total = parseFloat(row.total) || 0;
     const pagado = parseFloat(row.total_pagado) || 0;
     let estadoPago = '';
-    if (pagado >= total && total > 0) {
+    if (row.tiene_descarga_anticipada == 1) {
+        estadoPago = `<span class='badge bg-warning text-dark'><i class='bi bi-clock'></i> Descarga anticipada</span>`;
+    } else if (pagado >= total && total > 0) {
         estadoPago = `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
     } else if (pagado > 0 && pagado < total) {
         estadoPago = `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Parcial</span>`;
     } else {
         estadoPago = `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente</span>`;
     }
-    // Estado examen
+    // Estado examen con porcentaje
     let estadoExamen = '';
-    if (row.estado_examen === 'pendiente') {
-        estadoExamen = `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente</span>`;
+    const estado = row.estado_examen;
+    const porcentaje = row.porcentaje_examen;
+    if (estado === 'completado_100' || estado === 'pendiente_100') {
+        estadoExamen = `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado 100%</span>`;
+    } else if (estado === 'pendiente_0') {
+        estadoExamen = `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente 0%</span>`;
+    } else if (estado && estado.startsWith('pendiente_')) {
+        estadoExamen = `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente ${porcentaje}%</span>`;
     } else {
-        estadoExamen = `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado</span>`;
+        estadoExamen = `<span class='badge bg-secondary'>Sin datos</span>`;
     }
     // Acciones (todas como en escritorio)
     let acciones = '';

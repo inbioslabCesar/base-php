@@ -108,6 +108,10 @@ try {
         $row['saldo'] = obtenerSaldoCotizacion($pdo, $row['id']);
         // Calcular total pagado para estado de pago
         $row['total_pagado'] = $pdo->query("SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = {$row['id']}")->fetchColumn();
+        // Detectar si existe pago con método descarga_anticipada
+        $stmtDescAnt = $pdo->prepare("SELECT COUNT(*) FROM pagos WHERE id_cotizacion = ? AND metodo_pago = 'descarga_anticipada'");
+        $stmtDescAnt->execute([$row['id']]);
+        $row['tiene_descarga_anticipada'] = $stmtDescAnt->fetchColumn() > 0 ? 1 : 0;
         if (!empty($row['id_empresa']) && !empty($row['nombre_comercial'])) {
             $row['referencia'] = $row['nombre_comercial'];
         } elseif (!empty($row['id_convenio']) && !empty($row['nombre_convenio'])) {
@@ -115,6 +119,16 @@ try {
         } else {
             $row['referencia'] = 'Particular';
         }
+        // Calcular porcentaje de resultados llenados
+        $porcentaje = obtenerPorcentajeResultadosCotizacion($pdo, $row['id']);
+        if ($porcentaje === 100) {
+            $row['estado_examen'] = 'completado_100';
+        } elseif ($porcentaje === 0) {
+            $row['estado_examen'] = 'pendiente_0';
+        } else {
+            $row['estado_examen'] = 'pendiente_' . $porcentaje;
+        }
+        $row['porcentaje_examen'] = $porcentaje;
         $dataFinal[] = $row;
     }
     // Total filtrado

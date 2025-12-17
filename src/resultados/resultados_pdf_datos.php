@@ -60,11 +60,6 @@ function obtenerItemsResultados($pdo, $rows) {
         $adicional = $examen && $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
         $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
 
-        // Solo imprimir si el examen fue marcado para imprimir
-        if (!isset($resultados_json['imprimir_examen']) || !$resultados_json['imprimir_examen']) {
-            continue;
-        }
-
         // Normaliza valores numéricos (quita comas)
         foreach ($resultados_json as $k => $v) {
             if (is_string($v) && preg_match('/^\d{1,3}(,\d{3})*(\.\d+)?$/', $v)) {
@@ -96,9 +91,23 @@ function obtenerItemsResultados($pdo, $rows) {
                             return isset($valores[$param]) && is_numeric($valores[$param]) ? $valores[$param] : 0;
                         }, $formula);
                         try {
-                            $valor = eval('return ' . $formula_eval . ';');
+                            $expr = $formula_eval;
+                            if (strpos($expr, '^') !== false) {
+                                $expr = str_replace('^', '**', $expr);
+                            }
+                            $valor = eval('return ' . $expr . ';');
                             if (is_numeric($valor)) {
-                                $valor = number_format($valor, 1, '.', '');
+                                $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
+                                if ($dec !== null) {
+                                    $valor = number_format($valor, $dec, '.', '');
+                                } else {
+                                    // Sin decimales configurados: entero sin .0; fracción como valor natural
+                                    if (floor($valor) == $valor) {
+                                        $valor = (string) intval($valor);
+                                    } else {
+                                        $valor = (string) $valor;
+                                    }
+                                }
                             }
                         } catch (Throwable $e) {
                             $valor = '';
@@ -106,6 +115,21 @@ function obtenerItemsResultados($pdo, $rows) {
                     }
                 } else {
                     $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
+                    // Formateo para valores ingresados (sin fórmula): respetar decimales; sin decimales, natural
+                    if ($valor !== '' && is_numeric($valor)) {
+                        $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
+                        if ($dec !== null) {
+                            // Si hay decimales configurados, respetarlos
+                            $valor = number_format($valor, $dec, '.', '');
+                        } else {
+                            // Sin decimales configurados: entero sin .0, fracción como valor natural
+                            if (floor($valor) == $valor) {
+                                $valor = (string) intval($valor);
+                            } else {
+                                $valor = (string) $valor;
+                            }
+                        }
+                    }
                 }
                 $valores[$nombre] = $valor;
                 $examen_items[] = array_merge($item, [

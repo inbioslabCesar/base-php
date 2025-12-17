@@ -148,7 +148,7 @@ if ($esEdicion) {
     </form>
 </div>
 
-<script src="<?= BASE_URL ?>examenes/format-builder.js"></script>
+<script src="<?= BASE_URL ?>examenes/format-builder.js?v=<?= time() ?>"></script>
 <script>
     // Cargar datos al editar
     var datosAdicionales = <?php echo json_encode($adicional_array, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;

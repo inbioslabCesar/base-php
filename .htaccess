@@ -1,3 +1,20 @@
 RewriteEngine On
-RewriteCond %{HTTP_HOST} ^inbioslabstore\.com [NC]
-RewriteRule ^(.*)$ https://www.inbioslabstore.com/$1 [L,R=301]
+
+# Redirección 301 a HTTPS (compatible con proxy/CDN), excepto localhost
+RewriteCond %{HTTP_HOST} !^localhost$ [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1$ [NC]
+RewriteCond %{HTTPS} !=on [OR]
+RewriteCond %{HTTP:X-Forwarded-Proto} =http
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Bloquear acceso público a vendor (opcional pero recomendado)
+RedirectMatch 404 ^/vendor/.*$
+
+# Cabeceras de seguridad
+<IfModule mod_headers.c>
+	Header always set Strict-Transport-Security "max-age=31536000"
+	Header always set Content-Security-Policy "upgrade-insecure-requests"
+	Header always set X-Content-Type-Options "nosniff"
+	Header always set X-Frame-Options "SAMEORIGIN"
+	Header always set Referrer-Policy "no-referrer-when-downgrade"
+</IfModule>

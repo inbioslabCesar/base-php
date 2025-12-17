@@ -20,10 +20,10 @@ foreach ($resultados as $row) {
                     if (
                         !isset($ref['edad_min']) || $ref['edad_min'] === '' ||
                         !isset($ref['edad_max']) || $ref['edad_max'] === '' ||
-                        $ref['edad_min'] != 0 || $ref['edad_max'] != 100
+                        $ref['edad_min'] != 0 || $ref['edad_max'] != 120
                     ) {
                         $ref['edad_min'] = 0;
-                        $ref['edad_max'] = 100;
+                        $ref['edad_max'] = 120;
                         $actualizado = true;
                     }
                 }

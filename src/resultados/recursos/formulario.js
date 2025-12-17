@@ -41,8 +41,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 expr = expr.replaceAll(variable, val);
             });
             try {
+                // Soporta exponente usando '^' convirtiéndolo a '**' (JS)
+                if (expr.indexOf('^') !== -1) {
+                    expr = expr.replace(/\^/g, '**');
+                }
                 let resultado = eval(expr);
-                calculado.value = (!isFinite(resultado) || isNaN(resultado)) ? '' : resultado.toFixed(1);
+                if (!isFinite(resultado) || isNaN(resultado)) {
+                    calculado.value = '';
+                } else {
+                    const decAttr = calculado.getAttribute('data-decimales');
+                    const dec = (decAttr !== null && decAttr !== '') ? parseInt(decAttr, 10) : null;
+                    // Formateo natural: si hay decimales definidos, respetarlos;
+                    // si no, enteros sin ".0" y fracciones tal cual.
+                    if (dec !== null && !isNaN(dec)) {
+                        calculado.value = Number(resultado).toFixed(dec);
+                    } else if (Number.isInteger(resultado)) {
+                        calculado.value = String(Math.trunc(resultado));
+                    } else {
+                        calculado.value = String(resultado);
+                    }
+                }
                 // Efecto visual cuando se calcula
                 calculado.style.background = 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
                 setTimeout(() => {

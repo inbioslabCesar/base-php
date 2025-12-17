@@ -160,9 +160,8 @@ if (!empty($_POST['id_cotizacion'])) {
             $id_cotizacion
         ]);
     }
-    // Eliminar exámenes anteriores
+    // Eliminar exámenes anteriores de cotizaciones_detalle y agregar los nuevos
     $pdo->prepare("DELETE FROM cotizaciones_detalle WHERE id_cotizacion = ?")->execute([$id_cotizacion]);
-    // Insertar nuevos exámenes
     $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
     foreach ($detalles as $detalle) {
         $stmt->execute([
@@ -174,10 +173,30 @@ if (!empty($_POST['id_cotizacion'])) {
             $detalle['subtotal']
         ]);
     }
-    // Opcional: actualizar resultados_examenes (eliminar e insertar solo los nuevos)
-    $pdo->prepare("DELETE FROM resultados_examenes WHERE id_cotizacion = ?")->execute([$id_cotizacion]);
-    foreach ($detalles as $detalle) {
-        $id_examen = $detalle['id_examen'];
+
+    // --- RESULTADOS DE EXAMENES ---
+    // Obtener exámenes actuales en la BD
+    $stmtExist = $pdo->prepare("SELECT id_examen FROM resultados_examenes WHERE id_cotizacion = ?");
+    $stmtExist->execute([$id_cotizacion]);
+    $examenes_existentes = array_column($stmtExist->fetchAll(PDO::FETCH_ASSOC), 'id_examen');
+    // Exámenes nuevos y exámenes que permanecen
+    $examenes_nuevos = [];
+    $examenes_actuales = array_column($detalles, 'id_examen');
+    foreach ($examenes_actuales as $id_examen) {
+        if (!in_array($id_examen, $examenes_existentes)) {
+            $examenes_nuevos[] = $id_examen;
+        }
+    }
+    // Exámenes eliminados
+    $examenes_eliminados = array_diff($examenes_existentes, $examenes_actuales);
+    // Eliminar solo los resultados de exámenes eliminados
+    if (count($examenes_eliminados) > 0) {
+        $in = implode(',', array_fill(0, count($examenes_eliminados), '?'));
+        $sqlDel = "DELETE FROM resultados_examenes WHERE id_cotizacion = ? AND id_examen IN ($in)";
+        $pdo->prepare($sqlDel)->execute(array_merge([$id_cotizacion], $examenes_eliminados));
+    }
+    // Insertar resultados vacíos solo para exámenes nuevos
+    foreach ($examenes_nuevos as $id_examen) {
         $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
         $stmtRes = $pdo->prepare($sql);
         $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);

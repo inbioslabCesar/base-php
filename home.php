@@ -260,13 +260,17 @@
      </div>
  </section>
 
-  <!-- Ubicación del Laboratorio -->
+    <!-- Ubicación del Laboratorio  https://maps.app.goo.gl/DQreeBmVBVarrj8V9-->
  <div class="container mt-4">
-    <h4>Ubicación del Laboratorio</h4>
+     <h4 class="titulo-ubicacion">Ubicación del Laboratorio</h4>
     <div style="width:100%;max-width:600px;margin:auto;">
-        <iframe src="https://www.google.com/maps?q=INBIOSLAB+LABORATORIO+CLINICO&output=embed" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-    </div>
+        <!-- <iframe src="https://www.google.com/maps?q=INBIOSLAB+LABORATORIO+CLINICO&output=embed" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe> -->
+    <iframe src="https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3947.449775543747!2d-74.572863!3d-8.357336999999998!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zOMKwMjEnMjYuNCJTIDc0wrAzNCcyMi4zIlc!5e0!3m2!1ses-419!2spe!4v1765941479389!5m2!1ses-419!2spe"width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+     </div>
+
 </div>
+
+
 
  <!-- Botón flotante de WhatsApp -->
 

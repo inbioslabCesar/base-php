@@ -17,26 +17,58 @@ foreach ($resultados as $row) {
             if (isset($param['referencias']) && is_array($param['referencias'])) {
                 foreach ($param['referencias'] as &$ref) {
                     if (isset($ref['valor']) && $ref['valor'] !== '') {
-                        // Si el valor tiene formato "min-max"
-                        if (strpos($ref['valor'], '-') !== false) {
-                            list($min, $max) = explode('-', $ref['valor'], 2);
-                            $min = trim($min);
-                            $max = trim($max);
-                            if ($ref['valor_min'] != $min || $ref['valor_max'] != $max) {
-                                $ref['valor_min'] = $min;
-                                $ref['valor_max'] = $max;
-                                $actualizado = true;
+                        $valor = trim($ref['valor']);
+                        // Quitar paréntesis si existen
+                        if (preg_match('/^\((.*)\)$/', $valor, $matches)) {
+                            $valor = trim($matches[1]);
+                        }
+                        $nuevo_min = null;
+                        $nuevo_max = null;
+                        // Rango min-max
+                        if (preg_match('/^([\d.,]+)\s*-\s*([\d.,]+)$/', $valor, $m)) {
+                            $nuevo_min = str_replace(',', '.', $m[1]);
+                            $nuevo_max = str_replace(',', '.', $m[2]);
+                        }
+                        // <N
+                        elseif (preg_match('/^<\s*([\d.,]+)/', $valor, $m)) {
+                            $nuevo_min = 0;
+                            $nuevo_max = str_replace(',', '.', $m[1]);
+                            // Si es entero, restar 1
+                            if (is_numeric($nuevo_max) && strpos($nuevo_max, '.') === false) {
+                                $nuevo_max = (string)($nuevo_max - 1);
                             }
-                        } else {
-                            // Si solo hay un valor, lo pone en ambos si son diferentes
-                            if ($ref['valor_min'] != $ref['valor']) {
-                                $ref['valor_min'] = $ref['valor'];
-                                $actualizado = true;
+                        }
+                        // <=N o ≤N
+                        elseif (preg_match('/^(<=|≤)\s*([\d.,]+)/u', $valor, $m)) {
+                            $nuevo_min = 0;
+                            $nuevo_max = str_replace(',', '.', $m[2]);
+                        }
+                        // >N
+                        elseif (preg_match('/^>\s*([\d.,]+)/', $valor, $m)) {
+                            $nuevo_min = str_replace(',', '.', $m[1]);
+                            // Si es entero, sumar 1
+                            if (is_numeric($nuevo_min) && strpos($nuevo_min, '.') === false) {
+                                $nuevo_min = (string)($nuevo_min + 1);
                             }
-                            if ($ref['valor_max'] != $ref['valor']) {
-                                $ref['valor_max'] = $ref['valor'];
-                                $actualizado = true;
-                            }
+                            $nuevo_max = '999';
+                        }
+                        // >=N o ≥N
+                        elseif (preg_match('/^(>=|≥)\s*([\d.,]+)/u', $valor, $m)) {
+                            $nuevo_min = str_replace(',', '.', $m[2]);
+                            $nuevo_max = '999';
+                        }
+                        // Si no es ninguno de los anteriores, poner el valor en ambos
+                        else {
+                            $nuevo_min = $valor;
+                            $nuevo_max = $valor;
+                        }
+                        if ($ref['valor_min'] != $nuevo_min) {
+                            $ref['valor_min'] = $nuevo_min;
+                            $actualizado = true;
+                        }
+                        if ($ref['valor_max'] != $nuevo_max) {
+                            $ref['valor_max'] = $nuevo_max;
+                            $actualizado = true;
                         }
                     }
                 }
