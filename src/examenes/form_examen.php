@@ -44,7 +44,7 @@ if ($esEdicion) {
 }
 ?>
 
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <h2><?= $esEdicion ? 'Editar Examen' : 'Agregar Examen' ?></h2>
     <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_examen&id=' . htmlspecialchars($_GET['id']) : 'crear_examen' ?>" id="form-examen">
         <!-- Campos básicos -->
@@ -111,23 +111,33 @@ if ($esEdicion) {
 
         <!-- Builder visual para parámetros adicionales -->
         <h4>Parámetros del Examen</h4>
-        <div class="table-responsive">
+        <link rel="stylesheet" href="<?= BASE_URL ?>examenes/format-builder.css?v=<?= time() ?>">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <small class="text-muted">Ajusta los campos según tu formato. Activa la vista compacta si ves demasiadas columnas.</small>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="toggleCompact">
+                <label class="form-check-label" for="toggleCompact">Vista compacta</label>
+            </div>
+        </div>
+        <div id="builderWrapper">
+            <div class="table-responsive">
             <table class="table table-bordered table-editable" id="formatTable">
                 <thead>
                     <tr>
                         <th>Tipo</th>
                         <th>Nombre</th>
-                        <th>Metodología</th>
-                        <th>Unidad</th>
-                        <th>Opciones</th>
-                        <th>Valor(es) Referencia</th>
-                        <th>Fórmula</th>
-                        <th>Negrita</th>
-                        <th>Cursiva</th>
+                        <th class="col-metodologia">Metodología</th>
+                        <th class="col-unidad">Unidad</th>
+                        <th class="col-opciones">Opciones</th>
+                        <th class="col-referencias">Valor(es) Referencia</th>
+                        <th class="col-formula">Fórmula</th>
+                        <th>Neg.</th>
+                        <th>Cur.</th>
                         <th>Alineación</th>
-                        <th>Color texto</th>
-                        <th>Color fondo</th>
-                        <th>Decimales</th>
+                        <th class="col-color-texto">Color txt</th>
+                        <th class="col-color-fondo">Fondo</th>
+                        <th class="col-decimales">Dec.</th>
+                        <th class="col-rows">Filas</th>
                         <th>Orden</th>
                         <th>Acciones</th>
                     </tr>
@@ -136,6 +146,7 @@ if ($esEdicion) {
                     <!-- Filas dinámicas -->
                 </tbody>
             </table>
+            </div>
         </div>
         <input type="hidden" id="adicional" name="adicional">
         <button id="addRow" class="btn btn-success mb-2" type="button">Agregar Fila</button>
@@ -156,6 +167,37 @@ if ($esEdicion) {
         if (typeof datosAdicionales !== "undefined" && Array.isArray(datosAdicionales) && datosAdicionales.length > 0) {
             datosAdicionales.forEach(function(parametro) {
                 addRow(parametro);
+            });
+        }
+        // Toggle vista compacta para ocultar columnas avanzadas
+        const wrapper = document.getElementById('builderWrapper');
+        const toggle = document.getElementById('toggleCompact');
+        if (toggle && wrapper) {
+            // Marca manual cuando el usuario interactúa
+            toggle.addEventListener('change', function() {
+                this.dataset.manual = '1';
+                if (this.checked) {
+                    wrapper.classList.add('compact');
+                } else {
+                    wrapper.classList.remove('compact');
+                }
+            });
+            // Auto-compact en pantallas pequeñas (si el usuario no cambió manualmente)
+            function applyAutoCompact() {
+                if (toggle.dataset.manual === '1') return;
+                const shouldCompact = window.innerWidth < 992; // breakpoint md
+                toggle.checked = shouldCompact;
+                if (shouldCompact) {
+                    wrapper.classList.add('compact');
+                } else {
+                    wrapper.classList.remove('compact');
+                }
+            }
+            applyAutoCompact();
+            window.addEventListener('resize', function() {
+                // Debounce simple
+                clearTimeout(window.__builderResizeT);
+                window.__builderResizeT = setTimeout(applyAutoCompact, 150);
             });
         }
     });

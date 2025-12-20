@@ -1,0 +1,104 @@
+/* Compact layout to reduce horizontal scroll in exam parameters builder */
+.table-editable {
+  font-size: 0.875rem;
+}
+.table-editable thead th {
+  white-space: nowrap;
+}
+.table-editable th,
+.table-editable td {
+  padding: 0.25rem 0.5rem;
+  vertical-align: middle;
+}
+.table-editable .form-control,
+.table-editable .form-select {
+  padding: 0.25rem 0.5rem;
+  height: 30px;
+  font-size: 0.85rem;
+}
+.table-editable textarea.form-control {
+  min-height: 48px;
+}
+/* Make columns wrap text rather than force width */
+.table-editable td,
+.table-editable th {
+  white-space: normal;
+}
+/* Slightly tighter buttons */
+.table-editable .btn.btn-sm {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.75rem;
+}
+/* Reduce width impact of action buttons group */
+.table-editable td:last-child {
+  min-width: 100px;
+}
+/* Prevent container from constraining width too much */
+.container-fluid > .table-editable {
+  width: 100%;
+}
+
+/* Reference group compact widths */
+/* Reference group redesigned: basic + optional advanced */
+.valores-ref-group { display: block; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #e0e0e0; }
+.valores-ref-group.active { border-color: #0d6efd; box-shadow: 0 0 0 0.08rem rgba(13,110,253,.25); }
+.valores-ref-group .ref-header { margin-bottom: 4px; }
+.valores-ref-group .ref-badge { font-size: 0.75rem; }
+.valores-ref-group .ref-basic { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.valores-ref-group .ref-advanced { display: none; margin-top: 6px; padding: 8px; background: #f8f9fa; border: 1px dashed #dee2e6; border-radius: 6px; }
+.valores-ref-group.show-advanced .ref-advanced { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.valores-ref-group .field { display: flex; flex-direction: column; gap: 2px; }
+.valores-ref-group .label-sm { font-size: 0.75rem; color: #6c757d; }
+.valores-ref-group .valor-min,
+.valores-ref-group .valor-max,
+.valores-ref-group .edad-min,
+.valores-ref-group .edad-max { width: 90px !important; }
+.valores-ref-group .sexo-ref { width: 120px !important; }
+.valores-ref-group .valor { min-width: 160px; }
+.valores-ref-group .desc { min-width: 180px; }
+.valores-ref-group .toggle-advanced { white-space: nowrap; }
+
+/* Compact mode: hide advanced columns to avoid horizontal overflow */
+#builderWrapper.compact .col-metodologia,
+#builderWrapper.compact .col-unidad,
+#builderWrapper.compact .col-opciones,
+#builderWrapper.compact .col-referencias,
+#builderWrapper.compact .col-formula,
+#builderWrapper.compact .col-decimales {
+  display: none;
+}
+/* Keep acciones always visible */
+#builderWrapper .col-acciones { display: table-cell; }
+#builderWrapper .btn-icon { padding: 0.2rem 0.35rem; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Keep essential columns tight */
+.table-editable th:nth-child(1),
+.table-editable td:nth-child(1) {
+  width: 110px;
+}
+.table-editable th:nth-child(2),
+.table-editable td:nth-child(2) {
+  min-width: 220px;
+}
+/* Small columns widths */
+.table-editable .col-neg,
+.table-editable .col-cur { width: 40px; }
+.table-editable .col-color-texto,
+.table-editable .col-color-fondo { width: 60px; }
+.table-editable .col-decimales { width: 50px; }
+
+/* Narrow rows input width */
+.table-editable .col-rows .rows-input {
+  width: 50px !important;
+}
+
+/* Responsive auto-compact at breakpoints */
+@media (max-width: 1400px) {
+  .col-decimales, .col-formula { display: none; }
+}
+@media (max-width: 1200px) {
+  .col-referencias { display: none; }
+}
+@media (max-width: 992px) {
+  .col-opciones, .col-unidad, .col-metodologia { display: none; }
+}

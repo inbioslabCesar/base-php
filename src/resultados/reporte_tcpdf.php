@@ -69,7 +69,7 @@ class MYPDF extends TCPDF {
         $this->Cell(0, 10, '(L) Laboratorio de Referencia | * Resultados fuera de rango | ** Muestra remitida', 0, false, 'C');
         // Firma
         if (file_exists($this->firma_path)) {
-            $this->Image($this->firma_path, 160, 270, 30, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
+            $this->Image($this->firma_path, 160, 270, 40, '', '', '', 'T', false, 300, '', false, false, 0, false, false, false);
         }
         // Número de página
         $this->SetY(-15);

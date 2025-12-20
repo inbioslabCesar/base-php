@@ -19,12 +19,28 @@ $draw = intval($_GET['draw'] ?? 1);
 $start = intval($_GET['start'] ?? 0);
 $length = intval($_GET['length'] ?? 10);
 $search = trim($_GET['search']['value'] ?? '');
-$orderCol = $_GET['order'][0]['column'] ?? 0;
-$orderDir = $_GET['order'][0]['dir'] ?? 'desc';
+$orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : null;
+$orderDir = isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'asc' ? 'ASC' : 'DESC';
 
-// Mapeo de columnas
-$columns = ['id', 'codigo', 'nombre_cliente', 'dni', 'fecha', 'total', 'referencia', 'estado_pago', 'estado_examen', 'rol_creador', 'acciones'];
-$orderBy = $columns[$orderCol] ?? 'id';
+// Mapeo de columnas (usar alias para evitar ambigüedad). Para columnas calculadas usar null.
+$columns = [
+    'c.id',         // 0 (checkbox)
+    'c.codigo',     // 1
+    'cl.nombre',    // 2 (nombre_cliente)
+    'cl.dni',       // 3
+    'c.fecha',      // 4
+    'c.total',      // 5
+    null,           // 6 referencia (calculada)
+    null,           // 7 estado_pago (calculado)
+    null,           // 8 estado_examen (calculado)
+    'c.rol_creador',// 9
+    null            // 10 acciones
+];
+// Orden por defecto seguro
+$orderBy = 'c.id';
+if ($orderCol !== null && isset($columns[$orderCol]) && $columns[$orderCol]) {
+    $orderBy = $columns[$orderCol];
+}
 
 // Si se pasa un parámetro 'ids', devolver solo esas cotizaciones (para pago masivo)
 if (!empty($_GET['ids'])) {
@@ -86,11 +102,11 @@ try {
         $params[] = $_GET['filtro_convenio'];
     }
     if (!empty($_GET['filtro_fecha_desde'])) {
-        $where[] = "fecha >= ?";
+        $where[] = "c.fecha >= ?";
         $params[] = $_GET['filtro_fecha_desde'];
     }
     if (!empty($_GET['filtro_fecha_hasta'])) {
-        $where[] = "fecha <= ?";
+        $where[] = "c.fecha <= ?";
         $params[] = $_GET['filtro_fecha_hasta'];
     }
     if ($where) {

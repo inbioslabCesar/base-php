@@ -63,6 +63,15 @@ class ExamCardView {
                                 value="' . htmlspecialchars($resultados[$item['nombre']] ?? '') . '"
                                 placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">
                         </div>';
+                    } elseif ($item['tipo'] === 'Texto Largo') {
+                        $rows = isset($item['rows']) && is_numeric($item['rows']) ? intval($item['rows']) : 4;
+                        echo '<div class="mb-4">
+                            <label class="form-label">
+                                <i class="bi bi-textarea-t me-2"></i>
+                                ' . htmlspecialchars($item['nombre']) . '
+                            </label>
+                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($resultados[$item['nombre']] ?? '') . '</textarea>
+                        </div>';
                     } elseif ($item['tipo'] === 'Parámetro') {
                         // Refuerza la lógica: si no hay edad o sexo, nunca aplica
                         $referencia_aplicada = null;

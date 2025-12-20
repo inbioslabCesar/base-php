@@ -60,6 +60,12 @@ function obtenerItemsResultados($pdo, $rows) {
         $adicional = $examen && $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
         $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
 
+        // Respetar el flag de "Imprimir" por examen: si está deshabilitado, omitir todo el examen del PDF
+        $imprimir_examen = isset($resultados_json['imprimir_examen']) ? intval($resultados_json['imprimir_examen']) : 1;
+        if ($imprimir_examen !== 1) {
+            continue; // No incluir este examen en el reporte
+        }
+
         // Normaliza valores numéricos (quita comas)
         foreach ($resultados_json as $k => $v) {
             if (is_string($v) && preg_match('/^\d{1,3}(,\d{3})*(\.\d+)?$/', $v)) {
@@ -75,7 +81,7 @@ function obtenerItemsResultados($pdo, $rows) {
         $examen_items = [];
         foreach ($adicional as $item) {
             // Ignorar tipo "Campo" y otros no relevantes
-            if (!in_array($item['tipo'], ['Parámetro', 'Título', 'Subtítulo'])) {
+            if (!in_array($item['tipo'], ['Parámetro', 'Título', 'Subtítulo', 'Texto Largo'])) {
                 continue;
             }
             $nombre = $item['nombre'];
@@ -136,6 +142,13 @@ function obtenerItemsResultados($pdo, $rows) {
                     "prueba" => $nombre,
                     "valor" => $valor,
                     "tipo" => "Parámetro"
+                ]);
+            } elseif ($item['tipo'] === 'Texto Largo') {
+                $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
+                $examen_items[] = array_merge($item, [
+                    "prueba" => $nombre,
+                    "valor" => $valor,
+                    "tipo" => "Texto Largo"
                 ]);
             } else {
                 $examen_items[] = array_merge($item, [

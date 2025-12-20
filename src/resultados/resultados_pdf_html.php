@@ -115,16 +115,16 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             if ($valorFormateado !== "" && !is_null($valorFormateado) && is_numeric(str_replace(',', '', $valorFormateado))) {
                 $numVal = floatval(str_replace(',', '', $valorFormateado));
                 if (isset($item['decimales']) && $item['decimales'] !== '' && is_numeric($item['decimales'])) {
-                    // Respetar decimales definidos en el parámetro
-                    $valorFormateado = number_format($numVal, intval($item['decimales']), '.', '');
+                    // Respetar decimales definidos en el parámetro, con separador de miles
+                    $valorFormateado = number_format($numVal, intval($item['decimales']), '.', ',');
                 } elseif (in_array($item['prueba'], $sinDecimales)) {
-                    // Forzar sin decimales para pruebas específicas
-                    $valorFormateado = number_format($numVal, 0, '.', '');
+                    // Forzar sin decimales para pruebas específicas, con separador de miles
+                    $valorFormateado = number_format($numVal, 0, '.', ',');
                 } elseif (floor($numVal) == $numVal) {
-                    // Si es entero y no hay decimales definidos, mostrar sin ".0"
-                    $valorFormateado = (string) intval($numVal);
+                    // Enteros sin decimales, con separador de miles
+                    $valorFormateado = number_format($numVal, 0, '.', ',');
                 } else {
-                    // Mantener el valor tal como viene (formateado previamente)
+                    // Mantener el valor original para decimales no configurados
                     $valorFormateado = (string) $valorFormateado;
                 }
             }
@@ -152,6 +152,19 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 $html .= '<td class="referencia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . $refHTML . '</td>';
                 $html .= '</tr>';
             }
+        } elseif ($item['tipo'] === "Texto Largo") {
+            $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
+            $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
+            $text_align = isset($item['alineacion']) ? $item['alineacion'] : 'left';
+            $color_fondo = $item['color_fondo'] ?? '';
+            $color_texto = $item['color_texto'] ?? '';
+            $contenido = isset($item['valor']) ? (string)$item['valor'] : '';
+            $html .= '<tr>';
+            $html .= '<td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . ';">'
+                  . '<div><strong>' . htmlspecialchars($item['prueba']) . '</strong></div>'
+                  . '<div>' . nl2br(htmlspecialchars($contenido)) . '</div>'
+                  . '</td>';
+            $html .= '</tr>';
         }
     }
     $html .= '</tbody></table>';

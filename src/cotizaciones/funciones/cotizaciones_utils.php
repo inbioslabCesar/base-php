@@ -10,7 +10,8 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
         $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
         foreach ($adicional as $item) {
-            if ($item['tipo'] === 'Parámetro' || $item['tipo'] === 'Campo') {
+            // Contabilizar parámetros ingresables: Parámetro, Campo y Texto Largo
+            if ($item['tipo'] === 'Parámetro' || $item['tipo'] === 'Campo' || $item['tipo'] === 'Texto Largo') {
                 $total_parametros++;
                 $nombre = $item['nombre'];
                 if (

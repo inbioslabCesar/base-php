@@ -93,7 +93,7 @@ $mpdf->SetHTMLHeader('
         <tr><td colspan="2"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td></tr>
     </table>
 ', 'O', true);
-$firma_html = $firma && file_exists($firma) ? '<img src="' . $firma . '" style="height:65px;"><br>' : '';
+$firma_html = $firma && file_exists($firma) ? '<img src="' . $firma . '" style="height:95px;"><br>' : '';
 $mpdf->SetHTMLFooter('<div class="firma-footer">' . $firma_html . '<hr class="my-3" style="margin:8px 0;"><div style="font-size: 11px; color: #555; text-align:left;">Informe confidencial. Prohibida su reproducción total o parcial.<br><strong>Nota:</strong> Resultados fuera de los rangos referenciales se verán con un <strong>*</strong>.</div></div>');
 $mpdf->WriteHTML($reporte['css'], \Mpdf\HTMLParserMode::HEADER_CSS);
 $mpdf->WriteHTML($reporte['html'], \Mpdf\HTMLParserMode::HTML_BODY);

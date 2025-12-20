@@ -571,6 +571,11 @@ document.getElementById('buscadorClienteMovil').addEventListener('input', functi
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script>
 $(document).ready(function() {
+    // Mejor manejo de errores de DataTables para depurar
+    if ($.fn.dataTable) { $.fn.dataTable.ext.errMode = 'none'; }
+    $('#tablaClientes').on('error.dt', function(e, settings, techNote, message) {
+        console.error('DataTables error:', message);
+    });
     $('#tablaClientes').DataTable({
         "serverSide": true,
         "processing": true,

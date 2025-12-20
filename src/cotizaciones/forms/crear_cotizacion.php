@@ -4,6 +4,13 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../../conexion/conexion.php';
 
+// Protección: si la solicitud no es POST, redirigir a la vista de cotizaciones
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones&msg=dato_invalido");
+    exit;
+}
+
 // Recibir datos del formulario
 $id_cliente = $_POST['id_cliente'] ?? null;
 $examenes = $_POST['examenes'] ?? [];
@@ -46,7 +53,8 @@ if ($rol_creador === 'empresa') {
 }
 
 if (!$id_cliente || !$creado_por) {
-    echo '<div class="alert alert-danger">No se encontró el cliente o el usuario creador en sesión.</div>';
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones&msg=sesion_incompleta");
     exit;
 }
 
@@ -58,7 +66,8 @@ if (
     count($examenes) != count($cantidades) ||
     count($examenes) != count($precios)
 ) {
-    echo '<div class="alert alert-danger">Debes seleccionar al menos un examen y completar todos los datos.</div>';
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones&msg=datos_incompletos");
     exit;
 }
 // Calcular descuento según tipo de usuario o selección en el formulario

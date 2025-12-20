@@ -21,13 +21,18 @@ $draw = intval($_GET['draw'] ?? 1);
 $start = intval($_GET['start'] ?? 0);
 $length = intval($_GET['length'] ?? 10);
 $search = trim($_GET['search']['value'] ?? '');
-$orderCol = $_GET['order'][0]['column'] ?? 0;
-$orderDir = $_GET['order'][0]['dir'] ?? 'desc';
+// Ordenamiento (sanitizado)
+$orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : null;
+$orderDir = (isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'asc') ? 'ASC' : 'DESC';
 
 
-// Mapeo de columnas permitidas
-$columns = ['id', 'codigo_cliente', 'nombre', 'apellido', 'dni', 'edad', 'email', 'telefono', 'estado'];
-$orderBy = $columns[$orderCol] ?? 'id';
+// Mapeo de columnas permitidas (las que se pueden ordenar). "Acciones" no se ordena.
+$columns = ['id', 'codigo_cliente', 'nombre', 'apellido', 'dni', 'edad', 'email', 'telefono', 'estado', 'fecha_registro'];
+// Orden por defecto: últimos registrados primero
+$orderBy = 'fecha_registro';
+if ($orderCol !== null && isset($columns[$orderCol])) {
+    $orderBy = $columns[$orderCol];
+}
 
 try {
     if ($search !== '') {
@@ -38,6 +43,23 @@ try {
         $totalFiltered = clientes_count();
     }
     $totalRecords = clientes_count();
+
+    // Modo debug opcional
+    if (isset($_GET['debug']) && $_GET['debug'] == '1') {
+        header('Content-Type: application/json');
+        echo json_encode([
+            "draw" => $draw,
+            "recordsTotal" => intval($totalRecords),
+            "recordsFiltered" => intval($totalFiltered),
+            "data" => $data,
+            "debug" => [
+                "orderBy" => $orderBy,
+                "orderDir" => $orderDir,
+                "search" => $search
+            ]
+        ]);
+        exit;
+    }
 
     header('Content-Type: application/json');
     echo json_encode([
