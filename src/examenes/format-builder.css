@@ -38,6 +38,29 @@
   width: 100%;
 }
 
+/* Sticky first two columns for better horizontal scroll usability */
+#builderWrapper .table-responsive { position: relative; }
+.table-editable thead th:nth-child(1),
+.table-editable tbody td:nth-child(1) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 2px 0 0 rgba(0,0,0,0.04);
+}
+.table-editable thead th:nth-child(2),
+.table-editable tbody td:nth-child(2) {
+  position: sticky;
+  left: 110px; /* width of first column */
+  z-index: 2;
+  background: #fff;
+  box-shadow: 2px 0 0 rgba(0,0,0,0.04);
+}
+.table-editable thead th:nth-child(1),
+.table-editable thead th:nth-child(2) {
+  z-index: 3; /* keep headers above body cells */
+}
+
 /* Reference group compact widths */
 /* Reference group redesigned: basic + optional advanced */
 .valores-ref-group { display: block; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #e0e0e0; }
