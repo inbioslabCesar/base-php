@@ -248,36 +248,6 @@ function getSeleccionGlobal() {
 
 
     $(document).ready(function() {
-    // Mensajes rápidos por query (?msg=... | ?mensaje=...)
-    try {
-        const url = new URL(window.location.href);
-        const params = url.searchParams;
-        const rawMsg = params.get('msg') || params.get('mensaje');
-        if (rawMsg) {
-            const map = {
-                'dato_invalido': {text: 'Acceso inválido. Redirigido a Cotizaciones.', icon: 'info'},
-                'sesion_incompleta': {text: 'Sesión incompleta. Vuelve a iniciar el flujo.', icon: 'warning'},
-                'datos_incompletos': {text: 'Datos incompletos. Revisa el formulario e inténtalo de nuevo.', icon: 'warning'},
-                'falta_id': {text: 'Falta el ID de la cotización.', icon: 'error'}
-            };
-            const conf = map[rawMsg] || {text: rawMsg, icon: 'info'};
-            if (window.Swal && Swal.fire) {
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    timer: 3000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    icon: conf.icon,
-                    title: conf.text
-                });
-            }
-            params.delete('msg');
-            params.delete('mensaje');
-            url.search = params.toString();
-            window.history.replaceState({}, '', url);
-        }
-    } catch (e) { /* noop */ }
     // Forzar ajuste visual de DataTables y botones de acciones al cambiar tamaño de pantalla
     let lastIsMobile = window.innerWidth <= 768;
     $(window).on('resize', function() {
