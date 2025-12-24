@@ -90,77 +90,161 @@ foreach ($rows as $row) {
         return ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0);
     });
 
+    $normKey = function ($name) {
+        $s = is_string($name) ? $name : '';
+        $s = trim($s);
+        $s = preg_replace('/\s+/u', ' ', $s);
+        return mb_strtolower($s, 'UTF-8');
+    };
+
+    $formatValor = function ($valor, $item) {
+        if ($valor === '' || $valor === null) {
+            return '';
+        }
+        if (!is_numeric($valor)) {
+            return (string) $valor;
+        }
+        $num = floatval($valor);
+        $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
+        if ($dec !== null) {
+            return number_format($num, $dec, '.', '');
+        }
+        if (floor($num) == $num) {
+            return (string) intval($num);
+        }
+        return (string) $valor;
+    };
+
+    $extractVars = function ($formula) {
+        $vars = [];
+        if (!is_string($formula) || trim($formula) === '') {
+            return $vars;
+        }
+        if (preg_match_all('/\[(.*?)\]/', $formula, $m)) {
+            foreach ($m[1] as $v) {
+                $vars[] = trim($v);
+            }
+        }
+        return $vars;
+    };
+
+    $evalFormula = function ($formula, $valoresNorm) use ($extractVars, $normKey) {
+        $vars = $extractVars($formula);
+        foreach ($vars as $varName) {
+            $k = $normKey($varName);
+            if (!array_key_exists($k, $valoresNorm)) {
+                return null;
+            }
+            $raw = $valoresNorm[$k];
+            if ($raw === '' || $raw === null || !is_numeric($raw)) {
+                return null;
+            }
+        }
+        $expr = preg_replace_callback('/\[(.*?)\]/', function ($matches) use ($valoresNorm, $normKey) {
+            $param = trim($matches[1]);
+            $k = $normKey($param);
+            $v = $valoresNorm[$k] ?? null;
+            return (is_numeric($v)) ? $v : '0';
+        }, $formula);
+
+        // Soportar multiplicación implícita: 2(3+4) o (2+3)4
+        $expr = preg_replace('/([0-9\.]|\))\s*\(/', '$1*(', $expr);
+        $expr = preg_replace('/\)\s*([0-9\.-])/', ')*$1', $expr);
+
+        if (strpos($expr, '^') !== false) {
+            $expr = str_replace('^', '**', $expr);
+        }
+        try {
+            $res = eval('return ' . $expr . ';');
+            return is_numeric($res) ? floatval($res) : null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    };
+
     $valores = [];
-    $examen_items = [];
+    $valoresNorm = [];
+    $ordered = [];
+    $formulaItems = [];
+
     foreach ($adicional as $item) {
-        if ($item['tipo'] === 'Parámetro' && empty($item['formula'])) {
-            $nombre = $item['nombre'];
+        if ($item['tipo'] !== 'Parámetro' && $item['tipo'] !== 'Título' && $item['tipo'] !== 'Subtítulo' && $item['tipo'] !== 'Texto Largo') {
+            continue;
+        }
+        $nombre = $item['nombre'];
+
+        if ($item['tipo'] === 'Parámetro') {
             $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
-            // Formateo para valores ingresados (sin fórmula): respeta decimales; sin decimales, formateo natural
-            if ($valor !== '' && is_numeric($valor)) {
-                $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
-                if ($dec !== null) {
-                    $valor = number_format($valor, $dec, '.', '');
-                } else {
-                    // Sin decimales configurados: entero sin .0, fracción como valor natural
-                    if (floor($valor) == $valor) {
-                        $valor = (string) intval($valor);
-                    } else {
-                        $valor = (string) $valor;
-                    }
+            $valores[$nombre] = $valor;
+            $valoresNorm[$normKey($nombre)] = $valor;
+            $ordered[] = ['kind' => 'param', 'item' => $item, 'nombre' => $nombre];
+            if (!empty($item['formula'])) {
+                $formulaItems[] = ['nombre' => $nombre, 'item' => $item];
+            } else {
+                $valores[$nombre] = $formatValor($valor, $item);
+                $valoresNorm[$normKey($nombre)] = $valores[$nombre];
+            }
+        } elseif ($item['tipo'] === 'Texto Largo') {
+            $ordered[] = ['kind' => 'texto', 'item' => $item, 'nombre' => $nombre];
+        } else {
+            $ordered[] = ['kind' => 'otro', 'item' => $item, 'nombre' => $nombre];
+        }
+    }
+
+    $maxIter = max(1, count($formulaItems) + 3);
+    for ($i = 0; $i < $maxIter; $i++) {
+        $changed = false;
+        foreach ($formulaItems as $fi) {
+            $nombre = $fi['nombre'];
+            $item = $fi['item'];
+            $res = $evalFormula($item['formula'], $valoresNorm);
+            if ($res === null) {
+                continue;
+            }
+            $formatted = $formatValor($res, $item);
+            if (($valores[$nombre] ?? '') !== $formatted) {
+                $valores[$nombre] = $formatted;
+                $valoresNorm[$normKey($nombre)] = $formatted;
+                $changed = true;
+            }
+        }
+        if (!$changed) {
+            break;
+        }
+    }
+
+    $examen_items = [];
+    foreach ($ordered as $entry) {
+        $item = $entry['item'];
+        $nombre = $entry['nombre'];
+        if ($entry['kind'] === 'param') {
+            $valor = $valores[$nombre] ?? '';
+            if (empty($item['formula'])) {
+                $valor = $formatValor($valor, $item);
+            } else {
+                if (($valor === '' || $valor === null) && isset($resultados_json[$nombre]) && $resultados_json[$nombre] !== '') {
+                    $valor = $formatValor($resultados_json[$nombre], $item);
                 }
             }
-            $valores[$nombre] = $valor;
             $examen_items[] = array_merge($item, [
-                "prueba" => $nombre,
-                "valor" => $valor,
-                "tipo" => "Parámetro"
+                'prueba' => $nombre,
+                'valor' => $valor,
+                'tipo' => 'Parámetro'
             ]);
-        } elseif ($item['tipo'] !== 'Parámetro') {
+        } elseif ($entry['kind'] === 'texto') {
+            $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
             $examen_items[] = array_merge($item, [
-                "prueba" => $item['nombre']
+                'prueba' => $nombre,
+                'valor' => $valor,
+                'tipo' => 'Texto Largo'
+            ]);
+        } else {
+            $examen_items[] = array_merge($item, [
+                'prueba' => $nombre
             ]);
         }
     }
-    foreach ($adicional as $item) {
-        if ($item['tipo'] === 'Parámetro' && !empty($item['formula'])) {
-            $formula = $item['formula'];
-            $formula_eval = preg_replace_callback('/\[(.*?)\]/', function($matches) use ($valores) {
-                $param = trim($matches[1]);
-                return isset($valores[$param]) && is_numeric($valores[$param]) ? $valores[$param] : 0;
-            }, $formula);
-            $valor = '';
-            try {
-                $expr = $formula_eval;
-                if (strpos($expr, '^') !== false) {
-                    $expr = str_replace('^', '**', $expr);
-                }
-                $valor = eval('return ' . $expr . ';');
-                if (is_numeric($valor)) {
-                    $dec = (isset($item['decimales']) && $item['decimales'] !== '') ? intval($item['decimales']) : null;
-                    if ($dec !== null) {
-                        $valor = number_format($valor, $dec, '.', '');
-                    } else {
-                        // Sin decimales configurados: entero sin .0; fracción como valor natural
-                        if (floor($valor) == $valor) {
-                            $valor = (string) intval($valor);
-                        } else {
-                            $valor = (string) $valor;
-                        }
-                    }
-                }
-            } catch (Throwable $e) {
-                $valor = '';
-            }
-            $nombre = $item['nombre'];
-            $valores[$nombre] = $valor;
-            $examen_items[] = array_merge($item, [
-                "prueba" => $nombre,
-                "valor" => $valor,
-                "tipo" => "Parámetro"
-            ]);
-        }
-    }
+
     $items = array_merge($items, $examen_items);
 }
 

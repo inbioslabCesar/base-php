@@ -1,6 +1,21 @@
 <?php
 // Función para armar el HTML y CSS del reporte de resultados
 function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
+    $toNullableFloat = function ($value) {
+        if ($value === null) {
+            return null;
+        }
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return null;
+            }
+            $normalized = str_replace(',', '', $trimmed);
+            return is_numeric($normalized) ? floatval($normalized) : null;
+        }
+        return is_numeric($value) ? floatval($value) : null;
+    };
+
     $css = 'body, table, td, th { font-family: "Segoe UI", Arial, Helvetica, sans-serif; }'
         . '.encabezado-tabla { width: 100%; border-bottom: 2px solid #eee; margin-bottom: 0px; }'
         . '.logo { width: 110px; }'
@@ -91,8 +106,8 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 // Seleccionar la referencia correcta
                 foreach ($item['referencias'] as $ref) {
                     $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
-                    $ref_edad_min = isset($ref['edad_min']) ? floatval($ref['edad_min']) : null;
-                    $ref_edad_max = isset($ref['edad_max']) ? floatval($ref['edad_max']) : null;
+                    $ref_edad_min = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
+                    $ref_edad_max = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
                     $sexo_match = ($ref_sexo === 'cualquiera' || $ref_sexo === $sexo_paciente);
                     $edad_match = ($ref_edad_min === null || $edad_paciente >= $ref_edad_min) && ($ref_edad_max === null || $edad_paciente <= $ref_edad_max);
                     if ($sexo_match && $edad_match) {
@@ -102,8 +117,8 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 }
                 $valor_num = floatval(str_replace(',', '', $valorOriginal));
                 if ($referencia_aplicada) {
-                    $min = isset($referencia_aplicada['valor_min']) ? floatval($referencia_aplicada['valor_min']) : null;
-                    $max = isset($referencia_aplicada['valor_max']) ? floatval($referencia_aplicada['valor_max']) : null;
+                    $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
+                    $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
                     if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
                         $fuera_rango = true;
                     }

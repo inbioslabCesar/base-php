@@ -26,7 +26,7 @@ $orderBy = $columns[$orderCol] ?? 'id';
 
 try {
     $sql = "SELECT SQL_CALC_FOUND_ROWS * FROM examenes";
-    $where = [];
+    $where = ["vigente = 1"]; // mostrar solo exámenes vigentes
     $params = [];
     if ($search !== '') {
         $where[] = "(codigo LIKE ? OR nombre LIKE ? OR area LIKE ? OR metodologia LIKE ? OR precio_publico LIKE ? OR tiempo_respuesta LIKE ?)";
@@ -43,8 +43,8 @@ try {
 
     // Total filtrado
     $totalFiltered = $pdo->query("SELECT FOUND_ROWS()") ->fetchColumn();
-    // Total general
-    $totalRecords = $pdo->query("SELECT COUNT(*) FROM examenes") ->fetchColumn();
+    // Total general (solo vigentes)
+    $totalRecords = $pdo->query("SELECT COUNT(*) FROM examenes WHERE vigente = 1") ->fetchColumn();
 
     // DEBUG opcional
     if (isset($_GET['debug']) && $_GET['debug'] == '1') {

@@ -73,7 +73,7 @@ try {
 $logo_html = $logo && file_exists($logo) ? '<img src="' . $logo . '" class="logo" style="max-height:100px;max-width:160px;">' : '';
 $qr_html = $qrBase64 ? '<img src="data:image/png;base64,' . $qrBase64 . '" style="max-height:100px;max-width:100px;">' : '<div style="width:100px;height:100px;border:2px solid #222;text-align:center;line-height:100px;font-size:40px;">X</div>';
 $direccion_html = '<div style="font-size:17px;font-weight:bold;color:#1a237e;">' . htmlspecialchars($empresa['nombre']) . '</div>'
-    . '<div style="font-size:13px;color:#555;">Dominio: ' . htmlspecialchars($empresa['dominio'] ?? '') . '</div>'
+    . '<div style="font-size:13px;color:#555;">' . htmlspecialchars($empresa['dominio'] ?? '') . '</div>'
     . '<div style="font-size:13px;color:#555;">RUC: ' . htmlspecialchars($empresa['ruc'] ?? '') . '</div>'
     . '<div style="font-size:13px;color:#555;">' . htmlspecialchars($empresa['direccion']) . '</div>'
     . '<div style="font-size:13px;color:#555;">Tel: ' . htmlspecialchars($empresa['telefono']) . ' | Cel: ' . htmlspecialchars($empresa['celular']) . '</div>';

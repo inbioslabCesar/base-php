@@ -148,7 +148,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="selectAllCotizaciones" title="Seleccionar todo"></th>
-                        <th>Código</th>
+                        <th>Código Cliente</th>
                         <th>Paciente</th>
                         <th>DNI</th>
                         <th>Fecha</th>
@@ -290,7 +290,7 @@ function getSeleccionGlobal() {
                         return `<input type='checkbox' class='cotizacion-checkbox' data-id='${row.id}' data-saldo='${parseFloat(row.saldo) || 0}'>`;
                     }
                 },
-                { "data": "codigo" },
+                { "data": "codigo_cliente" },
                 {
                     "data": null,
                     "render": function(data, type, row) {
@@ -694,7 +694,7 @@ function renderCotizacionCard(row) {
     <div class='cotizacion-card mb-3'>
         <div class='d-flex justify-content-between align-items-center mb-2'>
             <span class='cotizacion-nombre'>${row.nombre_cliente || ''} ${row.apellido_cliente || ''}</span>
-            <span class='cotizacion-codigo'>${row.codigo || ''}</span>
+            <span class='cotizacion-codigo'>${row.codigo_cliente || ''}</span>
         </div>
         <div class='info-item'><span class='info-label'>DNI</span><span class='info-value'>${row.dni || ''}</span></div>
         <div class='info-item'><span class='info-label'>Fecha</span><span class='info-value'>${row.fecha || ''}</span></div>

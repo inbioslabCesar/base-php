@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 
-$stmt = $pdo->query("SELECT * FROM examenes ORDER BY id ASC");
+$stmt = $pdo->query("SELECT * FROM examenes WHERE vigente = 1 ORDER BY id ASC");
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 function capitalizar($texto)
@@ -14,22 +14,50 @@ function capitalizar($texto)
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
 
-<div class="container mt-4">
-    <h2>Lista de Exámenes</h2>
+<style>
+/* Fuerza el color de fondo del encabezado de la tabla de Exámenes */
+#tabla-examenes thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
+
+#tabla-examenes thead th.sorting,
+#tabla-examenes thead th.sorting_asc,
+#tabla-examenes thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+</style>
+
+<div class="container-fluid mt-4">
+    <!-- Encabezado con degradado para el título -->
+    <style>
+    .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        box-shadow: 0 4px 24px #764ba233;
+    }
+    </style>
+    <div class="header-section mb-3">
+        <div class="p-3">
+            <h3 class="mb-0 text-white text-3xl">Lista de Exámenes</h3>
+        </div>
+    </div>
     <a href="dashboard.php?vista=form_examen" class="btn btn-primary mb-3">Agregar Examen</a>
     <div class="table-responsive">
-        <table id="tabla-examenes" class="table table-bordered table-striped">
-            <thead class="table-dark">
+        <table id="tabla-examenes" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
+            <thead class="bg-indigo-600 text-white">
                 <tr>
-                    <th>Código</th>
-                    <th>Nombre</th>
-                    <th>Área</th>
-                    <th>Metodología</th>
-                    <th>Precio Público</th>
-                    <th>Tiempo Respuesta</th>
-                    <th>Detalle</th>
-                    <th>Acciones</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Código</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Área</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Metodología</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Precio Público</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Tiempo Respuesta</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Detalle</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -130,7 +158,7 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                     <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm" title="Editar">
                         <i class="fa fa-edit"></i>
                     </a>
-                    <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm('¿Estás seguro de eliminar este examen?');">
+                    <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm enlace-eliminar-examen" data-id="<?= $examen['id'] ?>" title="Eliminar">
                         <i class="fa fa-trash"></i>
                     </a>
                 </div>
@@ -191,6 +219,67 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
         filtrarCardsExamenes(e.target.value);
     });
     </script>
+
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+// Interceptar cualquier enlace que apunte a eliminar_examen
+document.addEventListener('click', async function (e) {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (href.includes('action=eliminar_examen')) {
+        e.preventDefault();
+        try {
+            const url = new URL(href, window.location.origin);
+            const id = url.searchParams.get('id');
+            if (!id) return;
+
+            // Consultar relaciones antes de proceder
+            const resp = await fetch('examenes/examenes_relaciones.php?id=' + encodeURIComponent(id));
+            const json = await resp.json();
+            const relacionados = json.ok && json.tiene_relaciones ? (json.conteo || 0) : 0;
+
+            if (relacionados > 0) {
+                const r = await Swal.fire({
+                    icon: 'warning',
+                    title: 'Este examen está relacionado',
+                    html: 'Se encontró <b>' + relacionados + '</b> registro(s) en otras tablas.<br>Para preservar el historial, se marcará como <b>INACTIVO</b> en lugar de eliminarse.',
+                    confirmButtonText: 'Desactivar',
+                    cancelButtonText: 'Cancelar',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d'
+                });
+                if (r.isConfirmed) {
+                    // Redirige al handler para baja lógica
+                    window.location.href = href;
+                }
+            } else {
+                const r = await Swal.fire({
+                    icon: 'question',
+                    title: 'Eliminar examen',
+                    text: 'Esta acción eliminará definitivamente el examen. ¿Deseas continuar?',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#6c757d'
+                });
+                if (r.isConfirmed) {
+                    window.location.href = href;
+                }
+            }
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'No se pudo verificar relaciones',
+                text: 'Intenta nuevamente. Si el problema persiste, contácta al administrador.'
+            });
+        }
+    }
+});
+</script>
         <?php
         // Mantener todos los parámetros excepto 'pagina'
         $params = $_GET;
@@ -263,8 +352,7 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                     data: null,
                     orderable: false,
                     render: function(data, type, row) {
-                        return `<button type="button" class="btn btn-info btn-sm rounded-circle" title="Ver detalle"
-                            data-bs-toggle="modal" data-bs-target="#modalDetalle${row.id}">
+                        return `<button type="button" class="btn btn-info btn-sm rounded-circle btn-detalle-examen" title="Ver detalle" data-id="${row.id}">
                             <i class="fa fa-search"></i>
                         </button>`;
                     }
@@ -300,5 +388,26 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                 }
             ]
         });
+                // Handler para abrir modal de detalle
+                $('#tabla-examenes').on('click', '.btn-detalle-examen', async function() {
+                        try {
+                                const id = this.getAttribute('data-id');
+                                const resp = await fetch('examenes/detalle_examen_modal.php?id=' + encodeURIComponent(id));
+                                const html = await resp.text();
+                                const cont = document.getElementById('modalDetalleExamenContent');
+                                if (cont) cont.innerHTML = html;
+                                const modal = new bootstrap.Modal(document.getElementById('modalDetalleExamen'));
+                                modal.show();
+                        } catch (e) {
+                                console.error(e);
+                        }
+                });
     });
 </script>
+
+<!-- Modal Detalle Examen -->
+<div class="modal fade" id="modalDetalleExamen" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" id="modalDetalleExamenContent"></div>
+    </div>
+</div>

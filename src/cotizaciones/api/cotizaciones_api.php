@@ -24,17 +24,17 @@ $orderDir = isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir
 
 // Mapeo de columnas (usar alias para evitar ambigüedad). Para columnas calculadas usar null.
 $columns = [
-    'c.id',         // 0 (checkbox)
-    'c.codigo',     // 1
-    'cl.nombre',    // 2 (nombre_cliente)
-    'cl.dni',       // 3
-    'c.fecha',      // 4
-    'c.total',      // 5
-    null,           // 6 referencia (calculada)
-    null,           // 7 estado_pago (calculado)
-    null,           // 8 estado_examen (calculado)
-    'c.rol_creador',// 9
-    null            // 10 acciones
+    'c.id',              // 0 (checkbox)
+    'cl.codigo_cliente', // 1 (mostrar código de cliente)
+    'cl.nombre',         // 2 (nombre_cliente)
+    'cl.dni',            // 3
+    'c.fecha',           // 4
+    'c.total',           // 5
+    null,                // 6 referencia (calculada)
+    null,                // 7 estado_pago (calculado)
+    null,                // 8 estado_examen (calculado)
+    'c.rol_creador',     // 9
+    null                 // 10 acciones
 ];
 // Orden por defecto seguro
 $orderBy = 'c.id';
@@ -47,7 +47,7 @@ if (!empty($_GET['ids'])) {
     $ids = array_filter(array_map('trim', explode(',', $_GET['ids'])), 'is_numeric');
     if (count($ids) > 0) {
         $in = implode(',', array_fill(0, count($ids), '?'));
-        $sql = "SELECT c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
+        $sql = "SELECT c.id, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
             c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada
             FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id
             WHERE c.id IN ($in)";
@@ -79,14 +79,14 @@ if (!empty($_GET['ids'])) {
 }
 
 try {
-    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
+    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
         c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada
         FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id";
     $where = [];
     $params = [];
     if ($search !== '') {
-        $where[] = "(c.codigo LIKE ? OR cl.nombre LIKE ? OR cl.apellido LIKE ? OR cl.dni LIKE ?)";
-        $params = ["%$search%", "%$search%", "%$search%", "%$search%"];
+        $where[] = "(cl.codigo_cliente LIKE ? OR c.codigo LIKE ? OR cl.nombre LIKE ? OR cl.apellido LIKE ? OR cl.dni LIKE ?)";
+        $params = ["%$search%", "%$search%", "%$search%", "%$search%", "%$search%"];
     }
     // Filtros extra
     if (!empty($_GET['filtro_dni'])) {

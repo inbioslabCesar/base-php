@@ -28,11 +28,37 @@ document.addEventListener('DOMContentLoaded', function () {
         let nameParts = calculado.name.match(/examenes\[(\d+)\]\[resultados\]\[([^\]]+)\]/);
         let idResultado = nameParts ? nameParts[1] : null;
 
+        const normalizeKey = (s) => {
+            return String(s ?? '')
+                .trim()
+                .replace(/\s+/g, ' ')
+                .toLowerCase();
+        };
+
+        const getInputsMap = () => {
+            // Mapea nombre de parámetro -> input dentro del mismo examen
+            const card = calculado.closest('.exam-card') || document;
+            const inputs = card.querySelectorAll(`[name^="examenes[${idResultado}][resultados]["]`);
+            const map = new Map();
+            inputs.forEach((el) => {
+                const m = el.name.match(/examenes\[\d+\]\[resultados\]\[([^\]]+)\]/);
+                if (!m) return;
+                const key = normalizeKey(m[1]);
+                if (!map.has(key)) map.set(key, el);
+            });
+            return map;
+        };
+
         function calcular() {
+            if (calculado.dataset.calculating === '1') return;
+            calculado.dataset.calculating = '1';
+
+            const inputsMap = getInputsMap();
+
             let expr = formula;
             variables.forEach(function(variable) {
-                let nombre = variable.replace(/[\[\]]/g, '').trim();
-                let input = document.querySelector(`[name="examenes[${idResultado}][resultados][${nombre}]"]`);
+                let nombre = variable.replace(/[\[\]]/g, '');
+                const input = inputsMap.get(normalizeKey(nombre));
                 let val = input && input.value ? parseFloat(input.value.replace(/,/g, '')) : 0;
                 // Si el campo es porcentaje y el valor es menor a 1 pero mayor a 0, lo convertimos a entero
                 if (input && input.getAttribute('unidad') === '%' && val > 0 && val < 1) {
@@ -45,7 +71,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (expr.indexOf('^') !== -1) {
                     expr = expr.replace(/\^/g, '**');
                 }
+
+                // Soporta multiplicación implícita: 2(3+4) o (2+3)4
+                expr = expr.replace(/([0-9\.]|\))\s*\(/g, '$1*(');
+                expr = expr.replace(/\)\s*([0-9\.-])/g, ')*$1');
+
                 let resultado = eval(expr);
+                const prevValue = calculado.value;
                 if (!isFinite(resultado) || isNaN(resultado)) {
                     calculado.value = '';
                 } else {
@@ -66,13 +98,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 setTimeout(() => {
                     calculado.style.background = 'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)';
                 }, 300);
+
+                // Importante: si este valor cambió, notificar para recalcular fórmulas dependientes
+                if (calculado.value !== prevValue) {
+                    calculado.dispatchEvent(new Event('input', { bubbles: true }));
+                }
             } catch (e) {
                 calculado.value = '';
+                calculado.dispatchEvent(new Event('input', { bubbles: true }));
+            } finally {
+                calculado.dataset.calculating = '0';
             }
         }
         variables.forEach(function(variable) {
-            let nombre = variable.replace(/[\[\]]/g, '').trim();
-            let input = document.querySelector(`[name="examenes[${idResultado}][resultados][${nombre}]"]`);
+            let nombre = variable.replace(/[\[\]]/g, '');
+            const input = getInputsMap().get(normalizeKey(nombre));
             if (input) {
                 input.addEventListener('input', calcular);
             }

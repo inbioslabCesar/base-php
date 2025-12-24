@@ -305,11 +305,27 @@ function capitalize($string) {
 
 .table-modern {
     margin-bottom: 0;
+    width: 100%;
 }
 
 .table-modern thead {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+}
+
+/* Fuerza el color de fondo del encabezado de la tabla
+   cuando DataTables/Bootstrap aplican estilos por defecto */
+.table-modern thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
+
+/* Mantener color en estados de ordenación de DataTables */
+.table-modern thead th.sorting,
+.table-modern thead th.sorting_asc,
+.table-modern thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
 }
 
 .table-modern thead th {
@@ -429,12 +445,14 @@ function capitalize($string) {
 }
 </style>
 
+<script src="https://cdn.tailwindcss.com"></script>
+
 <div class="clientes-container">
     <!-- Header Section -->
     <div class="header-section">
         <div class="d-flex justify-content-between align-items-center flex-wrap">
             <div>
-                <h3 class="mb-2">
+                <h3 class="mb-0 text-white text-3xl">
                     <i class="bi bi-people-fill me-2"></i>
                     Gestión de Pacientes
                 </h3>
@@ -476,20 +494,20 @@ function capitalize($string) {
 
     <!-- Vista Tabla para Desktop -->
     <div class="table-container">
-        <div class="table-responsive">
+        <div>
             <table id="tablaClientes" class="table table-modern">
-                <thead>
+                <thead class="bg-indigo-600 text-white">
                     <tr>
-                        <th>ID</th>
-                        <th>Código</th>
-                        <th>Nombre</th>
-                        <th>Apellido</th>
-                        <th>DNI</th>
-                        <th>Edad</th>
-                        <th>Email</th>
-                        <th class="d-none d-md-table-cell">Teléfono</th>
-                        <th class="d-none d-md-table-cell">Estado</th>
-                        <th>Acciones</th>
+                        <th class="px-4 py-2 text-sm font-semibold">ID</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Código</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Apellido</th>
+                        <th class="px-4 py-2 text-sm font-semibold">DNI</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Edad</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Email</th>
+                        <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Teléfono</th>
+                        <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Estado</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>

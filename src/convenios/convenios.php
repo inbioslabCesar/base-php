@@ -13,8 +13,36 @@ $stmt = $pdo->query("SELECT * FROM convenios ORDER BY id DESC");
 $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<div class="container mt-4">
-    <h2>Convenios</h2>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Fuerza el color de fondo del encabezado de la tabla de Convenios */
+#tabla-convenios thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
+
+#tabla-convenios thead th.sorting,
+#tabla-convenios thead th.sorting_asc,
+#tabla-convenios thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+</style>
+
+<div class="container-fluid mt-4">
+    <!-- Encabezado con degradado para el título -->
+    <style>
+    .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        box-shadow: 0 4px 24px #764ba233;
+    }
+    </style>
+    <div class="header-section mb-3">
+        <div class="p-3">
+            <h3 class="mb-0 text-white text-3xl">Convenios</h3>
+        </div>
+    </div>
     <?php if (!empty($_SESSION['mensaje'])): ?>
         <div class="alert alert-info"><?= htmlspecialchars($_SESSION['mensaje']) ?></div>
         <?php unset($_SESSION['mensaje']); ?>
@@ -79,18 +107,18 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <?php endif; ?>
     </div>
     <div class="table-responsive d-none d-md-block">
-        <table id="tabla-convenios" class="table table-bordered table-striped">
-            <thead>
+        <table id="tabla-convenios" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
+            <thead class="bg-indigo-600 text-white">
                 <tr>
-                    <th><input type="checkbox" id="selectAllConvenios"></th>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>DNI</th>
-                    <th>Especialidad</th>
-                    <th>Descuento (%)</th>
-                    <th>Descripción</th>
-                    <th>Email</th>
-                    <th>Acciones</th>
+                    <th class="px-4 py-2 text-sm font-semibold"><input type="checkbox" id="selectAllConvenios"></th>
+                    <th class="px-4 py-2 text-sm font-semibold">ID</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
+                    <th class="px-4 py-2 text-sm font-semibold">DNI</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Especialidad</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Descuento (%)</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Descripción</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Email</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>

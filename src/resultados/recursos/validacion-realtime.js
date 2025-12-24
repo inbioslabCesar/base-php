@@ -5,26 +5,39 @@ document.addEventListener('input', function(e) {
   if (e.target.classList.contains('form-control') && e.target.closest('.parameter-section')) {
     const input = e.target;
     const section = input.closest('.parameter-section');
+
+    const parseNullableFloat = (value) => {
+      if (value === null || value === undefined) return null;
+      const normalized = String(value).trim().replace(/,/g, '');
+      if (normalized === '') return null;
+      const parsed = parseFloat(normalized);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
     // Obtener referencias y datos del paciente desde atributos data
     const referencias = JSON.parse(input.getAttribute('data-referencias') || '[]');
-    const edad = parseFloat(document.getElementById('edad-paciente')?.value || input.getAttribute('data-edad') || 0);
-    const sexo = (document.getElementById('sexo-paciente')?.value || input.getAttribute('data-sexo') || '').toLowerCase();
+    const edad = parseNullableFloat(document.getElementById('edad-paciente')?.value ?? input.getAttribute('data-edad'));
+    const sexo = (document.getElementById('sexo-paciente')?.value ?? input.getAttribute('data-sexo') ?? '').toLowerCase();
     let referencia_aplicada = null;
-    referencias.forEach(ref => {
-      const ref_sexo = (ref.sexo || '').toLowerCase();
-      const ref_edad_min = parseFloat(ref.edad_min || 0);
-      const ref_edad_max = parseFloat(ref.edad_max || 999);
-      const sexo_match = (ref_sexo === 'cualquiera' || ref_sexo === sexo);
-      const edad_match = (edad >= ref_edad_min && edad <= ref_edad_max);
-      if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
-    });
+
+    if (edad !== null && sexo !== '') {
+      referencias.forEach(ref => {
+        const ref_sexo = (ref.sexo || '').toLowerCase();
+        const ref_edad_min = parseNullableFloat(ref.edad_min);
+        const ref_edad_max = parseNullableFloat(ref.edad_max);
+        const sexo_match = (ref_sexo === 'cualquiera' || ref_sexo === sexo);
+        const edad_match = (ref_edad_min === null || edad >= ref_edad_min) && (ref_edad_max === null || edad <= ref_edad_max);
+        if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
+      });
+    }
+
     let fuera_rango = false;
-    const valor = parseFloat(input.value.replace(/,/g, ''));
-    if (referencia_aplicada && !isNaN(valor)) {
-      const min = parseFloat((referencia_aplicada.valor_min || '').toString().replace(/,/g, ''));
-      const max = parseFloat((referencia_aplicada.valor_max || '').toString().replace(/,/g, ''));
-      if (!isNaN(min) && input.value !== '' && valor < min) fuera_rango = true;
-      if (!isNaN(max) && input.value !== '' && valor > max) fuera_rango = true;
+    const valor = parseNullableFloat(input.value);
+    if (referencia_aplicada && valor !== null && input.value !== '') {
+      const min = parseNullableFloat(referencia_aplicada.valor_min);
+      const max = parseNullableFloat(referencia_aplicada.valor_max);
+      if (min !== null && valor < min) fuera_rango = true;
+      if (max !== null && valor > max) fuera_rango = true;
     }
     input.classList.toggle('is-invalid', fuera_rango);
     input.classList.toggle('is-valid', !fuera_rango && input.value !== '');

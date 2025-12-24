@@ -14,10 +14,37 @@ function capitalizar($texto) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Fuerza el color de fondo del encabezado de la tabla de Empresas */
+#tabla-empresas thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
+
+#tabla-empresas thead th.sorting,
+#tabla-empresas thead th.sorting_asc,
+#tabla-empresas thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+</style>
 
 
-<div class="container mt-4">
-    <h2>Lista de Empresas</h2>
+<div class="container-fluid mt-4">
+    <!-- Encabezado con degradado para el título -->
+    <style>
+    .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        box-shadow: 0 4px 24px #764ba233;
+    }
+    </style>
+    <div class="header-section mb-3">
+        <div class="p-3">
+            <h3 class="mb-0 text-white text-3xl">Lista de Empresas</h3>
+        </div>
+    </div>
     <a href="dashboard.php?vista=form_empresa" class="btn btn-primary mb-3">Agregar Empresa</a>
     <!-- Buscador y cards para móvil -->
     <div class="mb-3 d-block d-md-none">
@@ -86,21 +113,21 @@ function capitalizar($texto) {
     </div>
     <!-- Tabla para desktop -->
     <div class="table-responsive d-none d-md-block">
-        <table id="tabla-empresas" class="table table-bordered table-striped">
-            <thead class="table-dark">
+        <table id="tabla-empresas" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
+            <thead class="bg-indigo-600 text-white">
                 <tr>
-                    <th>ID</th>
-                    <th>RUC</th>
-                    <th>Razón Social</th>
-                    <th>Nombre Comercial</th>
-                    <th>Dirección</th>
-                    <th>Teléfono</th>
-                    <th>Email</th>
-                    <th>Representante</th>
-                    <th>Convenio</th>
-                    <th>Estado</th>
-                    <th>Descuento (%)</th>
-                    <th>Acciones</th>
+                    <th class="px-4 py-2 text-sm font-semibold">ID</th>
+                    <th class="px-4 py-2 text-sm font-semibold">RUC</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Razón Social</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Nombre Comercial</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Dirección</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Teléfono</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Email</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Representante</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Convenio</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Estado</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Descuento (%)</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>

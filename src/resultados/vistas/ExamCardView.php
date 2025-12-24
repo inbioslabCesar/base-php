@@ -2,15 +2,30 @@
 <?php
 class ExamCardView {
     public static function render($examen, $index, $datos_paciente = []) {
+        $toNullableFloat = function ($value) {
+            if ($value === null) {
+                return null;
+            }
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                if ($trimmed === '') {
+                    return null;
+                }
+                $normalized = str_replace(',', '', $trimmed);
+                return is_numeric($normalized) ? floatval($normalized) : null;
+            }
+            return is_numeric($value) ? floatval($value) : null;
+        };
+
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
         $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
         // Si el examen tiene datos de paciente propios, usarlos; si no, usar los globales
         $edad_paciente = null;
         $sexo_paciente = '';
         if (isset($examen['edad_paciente']) && $examen['edad_paciente'] !== '') {
-            $edad_paciente = floatval($examen['edad_paciente']);
+            $edad_paciente = $toNullableFloat($examen['edad_paciente']);
         } elseif (isset($datos_paciente['edad']) && $datos_paciente['edad'] !== '') {
-            $edad_paciente = floatval($datos_paciente['edad']);
+            $edad_paciente = $toNullableFloat($datos_paciente['edad']);
         }
         if (isset($examen['sexo_paciente']) && $examen['sexo_paciente'] !== '') {
             $sexo_paciente = strtolower(trim($examen['sexo_paciente']));
@@ -79,8 +94,8 @@ class ExamCardView {
                         if (!empty($item['referencias']) && $edad_paciente !== null && $sexo_paciente !== '') {
                             foreach ($item['referencias'] as $idx => $ref) {
                                 $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
-                                $ref_edad_min = isset($ref['edad_min']) ? floatval($ref['edad_min']) : null;
-                                $ref_edad_max = isset($ref['edad_max']) ? floatval($ref['edad_max']) : null;
+                                $ref_edad_min = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
+                                $ref_edad_max = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
                                 $sexo_match = ($ref_sexo === 'cualquiera' || $ref_sexo === $sexo_paciente);
                                 $edad_match = ($ref_edad_min === null || $edad_paciente >= $ref_edad_min) && ($ref_edad_max === null || $edad_paciente <= $ref_edad_max);
                                 if ($sexo_match && $edad_match) {
@@ -94,8 +109,8 @@ class ExamCardView {
                         $valor_resultado_num = str_replace(',', '', $valor_resultado);
                         $fuera_rango = false;
                         if ($referencia_aplicada && is_numeric($valor_resultado_num)) {
-                            $min = isset($referencia_aplicada['valor_min']) ? floatval($referencia_aplicada['valor_min']) : null;
-                            $max = isset($referencia_aplicada['valor_max']) ? floatval($referencia_aplicada['valor_max']) : null;
+                            $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
+                            $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
                             $valor_num = floatval($valor_resultado_num);
                             if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
                                 $fuera_rango = true;

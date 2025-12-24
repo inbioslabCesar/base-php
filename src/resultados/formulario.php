@@ -61,7 +61,11 @@ if ($cotizacion_id) {
     ?>
 </div>
 </script>
-<script src="<?= BASE_URL ?>resultados/recursos/formulario.js"></script>
-<script src="<?= BASE_URL ?>resultados/recursos/validacion-realtime.js"></script>
+<?php
+$v_formulario_js = @filemtime(__DIR__ . '/recursos/formulario.js') ?: time();
+$v_validacion_js = @filemtime(__DIR__ . '/recursos/validacion-realtime.js') ?: time();
+?>
+<script src="<?= BASE_URL ?>resultados/recursos/formulario.js?v=<?= $v_formulario_js ?>"></script>
+<script src="<?= BASE_URL ?>resultados/recursos/validacion-realtime.js?v=<?= $v_validacion_js ?>"></script>
 </body>
 </html>

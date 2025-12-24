@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
-$stmt = $pdo->query("SELECT nombre, ruc, direccion, celular, telefono, logo FROM config_empresa LIMIT 1");
+$stmt = $pdo->query("SELECT nombre, ruc, direccion, celular, telefono, logo, dominio FROM config_empresa LIMIT 1");
 $config = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Si no hay datos, usa valores por defecto
@@ -11,7 +11,8 @@ if (!$config) {
         'direccion' => '',
         'celular' => '',
         'telefono' => '',
-        'logo' => '../images/empresa/logo_empresa.png'
+        'logo' => '../images/empresa/logo_empresa.png',
+        'dominio' => ''
     ];
 }
 

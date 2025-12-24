@@ -26,8 +26,36 @@ function capitalizar($texto) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Fuerza el color de fondo del encabezado de la tabla de Usuarios */
+#tabla-usuarios thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
 
-<div class="container mt-4">
+#tabla-usuarios thead th.sorting,
+#tabla-usuarios thead th.sorting_asc,
+#tabla-usuarios thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+</style>
+
+<div class="container-fluid mt-4">
+    <!-- Encabezado con degradado para el título -->
+    <style>
+    .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        box-shadow: 0 4px 24px #764ba233;
+    }
+    </style>
+    <div class="header-section mb-3">
+        <div class="p-3">
+            <h3 class="mb-0 text-white text-3xl">Lista de Usuarios</h3>
+        </div>
+    </div>
         <!-- Buscador para móvil -->
         <div class="mb-3 d-block d-md-none">
             <div class="input-group">
@@ -35,7 +63,6 @@ function capitalizar($texto) {
                 <button class="btn btn-primary" type="button" onclick="document.getElementById('buscadorUsuarioMovil').value = ''; filtrarCardsUsuarios('');"><i class="bi bi-x"></i></button>
             </div>
         </div>
-    <h2>Lista de Usuarios</h2>
     <a href="dashboard.php?vista=form_usuario" class="btn btn-primary mb-3">Agregar Usuario</a>
     <!-- Cards para móvil -->
     <div class="d-block d-md-none">
@@ -103,23 +130,23 @@ function capitalizar($texto) {
     <!-- Selector de filas para desktop: solo el nativo de DataTables -->
     <!-- Tabla para desktop -->
     <div class="table-responsive d-none d-md-block">
-        <table id="tabla-usuarios" class="table table-bordered table-striped">
-            <thead class="table-dark">
+        <table id="tabla-usuarios" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
+            <thead class="bg-indigo-600 text-white">
                 <tr>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>Apellido</th>
-                    <th>DNI</th>
-                    <th>Sexo</th>
-                    <th>Fecha Nacimiento</th>
-                    <th>Email</th>
-                    <th>Teléfono</th>
-                    <th>Dirección</th>
-                    <th>Cargo</th>
-                    <th>Profesión</th>
-                    <th>Rol</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
+                    <th class="px-4 py-2 text-sm font-semibold">ID</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Apellido</th>
+                    <th class="px-4 py-2 text-sm font-semibold">DNI</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Sexo</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Fecha Nacimiento</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Email</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Teléfono</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Dirección</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Cargo</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Profesión</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Rol</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Estado</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>

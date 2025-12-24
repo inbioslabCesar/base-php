@@ -29,7 +29,7 @@ require_once __DIR__ . '/../api/cotizaciones_consultas.php';
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="<?= BASE_URL ?>cotizaciones/styles/cotizaciones.css">
 
-<div class="container mt-4">
+<div class="container-fluid mt-3 px-3">
     <!-- BLOQUE COMPONENTE: cotizaciones_header.php -->
     <?php require_once __DIR__ . '/../components/cotizaciones_header.php'; ?>
 

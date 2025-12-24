@@ -66,8 +66,32 @@ foreach ($registros as $r) {
     $total_deuda += floatval($r['total_cotizacion']) - floatval($r['total_pagado']);
 }
 ?>
-<div class="container mt-4">
-    <h3 class="mb-4">Reporte de Deudas y Adelantos</h3>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Fuerza color de encabezado y estados de ordenación en ingresos */
+#tablaIngresos thead th {
+    background-color: #4f46e5 !important; /* indigo-600 */
+    color: #ffffff !important;
+}
+#tablaIngresos thead th.sorting,
+#tablaIngresos thead th.sorting_asc,
+#tablaIngresos thead th.sorting_desc {
+    background-color: #4f46e5 !important;
+    color: #ffffff !important;
+}
+/* Encabezado con degradado para el título */
+.header-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    box-shadow: 0 4px 24px #764ba233;
+}
+</style>
+<div class="container-fluid mt-4">
+    <div class="header-section mb-3">
+        <div class="p-3">
+            <h3 class="mb-0 text-white text-3xl">Reporte de Deudas y Adelantos</h3>
+        </div>
+    </div>
     <form method="get" class="row g-2 align-items-end mb-3">
         <input type="hidden" name="vista" value="ingresos">
         <div class="col-auto">
@@ -118,18 +142,18 @@ foreach ($registros as $r) {
         </div>
     </form>
     <div class="table-responsive">
-        <table id="tablaIngresos" class="table table-striped table-bordered align-middle">
-            <thead class="table-dark">
+        <table id="tablaIngresos" class="table table-striped table-bordered align-middle" style="width:100%; min-width:1200px;">
+            <thead class="bg-indigo-600 text-white">
                 <tr>
-                    <th>Código Cotización</th>
-                    <th>Fecha</th>
-                    <th>Mét. Pago</th>
-                    <th>Cliente</th>
-                    <th>Tipo de Paciente</th>
-                    <th>Referencia</th>
-                    <th>Total Cotización</th>
-                    <th>Adelanto</th>
-                    <th>Deuda</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Código Cotización</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Fecha</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Mét. Pago</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Cliente</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Tipo de Paciente</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Referencia</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Total Cotización</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Adelanto</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Deuda</th>
                 </tr>
             </thead>
             <tbody>

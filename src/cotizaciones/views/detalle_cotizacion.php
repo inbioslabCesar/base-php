@@ -10,7 +10,7 @@ if (!$id) {
 
 // Consulta principal: cotización + cliente
 $stmt = $pdo->prepare("
-    SELECT cotizaciones.*, clientes.nombre AS nombre_cliente, clientes.apellido AS apellido_cliente, clientes.dni
+    SELECT cotizaciones.*, clientes.nombre AS nombre_cliente, clientes.apellido AS apellido_cliente, clientes.dni, clientes.codigo_cliente
     FROM cotizaciones
     LEFT JOIN clientes ON cotizaciones.id_cliente = clientes.id
     WHERE cotizaciones.id = ?
@@ -628,6 +628,7 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
 <script>
 function imprimirTicketCotizacion() {
     var codigo = "<?= htmlspecialchars($cotizacion['codigo']) ?>";
+    var codigoPaciente = "<?= htmlspecialchars($cotizacion['codigo_cliente'] ?? '') ?>";
     var nombre = "<?= htmlspecialchars($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) ?>";
     var dni = "<?= htmlspecialchars($cotizacion['dni']) ?>";
     var fecha = "<?= htmlspecialchars($cotizacion['fecha']) ?>";
@@ -638,31 +639,62 @@ function imprimirTicketCotizacion() {
     var empresa_ruc = "<?= htmlspecialchars($config['ruc'] ?? '') ?>";
     var empresa_direccion = "<?= htmlspecialchars($config['direccion'] ?? '') ?>";
     var empresa_celular = "<?= htmlspecialchars($config['celular'] ?? '') ?>";
+    var empresa_dominio = "<?= htmlspecialchars($config['dominio'] ?? '') ?>";
 
-    var html = `<div style=\"font-family:monospace; width:280px; padding:10px; margin:0 auto; display:block; text-align:center;\">
-        <div style='font-size:1.1em; font-weight:bold;'>${empresa_nombre}</div>
-        <div style='font-size:0.95em;'>RUC: ${empresa_ruc}</div>
-        <div style='font-size:0.95em;'>${empresa_direccion}</div>
-        <div style='font-size:0.95em;'>Celular: ${empresa_celular}</div>
-        <div style='margin-bottom:8px;'>Ticket Cotización</div>
-        <div>Código: <strong>${codigo}</strong></div>
-        <div>Cliente: ${nombre}</div>
-        <div>DNI: ${dni}</div>
-        <div>Condición: ${condicion}</div>
-        <div>Fecha: ${fecha}</div>
-        <hr>
-        <div style='font-weight:bold;'>Exámenes:</div>
-        <table style='width:100%; font-size:0.95em; margin:0 auto; text-align:center;'>
-            <thead><tr><th style='text-align:center;'>Examen</th><th style='text-align:center;'>Cant</th></tr></thead>
-            <tbody>`;
-    examenes.forEach(function(ex) {
-        html += `<tr><td style='text-align:center;'>${ex.nombre_examen}</td><td style='text-align:center;'>${ex.cantidad}</td></tr>`;
-    });
-    html += `</tbody></table>
-        <hr>
-        <div style='font-size:1.2em;'>Total: S/ ${total}</div>
-        <div style='margin-top:10px;'>Gracias por su preferencia</div>
-    </div>`;
+        var rows = '';
+        examenes.forEach(function(ex) {
+                var precio = ex.precio_unitario ? parseFloat(ex.precio_unitario) : (ex.precio ? parseFloat(ex.precio) : (ex.precio_publico ? parseFloat(ex.precio_publico) : 0));
+                rows += `<tr><td>${ex.nombre_examen}</td><td class='qty'>${ex.cantidad}</td><td class='price'>S/ ${precio.toFixed(2)}</td></tr>`;
+        });
+       var html = `
+                <div class="receipt">
+                    <style>
+                        /* Ajustes de tamaño para el ticket (modifica aquí para cambiar manualmente) */
+                        .receipt{width:280px;margin:0 auto;font-family:'Courier New',monospace;color:#333;}
+                        .center{text-align:center}
+                        .small{font-size:12px} /* texto secundario */
+                        .separator{border-top:2px dotted #aaa;margin:8px 0}
+                        .info-table,.items-table{width:100%;border-collapse:collapse}
+                        .info-table td{padding:4px 0;font-size:12px} /* datos clave */
+                        .info-table td.label{color:#555}
+                        .info-table td.value{text-align:right}
+                        .items-table thead th{font-weight:700;font-size:13px;text-align:left;padding:6px 0;border-bottom:2px dotted #aaa}
+                        .items-table thead th.qty{text-align:right}
+                        .items-table thead th.price{text-align:right}
+                        .items-table tbody td{padding:4px 0;border-bottom:1px dotted #ddd;font-size:12px}
+                        .items-table tbody td.qty{text-align:right}
+                        .items-table tbody td.price{text-align:right}
+                        .total-row{margin-top:10px;border-top:2px dotted #000;padding-top:8px;font-weight:700;display:flex;justify-content:space-between;font-size:16px}
+                        .footer{margin-top:10px;font-size:12px}
+                    </style>
+                    <div class="center">
+                        <div style="font-size:22px;font-weight:700;text-transform:uppercase">${empresa_nombre}</div>
+                        <div class="small">RUC: ${empresa_ruc}</div>
+                        <div class="small">${empresa_direccion}</div>
+                        <div class="small">Celular: ${empresa_celular}</div>
+                        ${empresa_dominio ? `<div class="small">${empresa_dominio}</div>` : ''}
+                        <div class="separator"></div>
+                        <div class="small" style="font-weight:700">Ticket Cotización</div>
+                    </div>
+                    <table class="info-table">
+                        <tbody>
+                            <tr><td class="label">Cód. Paciente</td><td class="value"><strong>${codigoPaciente}</strong></td></tr>
+                            <tr><td class="label">Cód. Cotización</td><td class="value">${codigo}</td></tr>
+                            <tr><td class="label">Paciente</td><td class="value">${nombre}</td></tr>
+                            <tr><td class="label">DNI</td><td class="value">${dni}</td></tr>
+                            <tr><td class="label">Referencia</td><td class="value">${condicion}</td></tr>
+                            <tr><td class="label">Fecha</td><td class="value">${fecha}</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="separator"></div>
+                    <div class="center" style="font-weight:700;font-size:17px">Exámenes</div>
+                    <table class="items-table">
+                        <thead><tr><th>Examen</th><th class="qty">Cant</th><th class="price">Precio</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <div class="total-row"><span>TOTAL</span><span>S/ ${total}</span></div>
+                    <div class="footer center small">Gracias por su preferencia</div>
+                </div>`;
 
     Swal.fire({
         title: 'Vista previa del ticket',
@@ -683,4 +715,4 @@ function imprimirTicketCotizacion() {
     });
 }
 </script>
-</div>
+                
