@@ -58,12 +58,14 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Inicializar totales
+// Inicializar totales (clamp deuda a 0 para evitar negativos)
 $total_adelanto = 0;
 $total_deuda = 0;
 foreach ($registros as $r) {
-    $total_adelanto += floatval($r['total_pagado']);
-    $total_deuda += floatval($r['total_cotizacion']) - floatval($r['total_pagado']);
+    $pagado = floatval($r['total_pagado']);
+    $total = floatval($r['total_cotizacion']);
+    $total_adelanto += $pagado;
+    $total_deuda += max(0, $total - $pagado);
 }
 ?>
 <script src="https://cdn.tailwindcss.com"></script>

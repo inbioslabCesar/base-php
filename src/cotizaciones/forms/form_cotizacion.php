@@ -8,6 +8,11 @@ $rol = $_SESSION['rol'] ?? null;
 $isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
 $cotizacionData = null;
 $examenesCotizacion = [];
+$emitirComprobante = 1;
+$tipoComprobanteCliente = 'boleta';
+$receptorRuc = '';
+$receptorRazonSocial = '';
+$receptorDireccion = '';
 
 // Exámenes catálogo
 $stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico FROM examenes WHERE vigente = 1 ORDER BY nombre");
@@ -35,6 +40,18 @@ if ($isEdit) {
         echo "<div class='alert alert-danger mt-4'>No se encontró la cotización a editar.</div>";
         exit;
     }
+    $emitirComprobante = (int)($cotizacionData['emitir_comprobante'] ?? 1);
+
+    // Particular con Factura: precargar si existe en BD
+    if (!empty($cotizacionData['comprobante_tipo']) && in_array(strtolower((string)$cotizacionData['comprobante_tipo']), ['boleta','factura'], true)) {
+        $tipoComprobanteCliente = strtolower((string)$cotizacionData['comprobante_tipo']);
+    } else {
+        // Compatibilidad con registros antiguos
+        $tipoComprobanteCliente = !empty($cotizacionData['id_empresa']) ? 'factura' : 'boleta';
+    }
+    $receptorRuc = (string)($cotizacionData['receptor_numero_documento'] ?? '');
+    $receptorRazonSocial = (string)($cotizacionData['receptor_razon_social'] ?? '');
+    $receptorDireccion = (string)($cotizacionData['receptor_direccion'] ?? '');
     // Exámenes de la cotización
     $stmtDet = $pdo->prepare("SELECT * FROM cotizaciones_detalle WHERE id_cotizacion = ?");
     $stmtDet->execute([$id_cotizacion]);
@@ -581,6 +598,8 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     <strong>Importante:</strong> Después de guardar la cotización, podrás agendar la cita para la toma de muestra.
                 </div>
 
+                <div id="cotizacionFormAlert" class="alert alert-danger d-none" role="alert"></div>
+
                 <form action="<?= BASE_URL ?>dashboard.php?action=<?= $isEdit ? 'editar_cotizacion' : 'crear_cotizacion' ?>" method="POST" id="formCotizacion">
 
                     <?php if ($isEdit): ?>
@@ -659,6 +678,74 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row fade-in-up">
+                            <div class="col-md-4">
+                                <div class="form-group-modern">
+                                    <label for="emitirComprobante" class="form-label-modern">
+                                        <i class="bi bi-receipt"></i>
+                                        Comprobante
+                                    </label>
+                                    <select id="emitirComprobante" name="emitir_comprobante" class="form-select form-select-modern" required>
+                                        <option value="1" <?= ($emitirComprobante === 1) ? 'selected' : '' ?>>Sí (Boleta/Factura SUNAT)</option>
+                                        <option value="0" <?= ($emitirComprobante === 0) ? 'selected' : '' ?>>No (Solo Ticket)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">
+                                        Si eliges “Solo Ticket”, no se emitirá CPE (XML/CDR/PDF).
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row fade-in-up" id="rowTipoComprobanteCliente">
+                            <div class="col-md-4">
+                                <div class="form-group-modern">
+                                    <label for="tipoComprobanteCliente" class="form-label-modern">
+                                        <i class="bi bi-file-earmark-text"></i>
+                                        Tipo de comprobante (Particular)
+                                    </label>
+                                    <select id="tipoComprobanteCliente" name="tipo_comprobante_cliente" class="form-select form-select-modern">
+                                        <option value="boleta" <?= ($tipoComprobanteCliente === 'boleta') ? 'selected' : '' ?>>Boleta (DNI)</option>
+                                        <option value="factura" <?= ($tipoComprobanteCliente === 'factura') ? 'selected' : '' ?>>Factura (RUC)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">
+                                        Para “Factura” en particular, completa RUC y Razón Social.
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 d-none" id="colFacturaRuc">
+                                <div class="form-group-modern">
+                                    <label for="receptorRuc" class="form-label-modern">
+                                        <i class="bi bi-123"></i>
+                                        RUC (11 dígitos)
+                                    </label>
+                                    <input type="text" id="receptorRuc" name="receptor_ruc" class="form-control" maxlength="11" pattern="[0-9]{11}" value="<?= htmlspecialchars($receptorRuc) ?>">
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 d-none" id="colFacturaRazon">
+                                <div class="form-group-modern">
+                                    <label for="receptorRazon" class="form-label-modern">
+                                        <i class="bi bi-building"></i>
+                                        Razón Social
+                                    </label>
+                                    <input type="text" id="receptorRazon" name="receptor_razon_social" class="form-control" maxlength="255" value="<?= htmlspecialchars($receptorRazonSocial) ?>">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row fade-in-up d-none" id="rowFacturaDireccion">
+                            <div class="col-md-12">
+                                <div class="form-group-modern">
+                                    <label for="receptorDireccion" class="form-label-modern">
+                                        <i class="bi bi-geo-alt"></i>
+                                        Dirección (opcional)
+                                    </label>
+                                    <input type="text" id="receptorDireccion" name="receptor_direccion" class="form-control" maxlength="255" value="<?= htmlspecialchars($receptorDireccion) ?>">
                                 </div>
                             </div>
                         </div>
@@ -822,6 +909,26 @@ let descuentoCliente = <?= $descuento_cliente ?>;
 let descuentoActual = <?= $descuento_empresa_convenio ?: $descuento_cliente ?>;
 let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
 
+function showCotizacionFormError(message) {
+    const $alert = $('#cotizacionFormAlert');
+    $alert.text(message || 'Debes seleccionar al menos un examen.');
+    $alert.removeClass('d-none');
+    try {
+        $alert[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {
+        // noop
+    }
+}
+
+$('#formCotizacion').on('submit', function(e) {
+    if (!Array.isArray(examenesSeleccionados) || examenesSeleccionados.length === 0) {
+        e.preventDefault();
+        showCotizacionFormError('Debes seleccionar al menos una prueba/examen antes de guardar la cotización.');
+        return false;
+    }
+    $('#cotizacionFormAlert').addClass('d-none').text('');
+});
+
 // Inicializar descuento y precios al cargar como empresa/convenio
 $(document).ready(function() {
     // Inicializar Select2 para el buscador de exámenes con configuración mejorada
@@ -955,7 +1062,34 @@ $('#tipoCliente').on('change', function() {
     } else {
         $('#empresa, #convenio').val('');
     }
+
+    // Particular: habilitar selector de Boleta/Factura y campos de factura
+    syncFacturaFields();
     actualizarDescuento();
+});
+
+function syncFacturaFields() {
+    const tipoCliente = $('#tipoCliente').val();
+    const emitir = $('#emitirComprobante').val();
+    const tipoComp = $('#tipoComprobanteCliente').val();
+
+    // Mostrar solo cuando es Particular y se emitirá CPE
+    const show = (tipoCliente === 'cliente' && String(emitir) === '1');
+    $('#rowTipoComprobanteCliente').toggleClass('d-none', !show);
+
+    const isFactura = (show && tipoComp === 'factura');
+    $('#colFacturaRuc, #colFacturaRazon').toggleClass('d-none', !isFactura);
+    $('#rowFacturaDireccion').toggleClass('d-none', !isFactura);
+
+    $('#receptorRuc, #receptorRazon').prop('required', isFactura);
+}
+
+$('#emitirComprobante').on('change', syncFacturaFields);
+$('#tipoComprobanteCliente').on('change', syncFacturaFields);
+
+// Inicializar visibilidad al cargar
+$(document).ready(function() {
+    syncFacturaFields();
 });
 
 // Detectar selección de empresa/convenio y actualizar descuento

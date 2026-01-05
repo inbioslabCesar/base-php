@@ -1,0 +1,59 @@
+
+CONTRATO DE SERVICIOS DE SOFTWARE PARA LABORATORIO CLÍNICO
+
+Entre:
+INBIOSLAB EIRL, RUC: [colocar RUC], representada por su Gerente General Andreita Celeste Quevedo Del Aguila, DNI: [DNI gerente], con domicilio en [colocar dirección], en adelante “EL PROVEEDOR”.
+
+Y:
+[Nombre del Cliente], RUC/DNI: [colocar], representado por [nombre del representante], DNI: [DNI representante], en adelante “EL CLIENTE”.
+
+Desarrollador responsable: Ing. Cesar Perez Guimaraez.
+
+---
+
+CLÁUSULAS
+
+PRIMERA: OBJETO DEL CONTRATO
+EL PROVEEDOR otorga a EL CLIENTE el acceso y uso del sistema de gestión para laboratorio clínico, incluyendo módulos de pacientes, exámenes, resultados y reportes, según el plan elegido.
+
+SEGUNDA: PLANES Y CONDICIONES
+- Plan Alquiler Mensual:
+  EL CLIENTE paga una cuota mensual por el uso del sistema, con soporte y actualizaciones incluidas. El servicio se suspende si no se realiza el pago mensual.
+- Plan Alquiler Anual:
+  EL CLIENTE paga una cuota anual adelantada, con soporte y actualizaciones incluidas durante el año.
+- Plan Compra del Sistema:
+  EL CLIENTE adquiere una licencia perpetua del sistema, pagando solo el hosting anual para mantener el sistema en línea. Incluye instalación, capacitación y migración inicial de datos.
+
+TERCERA: GARANTÍAS Y SOPORTE
+- El sistema cuenta con garantía de funcionamiento durante la vigencia del contrato.
+- El soporte técnico incluye atención a incidencias, consultas y actualizaciones de seguridad.
+- Los datos del cliente son confidenciales y se realizan respaldos periódicos.
+
+CUARTA: RESPONSABILIDADES
+- EL PROVEEDOR se compromete a mantener el sistema operativo, seguro y actualizado.
+- EL CLIENTE se compromete a usar el sistema de acuerdo a las leyes y a no compartir accesos con terceros no autorizados.
+
+QUINTA: FACTURACIÓN ELECTRÓNICA (MEJORA FUTURA)
+EL CLIENTE queda informado que la funcionalidad de facturación electrónica SUNAT es una mejora en desarrollo y no está incluida en los beneficios actuales del sistema. Cuando esta funcionalidad esté disponible, podrá ser activada como un servicio adicional, sujeto a un costo mensual adicional, el cual será informado y acordado previamente entre las partes. La activación de la facturación electrónica requerirá la aceptación expresa de EL CLIENTE y la firma de una adenda o anexo a este contrato.
+
+SEXTA: DURACIÓN Y RENOVACIÓN
+- El contrato tiene vigencia según el plan elegido (mensual, anual o perpetuo).
+- En el caso de hosting anual, EL CLIENTE debe renovar el pago para mantener el sistema en línea.
+
+SÉPTIMA: RESOLUCIÓN DE CONTRATO
+- Cualquiera de las partes puede resolver el contrato por incumplimiento, previo aviso por escrito.
+- En caso de terminación, EL CLIENTE puede solicitar una copia de sus datos.
+
+OCTAVA: FIRMAS
+En señal de conformidad, ambas partes firman el presente contrato en dos ejemplares, en la ciudad de [Ciudad], a los [día] días del mes de [mes] del año [año].
+
+Por INBIOSLAB EIRL
+Gerente: Andreita Celeste Quevedo Del Aguila
+DNI: [DNI gerente]
+Firma: _______________________
+
+Por EL CLIENTE
+Representante: __________________
+DNI: [DNI representante]
+Firma: _______________________
+

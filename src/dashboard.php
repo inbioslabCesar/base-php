@@ -17,10 +17,10 @@ if (!isset($_SESSION['rol'])) {
 
 
 $acciones_por_rol = [
-    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf','pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'descargar_cotizacion'],
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf','pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante'],
 
     'laboratorista' => ['api_listado', 'guardar', 'cotizaciones_api', 'examenes_api'],
-    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf','pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
+    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf','pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante'],
     'empresa' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'cliente' => ['crear_cotizacion', 'procesar_agenda', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'convenio' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion']
@@ -71,6 +71,9 @@ $acciones = [
     'examenes_api' => __DIR__ . '/examenes/examenes_api.php',
     'usuarios_api' => __DIR__ . '/usuarios/usuarios_api.php',
     'descargar_cotizacion' => __DIR__ . '/cotizaciones/views/descargar_cotizacion.php',
+    'emitir_comprobante' => __DIR__ . '/cotizaciones/api/emitir_comprobante.php',
+    'estado_comprobante' => __DIR__ . '/cotizaciones/api/estado_comprobante.php',
+    'descargar_comprobante' => __DIR__ . '/cotizaciones/api/descargar_comprobante.php',
 ];
 
 $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';

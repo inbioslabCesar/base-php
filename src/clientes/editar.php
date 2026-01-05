@@ -31,10 +31,71 @@ $fecha_nacimiento = $_POST['fecha_nacimiento'] ?? null;
 $estado         = $_POST['estado'] ?? 'activo';
 $descuento      = $_POST['descuento'] ?? null;
 
+function normalizarDominioEmpresa(string $dominio): string {
+    $dominio = trim($dominio);
+    if ($dominio === '') return '';
+
+    $dominio = preg_replace('#^https?://#i', '', $dominio);
+    $dominio = preg_replace('#/.*$#', '', $dominio);
+    $dominio = preg_replace('#:\\d+$#', '', $dominio);
+    $dominio = preg_replace('#^www\\.#i', '', $dominio);
+    return strtolower(trim($dominio));
+}
+
+// Documento
+if ($tipo_documento === 'sin_dni') {
+    if ($dni === '') {
+        $intentos = 0;
+        do {
+            $dni = (string)random_int(10000000, 99999999);
+            $stmt = $pdo->prepare('SELECT id FROM clientes WHERE dni = ? AND id <> ? LIMIT 1');
+            $stmt->execute([$dni, $id]);
+            $existe = (bool)$stmt->fetchColumn();
+            $intentos++;
+        } while ($existe && $intentos < 20);
+
+        if ($existe) {
+            $_SESSION['msg'] = 'No se pudo generar un documento provisional único. Intente nuevamente.';
+            header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
+            exit;
+        }
+    }
+} else {
+    if ($dni === '') {
+        $_SESSION['msg'] = 'Por favor, ingrese el documento.';
+        header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
+        exit;
+    }
+}
+
+// Dominio empresa para email
+$dominio = '';
+try {
+    $stmtDom = $pdo->query('SELECT dominio FROM config_empresa LIMIT 1');
+    $dominio = (string)($stmtDom->fetchColumn() ?: '');
+} catch (Exception $e) {
+    $dominio = '';
+}
+$dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($dominio === '') {
+    $dominio = 'localhost';
+}
+
+// Siempre forzar email según documento@dominio
+$email = ($dni !== '' && $dominio !== '') ? ($dni . '@' . $dominio) : $email;
+
 // Validación de requeridos
 if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$email) {
     $_SESSION['msg'] = 'Por favor, complete todos los campos obligatorios.';
     header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
+    exit;
+}
+
+// Validar DNI único (excluyendo el registro actual)
+$stmt = $pdo->prepare('SELECT id FROM clientes WHERE dni = ? AND id <> ? LIMIT 1');
+$stmt->execute([$dni, $id]);
+if ($stmt->fetchColumn()) {
+    header('Location: ../dashboard.php?vista=form_cliente&id=' . $id . '&error=dni_duplicado');
     exit;
 }
 

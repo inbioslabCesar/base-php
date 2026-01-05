@@ -36,5 +36,5 @@ function obtenerSaldoCotizacion($pdo, $idCotizacion) {
     $stmt->execute([$idCotizacion]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) return 0;
-    return floatval($row['total']) - floatval($row['pagado']);
+    return max(0, floatval($row['total']) - floatval($row['pagado']));
 }

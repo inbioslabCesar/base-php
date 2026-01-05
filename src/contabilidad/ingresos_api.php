@@ -69,7 +69,7 @@ $sql = "SELECT
         END AS referencia,
         c.total AS total_cotizacion,
         (SELECT IFNULL(SUM(p2.monto),0) FROM pagos p2 WHERE p2.id_cotizacion = c.id) AS adelanto,
-        (c.total - (SELECT IFNULL(SUM(p2.monto),0) FROM pagos p2 WHERE p2.id_cotizacion = c.id)) AS deuda
+        GREATEST(0, c.total - (SELECT IFNULL(SUM(p2.monto),0) FROM pagos p2 WHERE p2.id_cotizacion = c.id)) AS deuda
     FROM cotizaciones c
     JOIN clientes cl ON c.id_cliente = cl.id
     LEFT JOIN convenios conv ON c.id_convenio = conv.id

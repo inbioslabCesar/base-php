@@ -15,8 +15,9 @@ if ($idCotizacion) {
     $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
     $stmtPagos->execute([$idCotizacion]);
     $totalPagado = floatval($stmtPagos->fetchColumn());
-    $saldo = floatval($cotizacion['total']) - $totalPagado;
-    $isPagada = ($saldo <= 0);
+    $saldoReal = floatval($cotizacion['total']) - $totalPagado;
+    $saldo = max(0, $saldoReal);
+    $isPagada = ($saldoReal <= 0);
 }
 ?>
 <style>
@@ -162,10 +163,25 @@ if ($idCotizacion) {
         </div>
         <div class="payment-card">
             <?php if ($msg == "error"): ?>
-                <div class="alert alert-danger alert-modern">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    El monto debe ser positivo y no mayor al saldo pendiente (excepto para descarga anticipada).
-                </div>
+                <?php
+                    $intento = isset($_GET['intento']) ? floatval($_GET['intento']) : null;
+                    $saldoParam = isset($_GET['saldo']) ? floatval($_GET['saldo']) : null;
+                    $esPagadaAhora = ($saldo <= 0);
+                ?>
+                <?php if ($esPagadaAhora): ?>
+                    <div class="alert alert-info alert-modern">
+                        <i class="bi bi-info-circle me-2"></i>
+                        La cotización ya está completamente pagada. No es posible registrar más pagos.
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-danger alert-modern">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        El monto debe ser positivo y no mayor al saldo pendiente.
+                        <?php if ($intento !== null && $saldoParam !== null): ?>
+                            <div class="mt-1"><small>Intento: S/ <?= number_format($intento, 2) ?> | Saldo disponible: S/ <?= number_format($saldoParam, 2) ?></small></div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             <?php elseif ($msg == "success"): ?>
                 <div class="alert alert-success alert-modern">
                     <i class="bi bi-check-circle me-2"></i>

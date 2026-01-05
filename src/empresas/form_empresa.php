@@ -32,6 +32,27 @@ if ($esEdicion) {
 function capitalizar($texto) {
     return $texto ? mb_convert_case($texto, MB_CASE_TITLE, "UTF-8") : '';
 }
+
+// Dominio para generar emails (config_empresa.dominio o HTTP_HOST)
+function normalizarDominioEmpresa(string $dominio): string {
+    $dominio = strtolower(trim($dominio));
+    $dominio = preg_replace('#^https?://#', '', $dominio) ?? $dominio;
+    $dominio = preg_replace('#/.*$#', '', $dominio) ?? $dominio;
+    $dominio = preg_replace('#:\\d+$#', '', $dominio) ?? $dominio;
+    $dominio = trim($dominio);
+    $dominio = ltrim($dominio, '@');
+    if (str_starts_with($dominio, 'www.')) {
+        $dominio = substr($dominio, 4);
+    }
+    return $dominio;
+}
+
+$stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
+$dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
+$dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($dominioEmpresa === '') {
+    $dominioEmpresa = 'ejemplo.com';
+}
 ?>
 
 <div class="container mt-4">
@@ -42,6 +63,15 @@ function capitalizar($texto) {
                 <label for="ruc" class="form-label">RUC *</label>
                 <input type="text" class="form-control" id="ruc" name="ruc" required
                     value="<?= htmlspecialchars($empresa['ruc'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="sin_ruc" name="sin_ruc">
+                    <label class="form-check-label" for="sin_ruc">
+                        Sin RUC (generar uno provisional)
+                    </label>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    El email y la contraseña se generan automáticamente según el RUC.
+                </small>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="razon_social" class="form-label">Razón Social *</label>
@@ -68,7 +98,10 @@ function capitalizar($texto) {
             <div class="col-md-4 mb-3">
                 <label for="email" class="form-label">Email *</label>
                 <input type="email" class="form-control" id="email" name="email" required
-                    value="<?= htmlspecialchars($empresa['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    value="<?= htmlspecialchars($empresa['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                <small class="text-muted d-block mt-1">
+                    Ejemplo: 20393997258@<?= htmlspecialchars($dominioEmpresa) ?>
+                </small>
             </div>
         </div>
         <div class="row">
@@ -104,6 +137,8 @@ function capitalizar($texto) {
                 </div>
                 <?php if ($esEdicion): ?>
                     <small class="text-muted">Deja en blanco si no deseas cambiar la contraseña.</small>
+                <?php else: ?>
+                    <small class="text-muted">Por defecto, la contraseña es el mismo RUC.</small>
                 <?php endif; ?>
             </div>
         </div>
@@ -113,6 +148,63 @@ function capitalizar($texto) {
 </div>
 
 <script>
+(function () {
+    const esEdicion = <?= $esEdicion ? 'true' : 'false' ?>;
+    const dominioEmpresa = <?= json_encode($dominioEmpresa) ?>;
+    const $ruc = document.getElementById('ruc');
+    const $sinRuc = document.getElementById('sin_ruc');
+    const $email = document.getElementById('email');
+    const $password = document.getElementById('password');
+
+    if (!$ruc || !$sinRuc || !$email || !$password) return;
+
+    function cleanDigits(value) {
+        return String(value || '').replace(/\D+/g, '');
+    }
+
+    function generarRucProvisional() {
+        // 11 dígitos, iniciando con 9 (heurística para diferenciarlo)
+        const n = Math.floor(Math.random() * 10000000000);
+        return '9' + String(n).padStart(10, '0');
+    }
+
+    function syncCredencialesFromRuc() {
+        const rucDigits = cleanDigits($ruc.value);
+        if (rucDigits.length === 0) return;
+
+        $ruc.value = rucDigits;
+        $email.value = `${rucDigits}@${dominioEmpresa || 'ejemplo.com'}`;
+
+        // En edición, NO autocompletar password para evitar cambios accidentales.
+        if (!esEdicion) {
+            $password.value = rucDigits;
+        }
+    }
+
+    function onToggleSinRuc() {
+        const enabled = $sinRuc.checked;
+        if (enabled) {
+            const provisional = generarRucProvisional();
+            $ruc.value = provisional;
+            $ruc.readOnly = true;
+            syncCredencialesFromRuc();
+        } else {
+            $ruc.readOnly = false;
+        }
+    }
+
+    $ruc.addEventListener('input', function () {
+        if ($ruc.readOnly) return;
+        syncCredencialesFromRuc();
+    });
+
+    $sinRuc.addEventListener('change', onToggleSinRuc);
+
+    if ($ruc.value) {
+        syncCredencialesFromRuc();
+    }
+})();
+
 function generarPassword() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let pass = "";

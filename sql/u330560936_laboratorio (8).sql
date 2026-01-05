@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1:3306
--- Tiempo de generación: 06-11-2025 a las 01:14:38
+-- Tiempo de generación: 04-01-2026 a las 22:52:34
 -- Versión del servidor: 11.8.3-MariaDB-log
 -- Versión de PHP: 7.2.34
 
@@ -18,7 +18,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 --
--- Base de datos: `u330560936_medditechbd`
+-- Base de datos: `u330560936_laboratorio`
 --
 
 -- --------------------------------------------------------
@@ -53,7 +53,7 @@ CREATE TABLE `clientes` (
   `convenio_nombre` varchar(100) DEFAULT NULL,
   `tipo_registro` varchar(20) DEFAULT 'cliente',
   `descuento` decimal(5,2) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -69,6 +69,7 @@ CREATE TABLE `config_empresa` (
   `celular` varchar(50) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `ruc` varchar(50) DEFAULT NULL,
+  `dominio` varchar(100) DEFAULT NULL,
   `logo` varchar(255) DEFAULT NULL,
   `firma` varchar(255) DEFAULT NULL,
   `color_principal` varchar(20) DEFAULT '#0d6efd',
@@ -88,7 +89,7 @@ CREATE TABLE `config_empresa` (
   `color_botones` varchar(20) DEFAULT '#198754',
   `color_texto` varchar(20) DEFAULT '#212529',
   `tamano_letra` varchar(20) DEFAULT '1rem'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -105,7 +106,7 @@ CREATE TABLE `convenios` (
   `descripcion` text DEFAULT NULL,
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -133,6 +134,7 @@ CREATE TABLE `cotizaciones` (
   `id_convenio` int(11) DEFAULT NULL,
   `tipo_usuario` enum('cliente','empresa','convenio','recepcionista') DEFAULT NULL,
   `fecha` datetime NOT NULL DEFAULT current_timestamp(),
+  `modificada` tinyint(1) NOT NULL DEFAULT 0,
   `total` decimal(10,2) NOT NULL,
   `total_bruto` decimal(10,2) DEFAULT 0.00,
   `estado_pago` enum('pendiente','pagado') DEFAULT 'pendiente',
@@ -146,8 +148,13 @@ CREATE TABLE `cotizaciones` (
   `direccion_toma` varchar(255) DEFAULT NULL,
   `descuento_aplicado` decimal(5,2) DEFAULT 0.00,
   `estado_muestra` enum('pendiente','realizada') DEFAULT 'pendiente',
-  `referencia_personalizada` varchar(100) DEFAULT NULL COMMENT 'Referencia personalizada para mostrar en PDF en lugar de empresa/convenio/particular'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `referencia_personalizada` varchar(100) DEFAULT NULL COMMENT 'Referencia personalizada para mostrar en PDF en lugar de empresa/convenio/particular',
+  `comprobante_tipo` varchar(10) DEFAULT NULL COMMENT 'boleta|factura (si es NULL se infiere por id_empresa)',
+  `receptor_tipo_documento` varchar(2) DEFAULT NULL COMMENT 'Tipo doc receptor SUNAT (6=RUC, 1=DNI, etc)',
+  `receptor_numero_documento` varchar(20) DEFAULT NULL COMMENT 'Número de documento del receptor (RUC/DNI)',
+  `receptor_razon_social` varchar(255) DEFAULT NULL COMMENT 'Razón social del receptor (para factura)',
+  `receptor_direccion` varchar(255) DEFAULT NULL COMMENT 'Dirección del receptor (opcional)'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -163,7 +170,7 @@ CREATE TABLE `cotizaciones_detalle` (
   `precio_unitario` decimal(10,2) NOT NULL,
   `cantidad` int(11) NOT NULL DEFAULT 1,
   `subtotal` decimal(10,2) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -176,7 +183,7 @@ CREATE TABLE `egresos` (
   `monto` decimal(10,2) NOT NULL,
   `descripcion` varchar(255) DEFAULT NULL,
   `fecha` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -198,7 +205,7 @@ CREATE TABLE `empresas` (
   `estado` enum('activo','inactivo') DEFAULT 'activo',
   `descuento` decimal(5,2) DEFAULT NULL,
   `fecha_registro` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -234,7 +241,7 @@ CREATE TABLE `examenes` (
   `precio_publico` decimal(10,2) NOT NULL DEFAULT 0.00,
   `adicional` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`adicional`)),
   `vigente` tinyint(1) DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -248,7 +255,7 @@ CREATE TABLE `examenes_cliente` (
   `cliente_id` int(11) NOT NULL,
   `precio` decimal(10,2) DEFAULT NULL,
   `descuento` decimal(5,2) DEFAULT 0.00
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -262,7 +269,7 @@ CREATE TABLE `examenes_convenio` (
   `convenio_id` int(11) NOT NULL,
   `precio` decimal(10,2) NOT NULL,
   `descuento` decimal(5,2) DEFAULT 0.00
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -276,7 +283,7 @@ CREATE TABLE `examenes_empresa` (
   `empresa_id` int(11) NOT NULL,
   `precio` decimal(10,2) DEFAULT NULL,
   `descuento` decimal(5,2) DEFAULT 0.00
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -288,7 +295,7 @@ CREATE TABLE `examenes_promocion` (
   `id` int(11) NOT NULL,
   `examen_id` int(11) NOT NULL,
   `promocion_id` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -303,7 +310,7 @@ CREATE TABLE `pagos` (
   `fecha` datetime DEFAULT current_timestamp(),
   `metodo_pago` varchar(30) DEFAULT 'efectivo',
   `observaciones` text DEFAULT NULL COMMENT 'Observaciones adicionales, especialmente para cambios de monto total'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -323,7 +330,7 @@ CREATE TABLE `promociones` (
   `activo` tinyint(1) DEFAULT 1,
   `vigente` tinyint(1) DEFAULT 1,
   `tipo_publico` varchar(20) NOT NULL DEFAULT 'todos'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -335,7 +342,7 @@ CREATE TABLE `promociones_empresa` (
   `id` int(11) NOT NULL,
   `promocion_id` int(11) NOT NULL,
   `empresa_id` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -347,7 +354,7 @@ CREATE TABLE `promociones_examen` (
   `id` int(11) NOT NULL,
   `promocion_id` int(11) NOT NULL,
   `examen_id` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -363,7 +370,7 @@ CREATE TABLE `resultados` (
   `fecha_registro` datetime DEFAULT current_timestamp(),
   `registrado_por` int(11) DEFAULT NULL,
   `observaciones` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -381,7 +388,7 @@ CREATE TABLE `resultados_examenes` (
   `id_laboratorista` int(11) DEFAULT NULL,
   `estado` varchar(20) DEFAULT 'pendiente',
   `observaciones` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -405,7 +412,7 @@ CREATE TABLE `usuarios` (
   `rol` enum('admin','recepcionista','laboratorista') DEFAULT 'recepcionista',
   `fecha_registro` datetime DEFAULT current_timestamp(),
   `estado` enum('activo','inactivo') DEFAULT 'activo'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Índices para tablas volcadas
@@ -448,7 +455,9 @@ ALTER TABLE `cotizaciones`
   ADD UNIQUE KEY `codigo` (`codigo`),
   ADD KEY `id_empresa` (`id_empresa`),
   ADD KEY `id_convenio` (`id_convenio`),
-  ADD KEY `cotizaciones_ibfk_1` (`id_cliente`);
+  ADD KEY `cotizaciones_ibfk_1` (`id_cliente`),
+  ADD KEY `idx_cotizaciones_comprobante_tipo` (`comprobante_tipo`),
+  ADD KEY `idx_cotizaciones_receptor_numero_documento` (`receptor_numero_documento`);
 
 --
 -- Indices de la tabla `cotizaciones_detalle`
@@ -571,7 +580,8 @@ ALTER TABLE `resultados_examenes`
 --
 ALTER TABLE `usuarios`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `dni` (`dni`);
+  ADD UNIQUE KEY `dni` (`dni`),
+  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- AUTO_INCREMENT de las tablas volcadas
@@ -736,10 +746,59 @@ ALTER TABLE `empresa_cliente`
   ADD CONSTRAINT `empresa_cliente_ibfk_2` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`);
 
 --
+-- Filtros para la tabla `examenes_cliente`
+--
+ALTER TABLE `examenes_cliente`
+  ADD CONSTRAINT `examenes_cliente_ibfk_1` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`),
+  ADD CONSTRAINT `examenes_cliente_ibfk_2` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`);
+
+--
+-- Filtros para la tabla `examenes_convenio`
+--
+ALTER TABLE `examenes_convenio`
+  ADD CONSTRAINT `examenes_convenio_ibfk_1` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`),
+  ADD CONSTRAINT `examenes_convenio_ibfk_2` FOREIGN KEY (`convenio_id`) REFERENCES `convenios` (`id`);
+
+--
+-- Filtros para la tabla `examenes_empresa`
+--
+ALTER TABLE `examenes_empresa`
+  ADD CONSTRAINT `examenes_empresa_ibfk_1` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `examenes_empresa_ibfk_2` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`);
+
+--
+-- Filtros para la tabla `examenes_promocion`
+--
+ALTER TABLE `examenes_promocion`
+  ADD CONSTRAINT `examenes_promocion_ibfk_1` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`),
+  ADD CONSTRAINT `examenes_promocion_ibfk_2` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`);
+
+--
 -- Filtros para la tabla `pagos`
 --
 ALTER TABLE `pagos`
   ADD CONSTRAINT `pagos_ibfk_1` FOREIGN KEY (`id_cotizacion`) REFERENCES `cotizaciones` (`id`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `promociones_empresa`
+--
+ALTER TABLE `promociones_empresa`
+  ADD CONSTRAINT `promociones_empresa_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`),
+  ADD CONSTRAINT `promociones_empresa_ibfk_2` FOREIGN KEY (`empresa_id`) REFERENCES `empresas` (`id`);
+
+--
+-- Filtros para la tabla `promociones_examen`
+--
+ALTER TABLE `promociones_examen`
+  ADD CONSTRAINT `promociones_examen_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`),
+  ADD CONSTRAINT `promociones_examen_ibfk_2` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`);
+
+--
+-- Filtros para la tabla `resultados`
+--
+ALTER TABLE `resultados`
+  ADD CONSTRAINT `resultados_ibfk_1` FOREIGN KEY (`id_cotizacion`) REFERENCES `cotizaciones` (`id`),
+  ADD CONSTRAINT `resultados_ibfk_2` FOREIGN KEY (`id_examen`) REFERENCES `examenes` (`id`);
 
 --
 -- Filtros para la tabla `resultados_examenes`

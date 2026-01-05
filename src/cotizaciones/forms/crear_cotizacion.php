@@ -19,6 +19,14 @@ $precios = $_POST['precios'] ?? [];
 $tipo_usuario = $_POST['tipo_usuario'] ?? 'cliente';
 $id_empresa = $_POST['id_empresa'] ?? null;
 $id_convenio = $_POST['id_convenio'] ?? null;
+$emitir_comprobante = isset($_POST['emitir_comprobante']) ? (int)$_POST['emitir_comprobante'] : 1;
+$emitir_comprobante = ($emitir_comprobante === 0) ? 0 : 1;
+
+// Particular pero Factura (RUC)
+$tipo_comprobante_cliente = strtolower(trim((string)($_POST['tipo_comprobante_cliente'] ?? 'boleta')));
+$receptor_ruc = preg_replace('/\D+/', '', (string)($_POST['receptor_ruc'] ?? ''));
+$receptor_razon_social = trim((string)($_POST['receptor_razon_social'] ?? ''));
+$receptor_direccion = trim((string)($_POST['receptor_direccion'] ?? ''));
 
 // Normalizar valores vacíos a null para evitar errores SQL
 $id_empresa = !empty($id_empresa) ? $id_empresa : null;
@@ -56,6 +64,37 @@ if (!$id_cliente || !$creado_por) {
     $base = defined('BASE_URL') ? BASE_URL : '../';
     header("Location: {$base}dashboard.php?vista=cotizaciones&msg=sesion_incompleta");
     exit;
+}
+
+// Helper: comprobar si una columna existe en la tabla cotizaciones (MySQL/MariaDB)
+function cotizacionesHasColumn(PDO $pdo, string $column): bool {
+    try {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM cotizaciones LIKE ?");
+        $stmt->execute([$column]);
+        return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+// Si es Particular y se quiere Factura, exigir columnas y datos
+$wantsFacturaParticular = ($tipo_usuario === 'cliente' && $emitir_comprobante === 1 && $tipo_comprobante_cliente === 'factura');
+if ($wantsFacturaParticular) {
+    if (!cotizacionesHasColumn($pdo, 'comprobante_tipo') || !cotizacionesHasColumn($pdo, 'receptor_numero_documento') || !cotizacionesHasColumn($pdo, 'receptor_razon_social')) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=bd_sin_campos_factura_particular");
+        exit;
+    }
+    if (strlen($receptor_ruc) !== 11) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=ruc_invalido");
+        exit;
+    }
+    if ($receptor_razon_social === '') {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=razon_social_requerida");
+        exit;
+    }
 }
 
 // Validar datos de exámenes
@@ -137,6 +176,13 @@ for ($i = 0; $i < count($examenes); $i++) {
     ];
 }
 
+// Si no quedó ningún detalle válido, no permitir crear cotización
+if (empty($detalles)) {
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones&msg=sin_examenes");
+    exit;
+}
+
 
 
 // SOLO CREAR NUEVA COTIZACION
@@ -151,27 +197,64 @@ if (!empty($_POST['fecha_toma']) && !empty($_POST['hora_toma'])) {
     date_default_timezone_set('America/Lima');
     $fecha = date('Y-m-d H:i:s');
 }
-$stmt = $pdo->prepare("INSERT INTO cotizaciones
-    (codigo, id_cliente, id_empresa, id_convenio, tipo_usuario, fecha, total, total_bruto, estado_pago, creado_por, rol_creador, tipo_toma, fecha_toma, hora_toma, direccion_toma, descuento_aplicado)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-$stmt->execute([
-    $codigo, 
-    $id_cliente, 
+$cols = [
+    'codigo','id_cliente','id_empresa','id_convenio','tipo_usuario','fecha','total','total_bruto','estado_pago','emitir_comprobante','creado_por','rol_creador','tipo_toma','fecha_toma','hora_toma','direccion_toma','descuento_aplicado'
+];
+$vals = [
+    $codigo,
+    $id_cliente,
     $id_empresa !== '' ? $id_empresa : null,
     $id_convenio !== '' ? $id_convenio : null,
     $tipo_usuario,
-    $fecha, 
-    $total, 
+    $fecha,
+    $total,
     $total_bruto,
-    $estado_pago, 
-    $creado_por, 
+    $estado_pago,
+    $emitir_comprobante,
+    $creado_por,
     $rol_creador,
     $_POST['tipo_toma'] ?? null,
     $_POST['fecha_toma'] ?? null,
     $_POST['hora_toma'] ?? null,
     $_POST['direccion_toma'] ?? null,
-    $descuento
-]);
+    $descuento,
+];
+
+// Guardar tipo y receptor solo si existen columnas
+if (cotizacionesHasColumn($pdo, 'comprobante_tipo')) {
+    $cols[] = 'comprobante_tipo';
+    if ($tipo_usuario === 'empresa' && !empty($id_empresa) && $emitir_comprobante === 1) {
+        $vals[] = 'factura';
+    } elseif ($wantsFacturaParticular) {
+        $vals[] = 'factura';
+    } else {
+        $vals[] = 'boleta';
+    }
+}
+
+if ($wantsFacturaParticular) {
+    if (cotizacionesHasColumn($pdo, 'receptor_tipo_documento')) {
+        $cols[] = 'receptor_tipo_documento';
+        $vals[] = '6';
+    }
+    if (cotizacionesHasColumn($pdo, 'receptor_numero_documento')) {
+        $cols[] = 'receptor_numero_documento';
+        $vals[] = $receptor_ruc;
+    }
+    if (cotizacionesHasColumn($pdo, 'receptor_razon_social')) {
+        $cols[] = 'receptor_razon_social';
+        $vals[] = $receptor_razon_social;
+    }
+    if (cotizacionesHasColumn($pdo, 'receptor_direccion')) {
+        $cols[] = 'receptor_direccion';
+        $vals[] = ($receptor_direccion !== '') ? $receptor_direccion : null;
+    }
+}
+
+$placeholders = implode(',', array_fill(0, count($cols), '?'));
+$sql = 'INSERT INTO cotizaciones (' . implode(',', $cols) . ') VALUES (' . $placeholders . ')';
+$stmt = $pdo->prepare($sql);
+$stmt->execute($vals);
 $id_cotizacion = $pdo->lastInsertId();
 $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
 foreach ($detalles as $detalle) {

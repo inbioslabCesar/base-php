@@ -43,6 +43,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("INSERT INTO pagos (id_cotizacion, monto, metodo_pago, fecha, observaciones) 
                               VALUES (?, 0, 'cambio_total', NOW(), ?)");
         $stmt->execute([$id_cotizacion, $motivo_completo]);
+
+        // Recalcular estado de pago según el nuevo total y pagos acumulados
+        $stmtPagos = $pdo->prepare("SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = ?");
+        $stmtPagos->execute([$id_cotizacion]);
+        $totalPagado = floatval($stmtPagos->fetchColumn());
+        $nuevoEstado = ($totalPagado >= $nuevo_total) ? 'pagado' : (($totalPagado > 0) ? 'abonado' : 'pendiente');
+        $stmtUpdEstado = $pdo->prepare("UPDATE cotizaciones SET estado_pago = ? WHERE id = ?");
+        $stmtUpdEstado->execute([$nuevoEstado, $id_cotizacion]);
         
         $pdo->commit();
         

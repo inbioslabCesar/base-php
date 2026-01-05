@@ -25,6 +25,17 @@ $descuento         = $_POST['descuento'] ?? null;
 $procedencia       = trim($_POST['procedencia'] ?? '');
 $rol_creador       = $_SESSION['rol'] ?? 'desconocido';
 
+function normalizarDominioEmpresa(string $dominio): string {
+    $dominio = trim($dominio);
+    if ($dominio === '') return '';
+
+    $dominio = preg_replace('#^https?://#i', '', $dominio);
+    $dominio = preg_replace('#/.*$#', '', $dominio);
+    $dominio = preg_replace('#:\\d+$#', '', $dominio);
+    $dominio = preg_replace('#^www\\.#i', '', $dominio);
+    return strtolower(trim($dominio));
+}
+
 // Nuevos campos para empresa/convenio y tipo_registro
 $empresa_nombre   = $_SESSION['empresa_nombre'] ?? null;
 $convenio_nombre = $_SESSION['convenio_nombre'] ?? null;
@@ -41,22 +52,47 @@ if ($_SESSION['rol'] === 'convenio' && isset($_SESSION['convenio_nombre'])) {
 
 // Validación de requeridos
 
-// Si el DNI está vacío, generar uno provisional de 8 dígitos
+// Documento
+if ($tipo_documento === 'sin_dni') {
+    if ($dni === '') {
+        $intentos = 0;
+        do {
+            $dni = (string)random_int(10000000, 99999999);
+            $stmt = $pdo->prepare('SELECT id FROM clientes WHERE dni = ? LIMIT 1');
+            $stmt->execute([$dni]);
+            $existe = (bool)$stmt->fetchColumn();
+            $intentos++;
+        } while ($existe && $intentos < 20);
 
-if (!$dni) {
-    $dni = str_pad(strval(mt_rand(0, 99999999)), 8, '0', STR_PAD_LEFT);
-}
-
-// Si el email está vacío, generar uno provisional usando el DNI y el nombre de la empresa (en minúsculas)
-if (!$email) {
-    $stmt = $pdo->query("SELECT nombre FROM config_empresa LIMIT 1");
-    $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
-    $nombre_empresa = 'inbioslab';
-    if ($empresa && !empty($empresa['nombre'])) {
-        $nombre_empresa = strtolower(preg_replace('/\s+/', '', $empresa['nombre']));
+        if ($existe) {
+            $_SESSION['msg'] = 'No se pudo generar un documento provisional único. Intente nuevamente.';
+            header('Location: ../dashboard.php?vista=form_cliente');
+            exit;
+        }
     }
-    $email = $dni . '@' . $nombre_empresa . '.com';
+} else {
+    if ($dni === '') {
+        $_SESSION['msg'] = 'Por favor, ingrese el documento.';
+        header('Location: ../dashboard.php?vista=form_cliente');
+        exit;
+    }
 }
+
+// Dominio empresa para email
+$dominio = '';
+try {
+    $stmtDom = $pdo->query('SELECT dominio FROM config_empresa LIMIT 1');
+    $dominio = (string)($stmtDom->fetchColumn() ?: '');
+} catch (Exception $e) {
+    $dominio = '';
+}
+$dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($dominio === '') {
+    $dominio = 'localhost';
+}
+
+// Siempre forzar email según documento@dominio
+$email = ($dni !== '' && $dominio !== '') ? ($dni . '@' . $dominio) : $email;
 
 // Si la contraseña está vacía, asignar el DNI como contraseña
 if (!$password) {

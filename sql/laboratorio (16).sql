@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Nov 06, 2025 at 01:12 AM
+-- Generation Time: Jan 04, 2026 at 10:52 PM
 -- Server version: 8.0.42
--- PHP Version: 8.3.16
+-- PHP Version: 8.3.28
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -58,26 +58,6 @@ CREATE TABLE `clientes` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `configuracion_clinica`
---
-
-CREATE TABLE `configuracion_clinica` (
-  `id` int NOT NULL,
-  `nombre_clinica` varchar(255) NOT NULL,
-  `direccion` text NOT NULL,
-  `telefono` varchar(20) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `horario_atencion` text,
-  `logo_url` varchar(500) DEFAULT NULL,
-  `website` varchar(255) DEFAULT NULL,
-  `ruc` varchar(20) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `config_empresa`
 --
 
@@ -89,6 +69,7 @@ CREATE TABLE `config_empresa` (
   `celular` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ruc` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dominio` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `logo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `firma` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `color_principal` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT '#0d6efd',
@@ -153,6 +134,7 @@ CREATE TABLE `cotizaciones` (
   `id_convenio` int DEFAULT NULL,
   `tipo_usuario` enum('cliente','empresa','convenio','recepcionista') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `modificada` tinyint(1) NOT NULL DEFAULT '0',
   `total` decimal(10,2) NOT NULL,
   `total_bruto` decimal(10,2) DEFAULT '0.00',
   `estado_pago` enum('pendiente','pagado') COLLATE utf8mb4_unicode_ci DEFAULT 'pendiente',
@@ -166,7 +148,13 @@ CREATE TABLE `cotizaciones` (
   `direccion_toma` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `descuento_aplicado` decimal(5,2) DEFAULT '0.00',
   `estado_muestra` enum('pendiente','realizada') COLLATE utf8mb4_unicode_ci DEFAULT 'pendiente',
-  `referencia_personalizada` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Referencia personalizada para mostrar en PDF en lugar de empresa/convenio/particular'
+  `referencia_personalizada` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Referencia personalizada para mostrar en PDF en lugar de empresa/convenio/particular',
+  `emitir_comprobante` tinyint(1) NOT NULL DEFAULT '1',
+  `comprobante_tipo` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'boleta|factura (si es NULL se infiere por id_empresa)',
+  `receptor_tipo_documento` varchar(2) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Tipo doc receptor SUNAT (6=RUC, 1=DNI, etc)',
+  `receptor_numero_documento` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Número de documento del receptor (RUC/DNI)',
+  `receptor_razon_social` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Razón social del receptor (para factura)',
+  `receptor_direccion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Dirección del receptor (opcional)'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -313,40 +301,6 @@ CREATE TABLE `examenes_promocion` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `medicamentos`
---
-
-CREATE TABLE `medicamentos` (
-  `id` int NOT NULL,
-  `nombre` varchar(100) NOT NULL,
-  `presentacion` varchar(50) DEFAULT NULL,
-  `concentracion` varchar(50) DEFAULT NULL,
-  `laboratorio` varchar(100) DEFAULT NULL,
-  `stock` int DEFAULT '0',
-  `estado` enum('activo','inactivo') DEFAULT 'activo',
-  `fecha_registro` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `fecha_actualizacion` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `movimientos_medicamento`
---
-
-CREATE TABLE `movimientos_medicamento` (
-  `id` int NOT NULL,
-  `medicamento_id` int NOT NULL,
-  `tipo` enum('entrada','salida') NOT NULL,
-  `cantidad` int NOT NULL,
-  `usuario_id` int DEFAULT NULL,
-  `observaciones` varchar(255) DEFAULT NULL,
-  `fecha` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `pagos`
 --
 
@@ -474,12 +428,6 @@ ALTER TABLE `clientes`
   ADD UNIQUE KEY `codigo_cliente` (`codigo_cliente`);
 
 --
--- Indexes for table `configuracion_clinica`
---
-ALTER TABLE `configuracion_clinica`
-  ADD PRIMARY KEY (`id`);
-
---
 -- Indexes for table `config_empresa`
 --
 ALTER TABLE `config_empresa`
@@ -508,7 +456,9 @@ ALTER TABLE `cotizaciones`
   ADD UNIQUE KEY `codigo` (`codigo`),
   ADD KEY `id_empresa` (`id_empresa`),
   ADD KEY `id_convenio` (`id_convenio`),
-  ADD KEY `cotizaciones_ibfk_1` (`id_cliente`);
+  ADD KEY `cotizaciones_ibfk_1` (`id_cliente`),
+  ADD KEY `idx_cotizaciones_comprobante_tipo` (`comprobante_tipo`),
+  ADD KEY `idx_cotizaciones_receptor_numero_documento` (`receptor_numero_documento`);
 
 --
 -- Indexes for table `cotizaciones_detalle`
@@ -580,19 +530,6 @@ ALTER TABLE `examenes_promocion`
   ADD KEY `promocion_id` (`promocion_id`);
 
 --
--- Indexes for table `medicamentos`
---
-ALTER TABLE `medicamentos`
-  ADD PRIMARY KEY (`id`);
-
---
--- Indexes for table `movimientos_medicamento`
---
-ALTER TABLE `movimientos_medicamento`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `medicamento_id` (`medicamento_id`);
-
---
 -- Indexes for table `pagos`
 --
 ALTER TABLE `pagos`
@@ -655,12 +592,6 @@ ALTER TABLE `usuarios`
 -- AUTO_INCREMENT for table `clientes`
 --
 ALTER TABLE `clientes`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `configuracion_clinica`
---
-ALTER TABLE `configuracion_clinica`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -739,18 +670,6 @@ ALTER TABLE `examenes_empresa`
 -- AUTO_INCREMENT for table `examenes_promocion`
 --
 ALTER TABLE `examenes_promocion`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `medicamentos`
---
-ALTER TABLE `medicamentos`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `movimientos_medicamento`
---
-ALTER TABLE `movimientos_medicamento`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -854,12 +773,6 @@ ALTER TABLE `examenes_empresa`
 ALTER TABLE `examenes_promocion`
   ADD CONSTRAINT `examenes_promocion_ibfk_1` FOREIGN KEY (`examen_id`) REFERENCES `examenes` (`id`),
   ADD CONSTRAINT `examenes_promocion_ibfk_2` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`);
-
---
--- Constraints for table `movimientos_medicamento`
---
-ALTER TABLE `movimientos_medicamento`
-  ADD CONSTRAINT `movimientos_medicamento_ibfk_1` FOREIGN KEY (`medicamento_id`) REFERENCES `medicamentos` (`id`);
 
 --
 -- Constraints for table `pagos`

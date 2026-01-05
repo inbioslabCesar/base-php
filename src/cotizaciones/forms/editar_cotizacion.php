@@ -19,6 +19,14 @@ $precios = $_POST['precios'] ?? [];
 $tipo_usuario = $_POST['tipo_usuario'] ?? 'cliente';
 $id_empresa = $_POST['id_empresa'] ?? null;
 $id_convenio = $_POST['id_convenio'] ?? null;
+$emitir_comprobante = isset($_POST['emitir_comprobante']) ? (int)$_POST['emitir_comprobante'] : 1;
+$emitir_comprobante = ($emitir_comprobante === 0) ? 0 : 1;
+
+// Particular pero Factura (RUC)
+$tipo_comprobante_cliente = strtolower(trim((string)($_POST['tipo_comprobante_cliente'] ?? 'boleta')));
+$receptor_ruc = preg_replace('/\D+/', '', (string)($_POST['receptor_ruc'] ?? ''));
+$receptor_razon_social = trim((string)($_POST['receptor_razon_social'] ?? ''));
+$receptor_direccion = trim((string)($_POST['receptor_direccion'] ?? ''));
 
 // Normalizar valores vacíos a null para evitar errores SQL
 $id_empresa = !empty($id_empresa) ? $id_empresa : null;
@@ -56,6 +64,36 @@ if (!$id_cliente || !$creado_por) {
     $base = defined('BASE_URL') ? BASE_URL : '../';
     header("Location: {$base}dashboard.php?vista=cotizaciones&msg=sesion_incompleta");
     exit;
+}
+
+// Helper: comprobar si una columna existe en la tabla cotizaciones (MySQL/MariaDB)
+function cotizacionesHasColumn(PDO $pdo, string $column): bool {
+    try {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM cotizaciones LIKE ?");
+        $stmt->execute([$column]);
+        return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+$wantsFacturaParticular = ($tipo_usuario === 'cliente' && $emitir_comprobante === 1 && $tipo_comprobante_cliente === 'factura');
+if ($wantsFacturaParticular) {
+    if (!cotizacionesHasColumn($pdo, 'comprobante_tipo') || !cotizacionesHasColumn($pdo, 'receptor_numero_documento') || !cotizacionesHasColumn($pdo, 'receptor_razon_social')) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=bd_sin_campos_factura_particular");
+        exit;
+    }
+    if (strlen($receptor_ruc) !== 11) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=ruc_invalido");
+        exit;
+    }
+    if ($receptor_razon_social === '') {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=cotizaciones&msg=razon_social_requerida");
+        exit;
+    }
 }
 
 // Validar datos de exámenes
@@ -135,6 +173,13 @@ for ($i = 0; $i < count($examenes); $i++) {
     ];
 }
 
+// Si no quedó ningún detalle válido, no permitir actualizar cotización
+if (empty($detalles)) {
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    header("Location: {$base}dashboard.php?vista=cotizaciones&msg=sin_examenes");
+    exit;
+}
+
 // MODO EDICIÓN: actualizar cotización existente
 if (!empty($_POST['id_cotizacion'])) {
     $id_cotizacion = intval($_POST['id_cotizacion']);
@@ -144,30 +189,97 @@ if (!empty($_POST['id_cotizacion'])) {
         $fecha_update = $_POST['fecha_toma'] . ' ' . $_POST['hora_toma'] . ':00';
     }
     if ($fecha_update) {
-        $stmt = $pdo->prepare("UPDATE cotizaciones SET id_cliente=?, id_empresa=?, id_convenio=?, tipo_usuario=?, total=?, total_bruto=?, descuento_aplicado=?, fecha=?, modificada=1 WHERE id=?");
-        $stmt->execute([
+        $set = [
+            'id_cliente=?',
+            'id_empresa=?',
+            'id_convenio=?',
+            'tipo_usuario=?',
+            'emitir_comprobante=?',
+            'total=?',
+            'total_bruto=?',
+            'descuento_aplicado=?',
+            'fecha=?',
+            'modificada=1'
+        ];
+        $params = [
             $id_cliente,
             $id_empresa !== '' ? $id_empresa : null,
             $id_convenio !== '' ? $id_convenio : null,
             $tipo_usuario,
+            $emitir_comprobante,
             $total,
             $total_bruto,
             $descuento,
             $fecha_update,
-            $id_cotizacion
-        ]);
+        ];
+
+        if (cotizacionesHasColumn($pdo, 'comprobante_tipo')) {
+            $set[] = 'comprobante_tipo=?';
+            if ($tipo_usuario === 'empresa' && !empty($id_empresa) && $emitir_comprobante === 1) {
+                $params[] = 'factura';
+            } elseif ($wantsFacturaParticular) {
+                $params[] = 'factura';
+            } else {
+                $params[] = 'boleta';
+            }
+        }
+
+        if ($wantsFacturaParticular) {
+            if (cotizacionesHasColumn($pdo, 'receptor_tipo_documento')) { $set[] = 'receptor_tipo_documento=?'; $params[] = '6'; }
+            if (cotizacionesHasColumn($pdo, 'receptor_numero_documento')) { $set[] = 'receptor_numero_documento=?'; $params[] = $receptor_ruc; }
+            if (cotizacionesHasColumn($pdo, 'receptor_razon_social')) { $set[] = 'receptor_razon_social=?'; $params[] = $receptor_razon_social; }
+            if (cotizacionesHasColumn($pdo, 'receptor_direccion')) { $set[] = 'receptor_direccion=?'; $params[] = ($receptor_direccion !== '') ? $receptor_direccion : null; }
+        }
+
+        $sql = 'UPDATE cotizaciones SET ' . implode(',', $set) . ' WHERE id=?';
+        $params[] = $id_cotizacion;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
     } else {
-        $stmt = $pdo->prepare("UPDATE cotizaciones SET id_cliente=?, id_empresa=?, id_convenio=?, tipo_usuario=?, total=?, total_bruto=?, descuento_aplicado=?, modificada=1 WHERE id=?");
-        $stmt->execute([
+        $set = [
+            'id_cliente=?',
+            'id_empresa=?',
+            'id_convenio=?',
+            'tipo_usuario=?',
+            'emitir_comprobante=?',
+            'total=?',
+            'total_bruto=?',
+            'descuento_aplicado=?',
+            'modificada=1'
+        ];
+        $params = [
             $id_cliente,
             $id_empresa !== '' ? $id_empresa : null,
             $id_convenio !== '' ? $id_convenio : null,
             $tipo_usuario,
+            $emitir_comprobante,
             $total,
             $total_bruto,
             $descuento,
-            $id_cotizacion
-        ]);
+        ];
+
+        if (cotizacionesHasColumn($pdo, 'comprobante_tipo')) {
+            $set[] = 'comprobante_tipo=?';
+            if ($tipo_usuario === 'empresa' && !empty($id_empresa) && $emitir_comprobante === 1) {
+                $params[] = 'factura';
+            } elseif ($wantsFacturaParticular) {
+                $params[] = 'factura';
+            } else {
+                $params[] = 'boleta';
+            }
+        }
+
+        if ($wantsFacturaParticular) {
+            if (cotizacionesHasColumn($pdo, 'receptor_tipo_documento')) { $set[] = 'receptor_tipo_documento=?'; $params[] = '6'; }
+            if (cotizacionesHasColumn($pdo, 'receptor_numero_documento')) { $set[] = 'receptor_numero_documento=?'; $params[] = $receptor_ruc; }
+            if (cotizacionesHasColumn($pdo, 'receptor_razon_social')) { $set[] = 'receptor_razon_social=?'; $params[] = $receptor_razon_social; }
+            if (cotizacionesHasColumn($pdo, 'receptor_direccion')) { $set[] = 'receptor_direccion=?'; $params[] = ($receptor_direccion !== '') ? $receptor_direccion : null; }
+        }
+
+        $sql = 'UPDATE cotizaciones SET ' . implode(',', $set) . ' WHERE id=?';
+        $params[] = $id_cotizacion;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
     }
     // Eliminar exámenes anteriores de cotizaciones_detalle y agregar los nuevos
     $pdo->prepare("DELETE FROM cotizaciones_detalle WHERE id_cotizacion = ?")->execute([$id_cotizacion]);

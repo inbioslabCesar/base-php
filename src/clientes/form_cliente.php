@@ -71,6 +71,29 @@ if ($esEdicion) {
 function capitalize($string) {
     return mb_convert_case(strtolower(trim((string)$string)), MB_CASE_TITLE, "UTF-8");
 }
+
+function normalizarDominioEmpresa(string $dominio): string {
+    $dominio = trim($dominio);
+    if ($dominio === '') return '';
+
+    $dominio = preg_replace('#^https?://#i', '', $dominio);
+    $dominio = preg_replace('#/.*$#', '', $dominio);
+    $dominio = preg_replace('#:\\d+$#', '', $dominio);
+    $dominio = preg_replace('#^www\\.#i', '', $dominio);
+    return strtolower(trim($dominio));
+}
+
+$dominioEmpresa = '';
+try {
+    $stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
+    $dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
+} catch (Exception $e) {
+    $dominioEmpresa = '';
+}
+$dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($dominioEmpresa === '') {
+    $dominioEmpresa = 'localhost';
+}
 ?>
 <div class="container mt-4">
     <h4><?= $esEdicion ? 'Editar Paciente' : 'Nuevo Paciente' ?></h4>
@@ -211,11 +234,15 @@ function capitalize($string) {
             </div>
             <div class="col-md-4 mb-3">
                 <label for="password" class="form-label">Contraseña (por defecto es el DNI)</label>
-                <input type="text" class="form-control" name="password" id="password" value="<?= htmlspecialchars($cliente['dni']) ?>">
+                <input type="text" class="form-control" name="password" id="password" value="<?= $esEdicion ? '' : htmlspecialchars((string)($cliente['dni'] ?? '')) ?>" autocomplete="new-password">
+                <?php if ($esEdicion): ?>
+                    <small class="text-muted">Si lo dejas vacío, no se cambiará la contraseña.</small>
+                <?php endif; ?>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="email" class="form-label">Email</label>
-                <input type="email" class="form-control" name="email" id="email" value="<?= htmlspecialchars($cliente['email']) ?>">
+                <input type="email" class="form-control" name="email" id="email" value="<?= htmlspecialchars((string)($cliente['email'] ?? '')) ?>" readonly>
+                <small class="text-muted">Se genera automáticamente según el documento y dominio de la empresa.</small>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="telefono" class="form-label">Teléfono</label>
@@ -241,6 +268,9 @@ function capitalize($string) {
     </form>
 </div>
 <script>
+const DOMINIO_EMPRESA = <?= json_encode($dominioEmpresa, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+const ES_EDICION = <?= $esEdicion ? 'true' : 'false' ?>;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Poner el foco en el campo nombre al cargar el formulario
     var nombreInput = document.getElementById('nombre');
@@ -263,8 +293,40 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoDocumento = document.getElementById('tipo_documento');
     const dniInput = document.getElementById('dni');
     const dniHelp = document.getElementById('dniHelp');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+
+    let usuarioTocoDocumento = false;
+    let lastAutoPassword = '';
+
+    function actualizarCredenciales() {
+        const doc = (dniInput?.value || '').trim();
+        if (emailInput) {
+            emailInput.value = doc && DOMINIO_EMPRESA ? `${doc}@${DOMINIO_EMPRESA}` : '';
+        }
+
+        if (!passwordInput) return;
+
+        if (ES_EDICION) {
+            // IMPORTANTE: no llenar al cargar; solo si el usuario cambió el documento.
+            if (usuarioTocoDocumento && passwordInput.value.trim() === '' && doc !== '') {
+                passwordInput.value = doc;
+                lastAutoPassword = doc;
+            }
+            return;
+        }
+
+        // Creación: no pisar password si el usuario lo editó manualmente.
+        if (doc === '') return;
+        if (passwordInput.value.trim() === '' || passwordInput.value === lastAutoPassword) {
+            passwordInput.value = doc;
+            lastAutoPassword = doc;
+        }
+    }
+
     if (tipoDocumento && dniInput) {
         tipoDocumento.addEventListener('change', function() {
+            usuarioTocoDocumento = true;
             if (this.value === 'sin_dni') {
                 // Solo generar si el campo está vacío
                 if (!dniInput.value) {
@@ -286,9 +348,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 dniInput.setAttribute('pattern', '[A-Za-z0-9]{6,20}');
                 dniHelp.textContent = 'Ingrese el número de carnet (6 a 20 caracteres alfanuméricos).';
             }
+
+            actualizarCredenciales();
         });
         // Inicializar según valor actual, sin borrar el valor existente
         tipoDocumento.dispatchEvent(new Event('change'));
+
+        dniInput.addEventListener('input', function() {
+            usuarioTocoDocumento = true;
+            actualizarCredenciales();
+        });
     }
 
     // Calcular edad automáticamente al seleccionar fecha de nacimiento

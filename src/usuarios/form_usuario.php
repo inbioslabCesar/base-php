@@ -34,6 +34,27 @@ if ($esEdicion) {
 function capitalizar($texto) {
     return $texto ? mb_convert_case($texto, MB_CASE_TITLE, "UTF-8") : '';
 }
+
+// Dominio para generar emails (config_empresa.dominio o HTTP_HOST)
+function normalizarDominioEmpresa(string $dominio): string {
+    $dominio = strtolower(trim($dominio));
+    $dominio = preg_replace('#^https?://#', '', $dominio) ?? $dominio;
+    $dominio = preg_replace('#/.*$#', '', $dominio) ?? $dominio;
+    $dominio = preg_replace('#:\\d+$#', '', $dominio) ?? $dominio;
+    $dominio = trim($dominio);
+    $dominio = ltrim($dominio, '@');
+    if (str_starts_with($dominio, 'www.')) {
+        $dominio = substr($dominio, 4);
+    }
+    return $dominio;
+}
+
+$stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
+$dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
+$dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
+if ($dominioEmpresa === '') {
+    $dominioEmpresa = 'ejemplo.com';
+}
 ?>
 
 <div class="container mt-4">
@@ -54,6 +75,15 @@ function capitalizar($texto) {
                 <label for="dni" class="form-label">DNI *</label>
                 <input type="text" class="form-control" id="dni" name="dni" required
                     value="<?= htmlspecialchars($usuario['dni'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="sin_dni" name="sin_dni">
+                    <label class="form-check-label" for="sin_dni">
+                        Sin DNI (generar uno provisional)
+                    </label>
+                </div>
+                <small class="text-muted d-block mt-1">
+                    El email y la contraseña se generan automáticamente según el DNI.
+                </small>
             </div>
         </div>
         <div class="row">
@@ -74,7 +104,10 @@ function capitalizar($texto) {
             <div class="col-md-4 mb-3">
                 <label for="email" class="form-label">Email *</label>
                 <input type="email" class="form-control" id="email" name="email" required
-                    value="<?= htmlspecialchars($usuario['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    value="<?= htmlspecialchars($usuario['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>" readonly>
+                <small class="text-muted d-block mt-1">
+                    Ejemplo: 12345678@<?= htmlspecialchars($dominioEmpresa) ?>
+                </small>
             </div>
         </div>
         <div class="row">
@@ -126,6 +159,8 @@ function capitalizar($texto) {
                 </div>
                 <?php if ($esEdicion): ?>
                     <small class="text-muted">Deja en blanco si no deseas cambiar la contraseña.</small>
+                <?php else: ?>
+                    <small class="text-muted">Por defecto, la contraseña es el mismo DNI.</small>
                 <?php endif; ?>
             </div>
         </div>
@@ -135,6 +170,63 @@ function capitalizar($texto) {
 </div>
 
 <script>
+(function () {
+    const esEdicion = <?= $esEdicion ? 'true' : 'false' ?>;
+    const dominioEmpresa = <?= json_encode($dominioEmpresa) ?>;
+    const $dni = document.getElementById('dni');
+    const $sinDni = document.getElementById('sin_dni');
+    const $email = document.getElementById('email');
+    const $password = document.getElementById('password');
+
+    if (!$dni || !$sinDni || !$email || !$password) return;
+
+    function cleanDigits(value) {
+        return String(value || '').replace(/\D+/g, '');
+    }
+
+    function generarDniProvisional() {
+        // 8 dígitos, iniciando con 9 (heurística)
+        const n = Math.floor(Math.random() * 10000000);
+        return '9' + String(n).padStart(7, '0');
+    }
+
+    function syncCredencialesFromDni() {
+        const dniDigits = cleanDigits($dni.value);
+        if (dniDigits.length === 0) return;
+
+        $dni.value = dniDigits;
+        $email.value = `${dniDigits}@${dominioEmpresa || 'ejemplo.com'}`;
+
+        // En edición, NO autocompletar password para evitar cambios accidentales.
+        if (!esEdicion) {
+            $password.value = dniDigits;
+        }
+    }
+
+    function onToggleSinDni() {
+        const enabled = $sinDni.checked;
+        if (enabled) {
+            const provisional = generarDniProvisional();
+            $dni.value = provisional;
+            $dni.readOnly = true;
+            syncCredencialesFromDni();
+        } else {
+            $dni.readOnly = false;
+        }
+    }
+
+    $dni.addEventListener('input', function () {
+        if ($dni.readOnly) return;
+        syncCredencialesFromDni();
+    });
+
+    $sinDni.addEventListener('change', onToggleSinDni);
+
+    if ($dni.value) {
+        syncCredencialesFromDni();
+    }
+})();
+
 function generarPassword() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let pass = "";

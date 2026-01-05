@@ -1,0 +1,14 @@
+# Local runtime / temp
+/tmp/
+*.log
+
+# API tokens / auth logs (DO NOT COMMIT)
+/tmp/api_tokens.json
+/tmp/auth.log
+
+# Facturacion config (local secrets)
+/src/config/facturacion_config.php
+
+# OS / editor
+.DS_Store
+Thumbs.db

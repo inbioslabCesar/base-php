@@ -23,6 +23,8 @@ if (!$cotizacion) {
     exit;
 }
 
+$requiereCpe = ((int)($cotizacion['emitir_comprobante'] ?? 1) === 1);
+
 // Consulta de exámenes cotizados
 $stmt = $pdo->prepare("
     SELECT cd.*, e.preanalitica_cliente, e.nombre AS nombre_examen
@@ -423,6 +425,14 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         <i class="bi bi-person-circle me-2"></i>Información del Cliente
                     </div>
                     <div class="card-body-info">
+                        <?php
+                        // Calcular estado de pago dinámico según pagos registrados
+                        $stmtPagosDet = $pdo->prepare("SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = ?");
+                        $stmtPagosDet->execute([$cotizacion['id']]);
+                        $totalPagadoDet = (float)$stmtPagosDet->fetchColumn();
+                        $saldoDet = max(0, (float)$cotizacion['total'] - $totalPagadoDet);
+                        $estado_pago_calc = ($saldoDet <= 0) ? 'pagado' : (($totalPagadoDet > 0) ? 'abonado' : 'pendiente');
+                        ?>
                         <div class="info-item">
                             <div class="info-icon">
                                 <i class="bi bi-person"></i>
@@ -462,8 +472,8 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                             <div class="info-content">
                                 <div class="info-label">Estado de Pago</div>
                                 <div class="info-value">
-                                    <span class="badge status-badge <?= $cotizacion['estado_pago'] === 'pagado' ? 'bg-success' : 'bg-warning text-dark' ?>">
-                                        <?= htmlspecialchars(ucwords(strtolower($cotizacion['estado_pago']))) ?>
+                                    <span class="badge status-badge <?= $estado_pago_calc === 'pagado' ? 'bg-success' : ($estado_pago_calc === 'abonado' ? 'bg-info' : 'bg-warning text-dark') ?>">
+                                        <?= htmlspecialchars(ucwords(strtolower($estado_pago_calc))) ?>
                                     </span>
                                 </div>
                             </div>
@@ -613,6 +623,40 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         <a href="<?= BASE_URL ?>dashboard.php?action=descargar_cotizacion&id=<?= $cotizacion['id'] ?>" class="btn btn-action-detalle btn-success-custom" target="_blank">
                             <i class="bi bi-download"></i> Descargar PDF
                         </a>
+                        <?php if ($requiereCpe && $estado_pago_calc === 'pagado'): ?>
+                            <a id="btnEmitirCpe" href="<?= BASE_URL ?>dashboard.php?action=emitir_comprobante&id=<?= $cotizacion['id'] ?>" class="btn btn-action-detalle btn-warning">
+                                <i class="bi bi-receipt"></i> Emitir Comprobante
+                            </a>
+                        <?php elseif (!$requiereCpe): ?>
+                            <span class="badge status-badge bg-secondary">Solo Ticket (sin CPE)</span>
+                        <?php endif; ?>
+
+                        <?php if ($requiereCpe): ?>
+                            <button type="button" class="btn btn-action-detalle btn-primary" onclick="verEstadoComprobante()">
+                                <i class="bi bi-info-circle"></i> Ver Estado
+                            </button>
+                            <div id="cpeDownloads" style="display:none">
+                                <a href="#" onclick="descargarCuandoListo('xml')" class="btn btn-action-detalle btn-secondary-custom">
+                                    <i class="bi bi-filetype-xml"></i> Descargar XML
+                                </a>
+                                <a href="<?= BASE_URL ?>dashboard.php?action=descargar_comprobante&id=<?= $cotizacion['id'] ?>&tipo=pdf" class="btn btn-action-detalle btn-secondary-custom">
+                                    <i class="bi bi-filetype-pdf"></i> Descargar PDF CPE
+                                </a>
+                                <a href="#" onclick="descargarCuandoListo('cdr')" class="btn btn-action-detalle btn-secondary-custom">
+                                    <i class="bi bi-file-zip"></i> Descargar CDR
+                                </a>
+                            </div>
+                            <div id="cpeDownloadsPlaceholder" class="alert alert-info py-2 px-3" style="display:none">
+                                <div class="d-flex align-items-center" style="gap:10px">
+                                    <i class="bi bi-hourglass-split"></i>
+                                    <span>XML/CDR aún en preparación. Se habilitarán al ser aceptado por SUNAT.</span>
+                                    <button type="button" class="btn btn-sm btn-secondary-custom" onclick="descargarCuandoListo('xml')">
+                                        <i class="bi bi-clock"></i> Esperar disponibilidad
+                                    </button>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
                         <button type="button" class="btn btn-action-detalle btn-info" onclick="imprimirTicketCotizacion()">
                             <i class="bi bi-printer"></i> Imprimir Ticket
                         </button>
@@ -714,5 +758,109 @@ function imprimirTicketCotizacion() {
         }
     });
 }
+
+function verEstadoComprobante() {
+    const id = <?= (int)$cotizacion['id'] ?>;
+    fetch('<?= BASE_URL ?>dashboard.php?action=estado_comprobante&id=' + id)
+        .then(r => r.json())
+        .then(data => {
+            const st = data && data.status ? data.status : { status: 'sin_estado' };
+            const estado = (typeof st === 'string') ? st : (st.status || 'sin_estado');
+            const detalle = (typeof st === 'object') ? st : {};
+            let html = `<div style="text-align:left">` +
+                `<div><strong>Estado:</strong> ${estado.toUpperCase()}</div>` +
+                (detalle.tipo ? `<div><strong>Tipo:</strong> ${detalle.tipo}</div>` : '') +
+                (detalle.remote_id ? `<div><strong>ID remoto:</strong> ${detalle.remote_id}</div>` : '') +
+                (detalle.sunat_code ? `<div><strong>Código SUNAT:</strong> ${detalle.sunat_code}</div>` : '') +
+                (detalle.sunat_message ? `<div><strong>Mensaje SUNAT:</strong> ${detalle.sunat_message}</div>` : '') +
+                (detalle.token_present !== undefined ? `<div><strong>Token listo:</strong> ${detalle.token_present ? 'Sí' : 'No'}</div>` : '') +
+                (detalle.updated_at ? `<div><strong>Actualizado:</strong> ${detalle.updated_at}</div>` : '') +
+                `</div>`;
+            Swal.fire({ title: 'Estado del comprobante', html, icon: 'info' });
+        })
+        .catch(err => {
+            Swal.fire({ title: 'Error', text: 'No se pudo obtener el estado', icon: 'error' });
+        });
+}
+
+function descargarCuandoListo(tipo) {
+    const id = <?= (int)$cotizacion['id'] ?>;
+    const urlEstado = '<?= BASE_URL ?>dashboard.php?action=estado_comprobante&id=' + id;
+    const urlDescarga = (t) => '<?= BASE_URL ?>dashboard.php?action=descargar_comprobante&id=' + id + '&tipo=' + t;
+    let intentos = 0, maxIntentos = 8, intervalo = 4000;
+    const chequear = () => {
+        fetch(urlEstado).then(r => r.json()).then(d => {
+            const st = d && d.status ? d.status : { status: 'sin_estado' };
+            const estado = (typeof st === 'string') ? st.toLowerCase() : (String(st.status || 'sin_estado').toLowerCase());
+            if (estado === 'aceptado') {
+                window.location.href = urlDescarga(tipo);
+                return;
+            }
+            intentos++;
+            if (intentos >= maxIntentos) {
+                Swal.fire({
+                    title: 'XML/CDR aún no disponible',
+                    html: 'Estado actual: ' + (estado.toUpperCase()) + '<br>Intenta nuevamente en unos segundos.',
+                    icon: 'info'
+                });
+            } else {
+                if (intentos === 1) {
+                    Swal.fire({ title: 'Esperando respuesta de SUNAT…', html: 'Revisando estado cada 4s', icon: 'info', timer: intervalo - 500, showConfirmButton: false });
+                }
+                setTimeout(chequear, intervalo);
+            }
+        }).catch(() => {
+            intentos++;
+            if (intentos < maxIntentos) setTimeout(chequear, intervalo);
+            else Swal.fire({ title: 'No se pudo verificar', text: 'Intenta nuevamente más tarde.', icon: 'warning' });
+        });
+    };
+    chequear();
+}
+</script>
+<script>
+// Ajuste dinámico del botón de emisión según estado remoto
+document.addEventListener('DOMContentLoaded', function() {
+    var btn = document.getElementById('btnEmitirCpe');
+    if (!btn) return;
+    const id = <?= (int)$cotizacion['id'] ?>;
+    fetch('<?= BASE_URL ?>dashboard.php?action=estado_comprobante&id=' + id)
+        .then(r => r.json())
+        .then(data => {
+            const st = data && data.status ? data.status : { status: 'sin_estado' };
+            const estado = (typeof st === 'string') ? st.toLowerCase() : (String(st.status || 'sin_estado').toLowerCase());
+            const hasRemote = !!(st.remote_id || (st.data && st.data.remote_id));
+            if (estado === 'aceptado') {
+                btn.textContent = 'Ya Emitido';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-secondary-custom');
+                btn.setAttribute('disabled', 'disabled');
+                btn.style.pointerEvents = 'none';
+                btn.title = 'El comprobante ya fue aceptado por SUNAT';
+                // Mostrar descargas y ocultar placeholder
+                var dw = document.getElementById('cpeDownloads');
+                var ph = document.getElementById('cpeDownloadsPlaceholder');
+                if (ph) ph.style.display = 'none';
+                if (dw) dw.style.display = 'flex';
+                if (dw) { dw.style.gap = '15px'; dw.style.flexWrap = 'wrap'; dw.style.justifyContent = 'center'; }
+            } else if (hasRemote) {
+                // Si existe ID remoto pero no aceptado, el botón actúa como reintento
+                btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Reintentar Envío';
+                btn.title = 'Reintentar envío a SUNAT';
+                // Ocultar descargas y mostrar placeholder
+                var dw = document.getElementById('cpeDownloads');
+                var ph = document.getElementById('cpeDownloadsPlaceholder');
+                if (dw) dw.style.display = 'none';
+                if (ph) ph.style.display = 'block';
+            } else {
+                // Aún sin enviar: mantener ocultas las descargas y mostrar placeholder informativo
+                var dw = document.getElementById('cpeDownloads');
+                var ph = document.getElementById('cpeDownloadsPlaceholder');
+                if (dw) dw.style.display = 'none';
+                if (ph) ph.style.display = 'block';
+            }
+        })
+        .catch(() => {});
+});
 </script>
                 
