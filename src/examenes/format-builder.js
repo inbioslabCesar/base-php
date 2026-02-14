@@ -256,6 +256,26 @@ document.getElementById('addRow').addEventListener('click', function() {
   addRow();
 });
 
+document.addEventListener('DOMContentLoaded', function() {
+  const mobileAddRow = document.getElementById('mobileAddRow');
+  const mobileToggleCompact = document.getElementById('mobileToggleCompact');
+  const desktopAddRow = document.getElementById('addRow');
+  const compactToggle = document.getElementById('toggleCompact');
+
+  if (mobileAddRow && desktopAddRow) {
+    mobileAddRow.addEventListener('click', function() {
+      desktopAddRow.click();
+    });
+  }
+
+  if (mobileToggleCompact && compactToggle) {
+    mobileToggleCompact.addEventListener('click', function() {
+      compactToggle.checked = !compactToggle.checked;
+      compactToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+});
+
 
 
 // Agregar valor de referencia en una fila

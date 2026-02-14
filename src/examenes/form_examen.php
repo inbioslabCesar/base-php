@@ -156,6 +156,18 @@ if ($esEdicion) {
         <!-- Acciones -->
         <button class="btn btn-primary mt-3" type="submit" id="saveFormat"><?= $esEdicion ? 'Actualizar' : 'Agregar' ?></button>
         <a href="dashboard.php?vista=examenes" class="btn btn-secondary">Cancelar</a>
+
+        <div class="mobile-builder-actions d-md-none" id="mobileBuilderActions">
+            <button type="button" class="btn btn-success" id="mobileAddRow">
+                <i class="bi bi-plus-circle"></i> + Fila
+            </button>
+            <button type="button" class="btn btn-outline-primary" id="mobileToggleCompact">
+                <i class="bi bi-layout-text-window-reverse"></i> Compacta
+            </button>
+            <button type="submit" class="btn btn-primary" id="mobileSaveFormat">
+                <i class="bi bi-check2-circle"></i> Guardar
+            </button>
+        </div>
     </form>
 </div>
 
