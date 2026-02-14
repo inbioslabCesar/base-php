@@ -75,32 +75,38 @@ function addRow(data = {}) {
   const tr = document.createElement('tr');
   // Tipo
   const tdType = document.createElement('td');
+  tdType.setAttribute('data-label', 'Tipo');
   const selectType = createTypeSelect();
   selectType.value = data.tipo || 'Parámetro';
   tdType.appendChild(selectType);
   tr.appendChild(tdType);
   // Nombre
   const tdNombre = document.createElement('td');
+  tdNombre.setAttribute('data-label', 'Nombre');
   tdNombre.innerHTML = `<textarea class="form-control form-control-sm" rows="2">${data.nombre || ''}</textarea>`;
   tr.appendChild(tdNombre);
   // Metodología
   const tdMetod = document.createElement('td');
   tdMetod.className = 'col-metodologia';
+  tdMetod.setAttribute('data-label', 'Metodología');
   tdMetod.innerHTML = `<input type="text" class="form-control form-control-sm" value="${data.metodologia || ''}">`;
   tr.appendChild(tdMetod);
   // Unidad
   const tdUnidad = document.createElement('td');
   tdUnidad.className = 'col-unidad';
+  tdUnidad.setAttribute('data-label', 'Unidad');
   tdUnidad.innerHTML = `<input type="text" class="form-control form-control-sm" value="${data.unidad || ''}">`;
   tr.appendChild(tdUnidad);
   // Opciones
   const tdOpciones = document.createElement('td');
   tdOpciones.className = 'col-opciones';
+  tdOpciones.setAttribute('data-label', 'Opciones');
   tdOpciones.innerHTML = `<textarea class="form-control form-control-sm opciones-input" rows="2" placeholder="Ej: amarillo, rojizo, ámbar">${data.opciones ? data.opciones.join(', ') : ''}</textarea>`;
   tr.appendChild(tdOpciones);
   // Valor(es) referencia
   const tdRef = document.createElement('td');
   tdRef.className = 'col-referencias';
+  tdRef.setAttribute('data-label', 'Referencia');
   const refList = document.createElement('div');
   refList.className = 'valores-ref-list';
   const referencias = data.referencias || [{valor:'', desc:'', valor_min:'', valor_max:'', sexo:'cualquiera', edad_min:'', edad_max:''}];
@@ -117,20 +123,24 @@ function addRow(data = {}) {
   // Fórmula
   const tdFormula = document.createElement('td');
   tdFormula.className = 'col-formula';
+  tdFormula.setAttribute('data-label', 'Fórmula');
   tdFormula.innerHTML = `<input type="text" class="form-control form-control-sm formula-input" value="${data.formula || ''}" placeholder="Ej: [Hemoglobina]/[Hematocrito]">`;
   tr.appendChild(tdFormula);
   // Negrita
   const tdBold = document.createElement('td');
   tdBold.className = 'col-neg';
+  tdBold.setAttribute('data-label', 'Negrita');
   tdBold.innerHTML = `<input type="checkbox" class="form-check-input" ${data.negrita ? 'checked' : ''}>`;
   tr.appendChild(tdBold);
   // Cursiva
   const tdItalic = document.createElement('td');
   tdItalic.className = 'col-cur';
+  tdItalic.setAttribute('data-label', 'Cursiva');
   tdItalic.innerHTML = `<input type="checkbox" class="form-check-input" ${data.cursiva ? 'checked' : ''}>`;
   tr.appendChild(tdItalic);
   // Alineación
   const tdAlign = document.createElement('td');
+  tdAlign.setAttribute('data-label', 'Alineación');
   tdAlign.innerHTML = `<select class="form-select form-select-sm align-select">
     <option value="left" ${(data.alineacion === 'left' || !data.alineacion) ? 'selected' : ''}>Izquierda</option>
     <option value="center" ${data.alineacion === 'center' ? 'selected' : ''}>Centro</option>
@@ -140,31 +150,37 @@ function addRow(data = {}) {
   // Color texto
   const tdColorText = document.createElement('td');
   tdColorText.className = 'col-color-texto';
+  tdColorText.setAttribute('data-label', 'Color txt');
   tdColorText.innerHTML = `<input type="color" class="color-input" value="${data.color_texto || '#000000'}">`;
   tr.appendChild(tdColorText);
   // Color fondo
   const tdColorBg = document.createElement('td');
   tdColorBg.className = 'col-color-fondo';
+  tdColorBg.setAttribute('data-label', 'Fondo');
   tdColorBg.innerHTML = `<input type="color" class="color-input" value="${data.color_fondo || '#ffffff'}">`;
   tr.appendChild(tdColorBg);
   // Decimales
   const tdDecimales = document.createElement('td');
   tdDecimales.className = 'col-decimales';
+  tdDecimales.setAttribute('data-label', 'Decimales');
   tdDecimales.innerHTML = `<input type="number" class="form-control form-control-sm decimales-input" value="${data.decimales !== undefined ? data.decimales : ''}" min="0" max="6" style="width:50px;">`;
   tr.appendChild(tdDecimales);
   // Filas (para Texto Largo)
   const tdRows = document.createElement('td');
   tdRows.className = 'col-rows';
+  tdRows.setAttribute('data-label', 'Filas');
   tdRows.innerHTML = `<input type="number" class="form-control form-control-sm rows-input" value="${data.rows !== undefined ? data.rows : 4}" min="2" max="12" style="width:50px;">`;
   tr.appendChild(tdRows);
   // Orden (solo número, no editable)
   const tdOrden = document.createElement('td');
   tdOrden.className = 'orden-fija';
+  tdOrden.setAttribute('data-label', 'Orden');
   tdOrden.textContent = tbody.children.length + 1;
   tr.appendChild(tdOrden);
   // Acciones
   const tdAcc = document.createElement('td');
   tdAcc.className = 'col-acciones';
+  tdAcc.setAttribute('data-label', 'Acciones');
   tdAcc.innerHTML = `
     <button type="button" class="btn btn-secondary btn-sm btn-icon move-up" title="Subir"><i class="bi bi-arrow-up"></i></button>
     <button type="button" class="btn btn-secondary btn-sm btn-icon move-down" title="Bajar"><i class="bi bi-arrow-down"></i></button>

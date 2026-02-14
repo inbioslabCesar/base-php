@@ -92,13 +92,84 @@
   width: 50px !important;
 }
 
-/* Responsive auto-compact at breakpoints */
-@media (max-width: 1400px) {
-  .col-decimales, .col-formula { display: none; }
-}
-@media (max-width: 1200px) {
-  .col-referencias { display: none; }
-}
-@media (max-width: 992px) {
-  .col-opciones, .col-unidad, .col-metodologia { display: none; }
+/* Edición móvil: cada fila se muestra como bloque vertical editable */
+@media (max-width: 767.98px) {
+  #builderWrapper .table-responsive {
+    overflow-x: visible;
+  }
+
+  #formatTable thead {
+    display: none;
+  }
+
+  #formatTable,
+  #formatTable tbody,
+  #formatTable tr,
+  #formatTable td {
+    display: block;
+    width: 100%;
+  }
+
+  #formatTable tr {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  #formatTable td {
+    position: relative;
+    border: 0;
+    border-bottom: 1px solid #f1f3f5;
+    padding: 0.5rem 0.5rem 0.5rem 6.8rem;
+    min-height: 44px;
+  }
+
+  #formatTable td:last-child {
+    border-bottom: 0;
+  }
+
+  #formatTable td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0.5rem;
+    top: 0.55rem;
+    width: 6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  #formatTable td.col-acciones {
+    padding-left: 0.5rem;
+  }
+
+  #formatTable td.col-acciones::before {
+    display: none;
+  }
+
+  #formatTable td.col-acciones .btn {
+    margin-right: 0.3rem;
+  }
+
+  #formatTable td .form-control,
+  #formatTable td .form-select,
+  #formatTable td .color-input {
+    width: 100% !important;
+  }
+
+  #formatTable td .form-check-input {
+    transform: scale(1.1);
+  }
+
+  #builderWrapper.compact .col-metodologia,
+  #builderWrapper.compact .col-unidad,
+  #builderWrapper.compact .col-opciones,
+  #builderWrapper.compact .col-referencias,
+  #builderWrapper.compact .col-formula,
+  #builderWrapper.compact .col-decimales {
+    display: block !important;
+  }
 }
