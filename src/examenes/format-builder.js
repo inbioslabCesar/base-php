@@ -38,11 +38,11 @@ function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', s
     <div class="ref-advanced">
       <div class="field">
         <label class="label-sm">Min</label>
-        <input type="number" step="0.01" class="form-control form-control-sm valor-min" placeholder="Min" value="${valorMinStr}">
+        <input type="number" step="any" class="form-control form-control-sm valor-min" placeholder="Min" value="${valorMinStr}">
       </div>
       <div class="field">
         <label class="label-sm">Max</label>
-        <input type="number" step="0.01" class="form-control form-control-sm valor-max" placeholder="Max" value="${valorMaxStr}">
+        <input type="number" step="any" class="form-control form-control-sm valor-max" placeholder="Max" value="${valorMaxStr}">
       </div>
       <div class="field">
         <label class="label-sm">Sexo</label>
@@ -429,8 +429,9 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
     refGroups.forEach(refDiv => {
       const valor = refDiv.querySelector('.valor').value;
       const desc = refDiv.querySelector('.desc').value;
-      const valor_min = refDiv.querySelector('.valor-min').value;
-      const valor_max = refDiv.querySelector('.valor-max').value;
+      // Normalizar decimales con coma a punto al serializar
+      const valor_min = refDiv.querySelector('.valor-min').value.replace(',', '.');
+      const valor_max = refDiv.querySelector('.valor-max').value.replace(',', '.');
       const sexo = refDiv.querySelector('.sexo-ref').value;
       const edad_min = refDiv.querySelector('.edad-min').value;
       const edad_max = refDiv.querySelector('.edad-max').value;

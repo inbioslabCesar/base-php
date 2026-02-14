@@ -65,7 +65,7 @@ if ($esEdicion) {
         <div class="mb-3">
             <label for="area" class="form-label">Área *</label>
             <input type="text" class="form-control" id="area" name="area" required
-                value="<?= htmlspecialchars(capitalizar($examen['area'] ?? '')) ?>">
+                value="<?= htmlspecialchars(trim($examen['area'] ?? '')) ?>">
         </div>
         <div class="mb-3">
             <label for="metodologia" class="form-label">Metodología</label>

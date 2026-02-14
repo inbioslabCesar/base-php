@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codigo = trim($_POST['codigo'] ?? '');
     $nombre = capitalizar($_POST['nombre'] ?? '');
     $descripcion = trim($_POST['descripcion'] ?? '');
-    $area = capitalizar($_POST['area'] ?? '');
+    $area = trim($_POST['area'] ?? '');
     $metodologia = capitalizar($_POST['metodologia'] ?? '');
     $tiempo_respuesta = trim($_POST['tiempo_respuesta'] ?? '');
     $preanalitica_cliente = trim($_POST['preanalitica_cliente'] ?? '');
@@ -36,6 +36,26 @@ if (json_decode($adicional) === null && json_last_error() !== JSON_ERROR_NONE) {
     header('Location: dashboard.php?vista=format'); // Cambia por la ruta correcta
     exit;
 }
+
+    // Normalizar decimales en referencias (comas → puntos) antes de guardar
+    $adicional_dec = json_decode($adicional, true);
+    if (is_array($adicional_dec)) {
+        foreach ($adicional_dec as &$fila) {
+            if (!empty($fila['referencias']) && is_array($fila['referencias'])) {
+                foreach ($fila['referencias'] as &$ref) {
+                    foreach (['valor_min', 'valor_max'] as $key) {
+                        if (isset($ref[$key]) && $ref[$key] !== '') {
+                            $v = str_replace(',', '.', (string)$ref[$key]);
+                            $ref[$key] = $v;
+                        }
+                    }
+                }
+                unset($ref);
+            }
+        }
+        unset($fila);
+        $adicional = json_encode($adicional_dec, JSON_UNESCAPED_UNICODE);
+    }
 
     try {
         $stmt = $pdo->prepare("INSERT INTO examenes 

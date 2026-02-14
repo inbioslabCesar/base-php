@@ -95,6 +95,26 @@ class FacturacionService {
         return isset($all[$key]) ? $all[$key] : null;
     }
 
+    private function normalizeEstado($status): string {
+        if (!is_string($status) || $status === '') {
+            return 'enviado';
+        }
+
+        $s = strtolower(trim($status));
+
+        // Estados SUNAT típicos
+        if (in_array($s, ['aceptado', 'aceptada', 'accepted'], true)) return 'aceptado';
+        if (in_array($s, ['rechazado', 'rechazada', 'rejected'], true)) return 'rechazado';
+        if (in_array($s, ['observado', 'observada', 'observed'], true)) return 'observado';
+        if (in_array($s, ['pendiente', 'pending'], true)) return 'pendiente';
+
+        // Estados internos comunes
+        if (in_array($s, ['en_cola', 'en cola', 'queued'], true)) return 'enviado';
+        if (in_array($s, ['error', 'failed'], true)) return 'pendiente';
+
+        return 'enviado';
+    }
+
     // Consulta el API externo para sincronizar el estado (aceptado/observado/rechazado)
     public function refreshRemoteStatus(int $cotizacionId): ?array {
         $st = $this->getStatus($cotizacionId);
@@ -138,24 +158,24 @@ class FacturacionService {
                 }
             }
             if ($resp) {
-                $status = $resp['status'] ?? $resp['sunat_status'] ?? $resp['estado_sunat'] ?? ($resp['data']['status'] ?? null);
-                $status = is_string($status) ? strtolower($status) : null;
-                if (!in_array($status, ['aceptado','observado','rechazado','enviado','pendiente'])) {
-                    if (!empty($resp['accepted']) || !empty(($resp['data']['accepted'] ?? null))) { $status = 'aceptado'; }
-                }
-                // Detectar aceptación por presencia de rutas de archivos
                 $data = (isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : $resp;
+
+                // Priorizar estado SUNAT real del recurso (API Laravel lo entrega dentro de data)
+                $estadoSunat = $data['estado_sunat'] ?? ($resp['estado_sunat'] ?? null);
+                $statusRaw = $resp['status'] ?? $resp['sunat_status'] ?? $estadoSunat ?? ($data['status'] ?? null);
+                $status = $this->normalizeEstado($statusRaw);
+
+                // Detectar aceptación por presencia de rutas de archivos
                 if (($data['xml_path'] ?? null) || ($data['cdr_path'] ?? null)) { $status = 'aceptado'; }
-                if ($status) {
-                    $extra = $st;
-                    $extra['sunat_code'] = $resp['sunat_code'] ?? ($resp['data']['sunat_code'] ?? null);
-                    $extra['sunat_message'] = $resp['sunat_message'] ?? ($resp['data']['sunat_message'] ?? ($resp['message'] ?? null));
-                    $extra['xml_path'] = $data['xml_path'] ?? ($extra['xml_path'] ?? null);
-                    $extra['cdr_path'] = $data['cdr_path'] ?? ($extra['cdr_path'] ?? null);
-                    $extra['pdf_path'] = $data['pdf_path'] ?? ($extra['pdf_path'] ?? null);
-                    $this->setStatus($cotizacionId, $status, $extra);
-                    return $this->getStatus($cotizacionId);
-                }
+
+                $extra = $st;
+                $extra['sunat_code'] = $data['sunat_code'] ?? ($resp['sunat_code'] ?? null);
+                $extra['sunat_message'] = $data['sunat_message'] ?? ($resp['sunat_message'] ?? ($resp['message'] ?? null));
+                $extra['xml_path'] = $data['xml_path'] ?? ($extra['xml_path'] ?? null);
+                $extra['cdr_path'] = $data['cdr_path'] ?? ($extra['cdr_path'] ?? null);
+                $extra['pdf_path'] = $data['pdf_path'] ?? ($extra['pdf_path'] ?? null);
+                $this->setStatus($cotizacionId, $status, $extra);
+                return $this->getStatus($cotizacionId);
             }
         return $st;
     }
@@ -172,7 +192,8 @@ class FacturacionService {
         $urlSend = $base . str_replace('{id}', $st['remote_id'], $routeSend);
         $resp = $this->curlJson('POST', $urlSend, null, $token, ['cotizacion_id' => $cotizacionId, 'stage' => 'send', 'tipo' => $st['tipo'], 'remote_id' => $st['remote_id']]);
         $data = (isset($resp['data']) && is_array($resp['data'])) ? $resp['data'] : $resp;
-        $status = strtolower($resp['status'] ?? $resp['sunat_status'] ?? $resp['estado_sunat'] ?? 'enviado');
+        $estadoSunat = $data['estado_sunat'] ?? ($resp['estado_sunat'] ?? null);
+        $status = $this->normalizeEstado($resp['status'] ?? $resp['sunat_status'] ?? $estadoSunat ?? 'enviado');
         if (($data['xml_path'] ?? null) || ($data['cdr_path'] ?? null)) { $status = 'aceptado'; }
         $extra = $st;
         $extra['sunat_message'] = $data['sunat_message'] ?? ($resp['message'] ?? null);
@@ -313,16 +334,10 @@ class FacturacionService {
         // Enviar a SUNAT
         $urlSend = $base . str_replace('{id}', $remoteId, $routeSend);
         $respSend = $this->curlJson('POST', $urlSend, null, $token, ['cotizacion_id' => $cotizacionId, 'stage' => 'send', 'tipo' => $tipo, 'remote_id' => $remoteId]);
-        // Considerar distintas claves posibles: status, sunat_status, estado_sunat
-        $status = $respSend['status'] ?? $respSend['sunat_status'] ?? $respSend['estado_sunat'] ?? 'enviado';
-        if (is_string($status)) {
-            $status = strtolower($status);
-            if (in_array($status, ['aceptada'])) { $status = 'aceptado'; }
-            if (in_array($status, ['observada'])) { $status = 'observado'; }
-            if (in_array($status, ['rechazada'])) { $status = 'rechazado'; }
-        }
-        // Si la respuesta contiene rutas de archivos, considerar aceptado
         $data = (isset($respSend['data']) && is_array($respSend['data'])) ? $respSend['data'] : $respSend;
+        $estadoSunat = $data['estado_sunat'] ?? ($respSend['estado_sunat'] ?? null);
+        $status = $this->normalizeEstado($respSend['status'] ?? $respSend['sunat_status'] ?? $estadoSunat ?? 'enviado');
+        // Si la respuesta contiene rutas de archivos, considerar aceptado
         if (($data['xml_path'] ?? null) || ($data['cdr_path'] ?? null)) { $status = 'aceptado'; }
         $res = ['status' => $status, 'remote_id' => $remoteId, 'tipo' => $tipo];
         $res['sunat_message'] = $data['sunat_message'] ?? ($respSend['message'] ?? null);

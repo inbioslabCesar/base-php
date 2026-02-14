@@ -316,6 +316,115 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
         .titulo-ubicacion {
             color: #fff;
         }
+
+        /* Ubicación (home) */
+        .ubicacion-section {
+            padding: 42px 0;
+            background: linear-gradient(120deg,
+                    <?= htmlspecialchars($color_principal) ?> 0%,
+                    <?= htmlspecialchars($color_secundario) ?> 55%,
+                    rgba(255, 255, 255, 0.65) 100%);
+        }
+
+        .ubicacion-card {
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 22px;
+            padding: 28px;
+            backdrop-filter: blur(8px);
+        }
+
+        .ubicacion-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #101828;
+            letter-spacing: -0.02em;
+        }
+
+        .ubicacion-subtitle {
+            color: #475467;
+        }
+
+        .ubicacion-link {
+            color: #1d4ed8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .ubicacion-link:hover {
+            text-decoration: underline;
+        }
+
+        .ubicacion-controls {
+            height: 100%;
+        }
+
+        .ubicacion-btn {
+            border-radius: 14px;
+            border: 1px solid rgba(0, 0, 0, 0.10);
+        }
+
+        .ubicacion-hint {
+            color: #667085;
+            font-size: 0.95rem;
+            min-height: 1.2em;
+        }
+
+        .ubicacion-place {
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 18px;
+            padding: 16px;
+        }
+
+        .ubicacion-place-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: rgba(29, 78, 216, 0.10);
+            color: #1d4ed8;
+            font-size: 1.4rem;
+        }
+
+        .ubicacion-place-name {
+            font-weight: 800;
+            color: #101828;
+            line-height: 1.1;
+        }
+
+        .ubicacion-place-sub {
+            color: #475467;
+            font-size: 0.95rem;
+        }
+
+        .ubicacion-map-wrap {
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 20px;
+            overflow: hidden;
+            height: 100%;
+            min-height: 420px;
+        }
+
+        .ubicacion-map-wrap iframe {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .ubicacion-card {
+                padding: 18px;
+            }
+
+            .ubicacion-title {
+                font-size: 1.7rem;
+            }
+
+            .ubicacion-map-wrap {
+                min-height: 320px;
+            }
+        }
     </style>
     <script type="application/ld+json">
         <?php

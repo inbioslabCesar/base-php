@@ -19,7 +19,7 @@ $precios = $_POST['precios'] ?? [];
 $tipo_usuario = $_POST['tipo_usuario'] ?? 'cliente';
 $id_empresa = $_POST['id_empresa'] ?? null;
 $id_convenio = $_POST['id_convenio'] ?? null;
-$emitir_comprobante = isset($_POST['emitir_comprobante']) ? (int)$_POST['emitir_comprobante'] : 1;
+$emitir_comprobante = isset($_POST['emitir_comprobante']) ? (int)$_POST['emitir_comprobante'] : 0;
 $emitir_comprobante = ($emitir_comprobante === 0) ? 0 : 1;
 
 // Particular pero Factura (RUC)
@@ -269,9 +269,31 @@ foreach ($detalles as $detalle) {
 }
 foreach ($detalles as $detalle) {
     $id_examen = $detalle['id_examen'];
-    $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-    $stmtRes = $pdo->prepare($sql);
-    $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+
+    // Snapshot del formato (adicional) para que el histórico no cambie si se edita el examen luego.
+    $hasSnapshotCol = false;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'adicional_snapshot'")->fetch(PDO::FETCH_ASSOC);
+        $hasSnapshotCol = !empty($col);
+    } catch (Exception $e) {
+        $hasSnapshotCol = false;
+    }
+    $adicional_snapshot = null;
+    if ($hasSnapshotCol) {
+        $stmtAd = $pdo->prepare('SELECT adicional FROM examenes WHERE id = ?');
+        $stmtAd->execute([$id_examen]);
+        $adicional_snapshot = $stmtAd->fetchColumn();
+    }
+
+    if ($hasSnapshotCol) {
+        $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
+        $stmtRes = $pdo->prepare($sql);
+        $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
+    } else {
+        $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
+        $stmtRes = $pdo->prepare($sql);
+        $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+    }
 }
 
 // Redirigir según el rol

@@ -165,6 +165,120 @@ body {
     box-shadow: 0 8px 25px rgba(79, 172, 254, 0.6);
     color: white;
 }
+
+.update-format-form {
+    margin-top: 0.75rem;
+}
+
+.update-format-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: 1px solid rgba(102, 126, 234, 0.35);
+    color: #4a5fd6;
+    background: rgba(102, 126, 234, 0.08);
+    backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.update-format-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(102, 126, 234, 0.55);
+    background: rgba(102, 126, 234, 0.14);
+    color: #3f55d2;
+    box-shadow: 0 8px 22px rgba(102, 126, 234, 0.18);
+}
+
+.update-format-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.update-format-btn:focus {
+    outline: none;
+}
+
+.update-format-btn:focus-visible {
+    outline: 3px solid rgba(102, 126, 234, 0.35);
+    outline-offset: 3px;
+}
+
+.header-builder {
+    margin-bottom: 1rem;
+    padding: 0.9rem;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(102, 126, 234, 0.18);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.header-builder-title {
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 0.6rem;
+}
+
+.header-existing {
+    margin-bottom: 0.75rem;
+}
+
+.header-existing-row {
+    display: grid;
+    grid-template-columns: 1fr 64px 220px 110px;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.header-remove {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    user-select: none;
+}
+
+.header-preview-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.header-preview-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(102, 126, 234, 0.08);
+    border: 1px solid rgba(102, 126, 234, 0.18);
+}
+
+.header-preview-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.header-preview-text {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #334155;
+}
+
+.header-preview-remove {
+    padding: 0;
+    margin: 0;
+    font-size: 0.85rem;
+}
 .form-check-input:checked {
     background-color: #667eea;
     border-color: #667eea;

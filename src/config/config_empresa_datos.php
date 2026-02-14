@@ -57,7 +57,7 @@ $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
         <div class="alert alert-info"><?= htmlspecialchars($_SESSION['msg']) ?></div>
         <?php unset($_SESSION['msg']); ?>
     <?php endif; ?>
-    <form method="POST" action="config/config_empresa_guardar.php" enctype="multipart/form-data" autocomplete="off">
+    <form method="POST" action="<?= htmlspecialchars(BASE_URL) ?>dashboard.php?action=config_empresa_guardar" enctype="multipart/form-data" autocomplete="off">
         <div class="row">
             <!-- Datos básicos -->
             <div class="col-md-6 mb-3">
@@ -79,6 +79,12 @@ $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
                 <label for="direccion" class="form-label">Dirección *</label>
                 <input type="text" class="form-control" id="direccion" name="direccion"
                     value="<?= htmlspecialchars($empresa['direccion'] ?? '') ?>" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="maps_embed" class="form-label">Mapa Google (iframe/src) (opcional)</label>
+                <textarea class="form-control" id="maps_embed" name="maps_embed" rows="3"
+                    placeholder="Pega aquí el iframe completo o solo el src (https://www.google.com/maps/embed?pb=...)" autocomplete="off"><?= htmlspecialchars($empresa['maps_embed'] ?? '') ?></textarea>
+                <div class="form-text">Si lo completas, la web pública usará este mapa exacto en la sección Ubicación.</div>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="email" class="form-label">Email *</label>

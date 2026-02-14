@@ -535,11 +535,22 @@ function getSeleccionGlobal() {
                     setSeleccionadasManual([]);
                     setTimeout(() => location.reload(), 1800);
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error al realizar el pago masivo',
-                        text: data.message || '',
-                    });
+                    if (data.redirect_url) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Caja no disponible',
+                            text: data.message || 'Debes abrir caja para continuar.',
+                            confirmButtonText: 'Ir a Contabilidad'
+                        }).then(() => {
+                            window.location.href = data.redirect_url;
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error al realizar el pago masivo',
+                            text: data.message || '',
+                        });
+                    }
                 }
             })
             .catch(err => {
@@ -887,11 +898,22 @@ $(document).on('change', '#selectAllCotizacionesMovil', function() {
                     setSeleccionadasManualMovil([]);
                     setTimeout(() => location.reload(), 1800);
                 } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error al realizar el pago masivo',
-                        text: data.message || '',
-                    });
+                    if (data.redirect_url) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Caja no disponible',
+                            text: data.message || 'Debes abrir caja para continuar.',
+                            confirmButtonText: 'Ir a Contabilidad'
+                        }).then(() => {
+                            window.location.href = data.redirect_url;
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error al realizar el pago masivo',
+                            text: data.message || '',
+                        });
+                    }
                 }
             })
             .catch(err => {

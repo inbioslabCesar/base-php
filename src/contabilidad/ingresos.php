@@ -87,6 +87,8 @@ foreach ($registros as $r) {
     border-radius: 15px;
     box-shadow: 0 4px 24px #764ba233;
 }
+/* Ocultar cards en desktop (solo móvil) */
+.cards-container { display: none; }
 </style>
 <div class="container-fluid mt-4">
     <div class="header-section mb-3">
@@ -96,15 +98,15 @@ foreach ($registros as $r) {
     </div>
     <form method="get" class="row g-2 align-items-end mb-3">
         <input type="hidden" name="vista" value="ingresos">
-        <div class="col-auto">
+        <div class="col-12 col-sm-6 col-md-auto">
             <label class="form-label">Desde</label>
             <input type="date" name="desde" class="form-control" value="<?= htmlspecialchars($desde) ?>">
         </div>
-        <div class="col-auto">
+        <div class="col-12 col-sm-6 col-md-auto">
             <label class="form-label">Hasta</label>
             <input type="date" name="hasta" class="form-control" value="<?= htmlspecialchars($hasta) ?>">
         </div>
-        <div class="col-auto">
+        <div class="col-12 col-md-auto">
             <label class="form-label">Tipo de Paciente</label>
             <select name="tipo_paciente" class="form-select" onchange="this.form.submit()">
                 <option value="todos" <?= $tipo_paciente == 'todos' ? 'selected' : '' ?>>Todos</option>
@@ -114,7 +116,7 @@ foreach ($registros as $r) {
             </select>
         </div>
         <?php if ($tipo_paciente == 'convenio'): ?>
-            <div class="col-auto">
+            <div class="col-12 col-md-auto">
                 <label class="form-label">Convenio</label>
                 <select name="filtro_convenio" class="form-select" onchange="this.form.submit()">
                     <option value="">Todos</option>
@@ -126,7 +128,7 @@ foreach ($registros as $r) {
                 </select>
             </div>
         <?php elseif ($tipo_paciente == 'empresa'): ?>
-            <div class="col-auto">
+            <div class="col-12 col-md-auto">
                 <label class="form-label">Empresa</label>
                 <select name="filtro_empresa" class="form-select" onchange="this.form.submit()">
                     <option value="">Todas</option>
@@ -138,12 +140,14 @@ foreach ($registros as $r) {
                 </select>
             </div>
         <?php endif; ?>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Filtrar</button>
-            <a href="dashboard.php?vista=ingresos" class="btn btn-secondary">Limpiar</a>
+        <div class="col-12 col-md-auto">
+            <div class="d-grid gap-2 d-md-flex">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                <a href="dashboard.php?vista=ingresos" class="btn btn-secondary">Limpiar</a>
+            </div>
         </div>
     </form>
-    <div class="table-responsive">
+    <div class="table-responsive ingresos-table-responsive">
         <table id="tablaIngresos" class="table table-striped table-bordered align-middle" style="width:100%; min-width:1200px;">
             <thead class="bg-indigo-600 text-white">
                 <tr>
@@ -156,6 +160,7 @@ foreach ($registros as $r) {
                     <th class="px-4 py-2 text-sm font-semibold">Total Cotización</th>
                     <th class="px-4 py-2 text-sm font-semibold">Adelanto</th>
                     <th class="px-4 py-2 text-sm font-semibold">Deuda</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -188,6 +193,57 @@ foreach ($registros as $r) {
 
     <!-- Inicialización de DataTables con botones de exportación -->
     <script>
+        function buildIngresosExportUrl(format, dtOrSearch) {
+            // dtOrSearch puede ser una instancia de DataTables (desktop) o un string de búsqueda (móvil)
+            var dt = null;
+            var searchOverride = '';
+
+            if (typeof dtOrSearch === 'string') {
+                searchOverride = dtOrSearch;
+            } else {
+                dt = dtOrSearch || null;
+            }
+
+            var params = new URLSearchParams();
+            params.set('action', 'ingresos_export');
+            params.set('format', format);
+            params.set('desde', $('input[name="desde"]').val() || '');
+            params.set('hasta', $('input[name="hasta"]').val() || '');
+            params.set('tipo_paciente', $('select[name="tipo_paciente"]').val() || 'todos');
+            params.set('filtro_convenio', $('select[name="filtro_convenio"]').val() || '');
+            params.set('filtro_empresa', $('select[name="filtro_empresa"]').val() || '');
+            params.set('search', searchOverride || ((dt && dt.search) ? (dt.search() || '') : ''));
+            // Exportar con detalle (exámenes y precios)
+            params.set('detalle', '1');
+
+            if (dt && dt.order) {
+                var ord = dt.order();
+                if (ord && ord.length) {
+                    params.set('orderCol', ord[0][0]);
+                    params.set('orderDir', ord[0][1]);
+                }
+            }
+
+            return 'dashboard.php?' + params.toString();
+        }
+
+        function triggerDownload(url) {
+            // Disparo de descarga sin depender de popups (sigue siendo un gesto del usuario)
+            var a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function exportIngresosMovil(format) {
+            var input = document.getElementById('buscadorIngresosMovil');
+            var searchValue = input ? (input.value || '') : '';
+            triggerDownload(buildIngresosExportUrl(format, searchValue));
+        }
+
         $(document).ready(function() {
             var tabla = $('#tablaIngresos').DataTable({
                 serverSide: true,
@@ -232,7 +288,8 @@ foreach ($registros as $r) {
                             return data.split(',').map(metodo => {
                                 const key = metodo.trim().toLowerCase();
                                 const color = colores[key] || colores['default'];
-                                return `<span class="badge ${color} me-1">${metodo.trim()}</span>`;
+                                const label = key === 'yape' ? 'Yape/Plin' : metodo.trim();
+                                return `<span class="badge ${color} me-1">${label}</span>`;
                             }).join(' ');
                         }
                     },
@@ -269,37 +326,63 @@ foreach ($registros as $r) {
                         },
                     { data: 'total_cotizacion' },
                     { data: 'adelanto' },
-                    { data: 'deuda' }
+                    { data: 'deuda' },
+                    { 
+                        data: 'id_cotizacion',
+                        orderable: false,
+                        searchable: false,
+                        render: function(id) {
+                            if (!id) return '';
+                            return `<button type="button" class="btn btn-outline-primary btn-sm ver-detalle" data-id="${id}" title="Ver exámenes y precios"><i class="bi bi-list-ul"></i></button>`;
+                        }
+                    }
                 ],
                 dom: 'Bfrtip',
-                buttons: [{
-                        extend: 'excelHtml5',
-                        text: '<i class="bi bi-file-earmark-excel"></i> Exportar a Excel',
-                        className: 'btn btn-success mb-2'
-                    },
+                buttons: [
                     {
-                        extend: 'pdfHtml5',
-                        text: '<i class="bi bi-file-earmark-pdf"></i> Exportar a PDF',
-                        className: 'btn btn-danger mb-2',
-                        orientation: 'landscape',
-                        pageSize: 'A4',
-                        exportOptions: {
-                            columns: ':visible'
-                        },
-                        customize: function(doc) {
-                            doc.defaultStyle.fontSize = 10;
+                        text: '<i class="bi bi-file-earmark-excel"></i> Exportar a Excel',
+                        className: 'btn btn-success mb-2',
+                        action: function(e, dt) {
+                            e.preventDefault();
+                            triggerDownload(buildIngresosExportUrl('xls', dt));
                         }
                     },
                     {
-                        extend: 'print',
+                        text: '<i class="bi bi-file-earmark-pdf"></i> Exportar a PDF',
+                        className: 'btn btn-danger mb-2',
+                        action: function(e, dt) {
+                            e.preventDefault();
+                            triggerDownload(buildIngresosExportUrl('pdf', dt));
+                        }
+                    },
+                    {
                         text: '<i class="bi bi-printer"></i> Imprimir',
-                        className: 'btn btn-info mb-2'
+                        className: 'btn btn-info mb-2',
+                        action: function(e, dt) {
+                            e.preventDefault();
+                            triggerDownload(buildIngresosExportUrl('print', dt));
+                        }
                     }
                 ]
             });
             // Filtros avanzados: recargar tabla al cambiar filtros
             $('input[name="desde"], input[name="hasta"], select[name="tipo_paciente"], select[name="filtro_convenio"], select[name="filtro_empresa"]').on('change', function() {
                 tabla.ajax.reload();
+            });
+            // Evento para abrir modal de detalle
+            $(document).on('click', '.ver-detalle', function() {
+                var id = $(this).data('id');
+                if (!id) return;
+                $('#detalleIngresosBody').html('<div class="p-3 text-center text-muted">Cargando...</div>');
+                $.get('dashboard.php?action=ingresos_detalle&id_cotizacion=' + encodeURIComponent(id), function(html) {
+                    $('#detalleIngresosBody').html(html);
+                    var modal = new bootstrap.Modal(document.getElementById('modalDetalleIngresos'));
+                    modal.show();
+                }).fail(function() {
+                    $('#detalleIngresosBody').html('<div class="alert alert-danger m-3">No se pudo cargar el detalle.</div>');
+                    var modal = new bootstrap.Modal(document.getElementById('modalDetalleIngresos'));
+                    modal.show();
+                });
             });
         });
     </script>
@@ -337,7 +420,7 @@ foreach ($registros as $r) {
             color: #fff !important;
         }
         @media (max-width: 768px) {
-    .table-responsive { display: none; }
+    .ingresos-table-responsive { display: none; }
     .cards-container { display: block; }
     .mobile-pagination-ingresos {
         display: flex;
@@ -411,6 +494,17 @@ foreach ($registros as $r) {
     </style>
 <!-- Buscador y cards para móvil -->
 <div class="mb-3 d-block d-md-none">
+        <div class="d-grid gap-2 d-sm-flex flex-wrap mb-2">
+        <button type="button" class="btn btn-success" onclick="exportIngresosMovil('xls')">
+            <i class="bi bi-file-earmark-excel"></i> Excel
+        </button>
+        <button type="button" class="btn btn-danger" onclick="exportIngresosMovil('pdf')">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+        <button type="button" class="btn btn-info" onclick="exportIngresosMovil('print')">
+            <i class="bi bi-printer"></i> Imprimir
+        </button>
+    </div>
     <div class="input-group">
         <input type="text" id="buscadorIngresosMovil" class="form-control" placeholder="Buscar por cliente, referencia...">
         <button class="btn btn-primary" type="button" id="btnClearIngresosMovil"><i class="bi bi-x"></i></button>
@@ -427,80 +521,20 @@ foreach ($registros as $r) {
         </div>
     </div>
 </div>
-<style>
-@media (max-width: 768px) {
-    .table-responsive { display: none; }
-    .cards-container { display: block; }
-    .mobile-pagination-ingresos {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 6px;
-        margin: 1.5rem 0 2rem 0;
-        width: 100%;
-    }
-    .cliente-card {
-        background: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        border: 1px solid #e3e6f0;
-        transition: transform 0.2s, box-shadow 0.2s;
-        position: relative;
-        overflow: hidden;
-        animation: fadeInUp 0.3s ease-out;
-    }
-    .cliente-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-    }
-    .cliente-codigo {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 0.25rem 0.75rem;
-        border-radius: 15px;
-        font-size: 0.8rem;
-        font-weight: 500;
-    }
-    .cliente-nombre {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #2c3e50;
-        margin: 0;
-    }
-    .info-item {
-        margin-bottom: 0.5rem;
-    }
-    .info-label {
-        font-size: 0.8rem;
-        color: #6c757d;
-        font-weight: 500;
-        margin-right: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        display: inline-block;
-    }
-    .info-value {
-        font-size: 0.95rem;
-        color: #2c3e50;
-        font-weight: 500;
-        display: inline-block;
-    }
-    .badge {
-        padding: 0.4rem 0.8rem;
-        border-radius: 12px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        border: none;
-        display: inline-block;
-    }
-}
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-</style>
+<!-- Modal Detalle de Cotización -->
+<div class="modal fade" id="modalDetalleIngresos" tabindex="-1" aria-labelledby="modalDetalleIngresosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetalleIngresosLabel">Detalle de exámenes y precios</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="detalleIngresosBody">
+                <!-- contenido dinámico -->
+            </div>
+        </div>
+    </div>
+    </div>
 <script>
 function renderIngresoCard(ingreso) {
     // Puedes personalizar el diseño del card según los campos de ingreso
@@ -520,7 +554,8 @@ function renderIngresoCard(ingreso) {
                 'default': 'bg-dark'
             };
             const color = colores[key] || colores['default'];
-            badges += `<span class="badge ${color} me-1">${metodo.trim()}</span>`;
+            const label = key === 'yape' ? 'Yape/Plin' : metodo.trim();
+            badges += `<span class="badge ${color} me-1">${label}</span>`;
         });
     } else {
         badges += '<span class="badge bg-dark">Sin pago</span>';
@@ -543,12 +578,17 @@ function renderIngresoCard(ingreso) {
             refBadges += `<span class="badge ${color} me-1">${ref.trim()}</span>`;
         });
     }
+    const btnDetalle = ingreso.id_cotizacion ?
+        `<button type="button" class="btn btn-outline-primary btn-sm ver-detalle" data-id="${ingreso.id_cotizacion}" title="Ver exámenes y precios"><i class="bi bi-list-ul"></i></button>`
+        : '';
     return `
     <div class='cliente-card mb-3'>
-        <div class='card-header d-flex justify-content-between align-items-center'>
+        <div class='card-header d-flex justify-content-between align-items-center gap-2'>
             <h5 class='cliente-nombre mb-0'>${ingreso.cliente || ''}</h5>
-            <span class='cliente-codigo'>${ingreso.codigo_cotizacion || ''}</span>
-        </div>
+            <div class='d-flex align-items-center gap-2'>
+                <span class='cliente-codigo'>${ingreso.codigo_cotizacion || ''}</span>
+                ${btnDetalle}
+            </div>
         <div class='card-body'>
             <div class='info-item'><span class='info-label'>Fecha</span><span class='info-value'>${ingreso.fecha || ''}</span></div>
             <div class='info-item'><span class='info-label'>Mét. Pago</span><span class='info-value'>${badges}</span></div>
@@ -632,9 +672,13 @@ function renderPaginacionIngresosMovil(pagina, totalPaginas, busqueda) {
             // Limpiar cards
             const cont = document.getElementById('cardsIngresosAjax');
             if (cont) cont.innerHTML = '';
-            // Forzar ajuste de columnas DataTables al volver a desktop
-            if ($.fn.DataTable && $('#tablaIngresos').length && $('#tablaIngresos').hasClass('dataTable')) {
-                $('#tablaIngresos').DataTable().columns.adjust().responsive.recalc();
+            // Forzar ajuste de columnas DataTables al volver a desktop (si existe y si Responsive está activo)
+            if ($.fn.DataTable && $.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable('#tablaIngresos')) {
+                const dt = $('#tablaIngresos').DataTable();
+                dt.columns.adjust();
+                if (dt.responsive && typeof dt.responsive.recalc === 'function') {
+                    dt.responsive.recalc();
+                }
             }
             lastMode = 'desktop';
         }

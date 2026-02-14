@@ -1,17 +1,38 @@
 <?php
 // Función para armar el HTML y CSS del reporte de resultados
 function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
+    // Conversión robusta de números con separadores locales (coma/punto)
     $toNullableFloat = function ($value) {
         if ($value === null) {
             return null;
         }
         if (is_string($value)) {
-            $trimmed = trim($value);
-            if ($trimmed === '') {
+            $s = trim($value);
+            if ($s === '') {
                 return null;
             }
-            $normalized = str_replace(',', '', $trimmed);
-            return is_numeric($normalized) ? floatval($normalized) : null;
+            // Quitar espacios no separadores
+            $s = str_replace([' ', '\u00A0'], '', $s);
+            $hasComma = strpos($s, ',') !== false;
+            $hasDot = strpos($s, '.') !== false;
+            if ($hasComma && $hasDot) {
+                $posComma = strrpos($s, ',');
+                $posDot = strrpos($s, '.');
+                if ($posComma > $posDot) {
+                    // Formato tipo "1.234,56" → '.' miles, ',' decimal
+                    $s = str_replace('.', '', $s);
+                    $s = str_replace(',', '.', $s);
+                } else {
+                    // Formato tipo "1,234.56" → ',' miles, '.' decimal
+                    $s = str_replace(',', '', $s);
+                }
+            } elseif ($hasComma && !$hasDot) {
+                // Solo coma: asumir coma decimal
+                $s = str_replace(',', '.', $s);
+            } else {
+                // Solo punto o sin separadores: dejar como está
+            }
+            return is_numeric($s) ? floatval($s) : null;
         }
         return is_numeric($value) ? floatval($value) : null;
     };
@@ -102,7 +123,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             $referencia_aplicada = null;
             $edad_paciente = isset($paciente['edad']) ? floatval($paciente['edad']) : null;
             $sexo_paciente = isset($paciente['sexo']) ? strtolower(trim($paciente['sexo'])) : '';
-            if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "" && is_numeric(str_replace(',', '', $valorOriginal))) {
+            if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "" && $toNullableFloat($valorOriginal) !== null) {
                 // Seleccionar la referencia correcta
                 foreach ($item['referencias'] as $ref) {
                     $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
@@ -115,7 +136,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                         break;
                     }
                 }
-                $valor_num = floatval(str_replace(',', '', $valorOriginal));
+                $valor_num = $toNullableFloat($valorOriginal);
                 if ($referencia_aplicada) {
                     $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
                     $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;

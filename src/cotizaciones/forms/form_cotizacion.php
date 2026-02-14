@@ -8,7 +8,7 @@ $rol = $_SESSION['rol'] ?? null;
 $isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
 $cotizacionData = null;
 $examenesCotizacion = [];
-$emitirComprobante = 1;
+$emitirComprobante = 0;
 $tipoComprobanteCliente = 'boleta';
 $receptorRuc = '';
 $receptorRazonSocial = '';
@@ -1077,11 +1077,15 @@ function syncFacturaFields() {
     const show = (tipoCliente === 'cliente' && String(emitir) === '1');
     $('#rowTipoComprobanteCliente').toggleClass('d-none', !show);
 
+    // Si no se emitirá CPE (Solo Ticket) o no es particular, deshabilitar campos para que no se envíen
+    $('#tipoComprobanteCliente').prop('disabled', !show);
+
     const isFactura = (show && tipoComp === 'factura');
     $('#colFacturaRuc, #colFacturaRazon').toggleClass('d-none', !isFactura);
     $('#rowFacturaDireccion').toggleClass('d-none', !isFactura);
 
     $('#receptorRuc, #receptorRazon').prop('required', isFactura);
+    $('#receptorRuc, #receptorRazon, #receptorDireccion').prop('disabled', !isFactura);
 }
 
 $('#emitirComprobante').on('change', syncFacturaFields);

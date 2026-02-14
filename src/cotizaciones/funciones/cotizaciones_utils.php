@@ -1,7 +1,27 @@
 <?php
 // Calcula el porcentaje de parámetros llenados para una cotización
 function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
-    $stmt = $pdo->prepare('SELECT re.resultados, e.adicional FROM resultados_examenes re JOIN examenes e ON re.id_examen = e.id WHERE re.id_cotizacion = ?');
+    static $hasSnapshotCol = null;
+    if ($hasSnapshotCol === null) {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'adicional_snapshot'")->fetch(PDO::FETCH_ASSOC);
+            $hasSnapshotCol = !empty($col);
+        } catch (Exception $e) {
+            $hasSnapshotCol = false;
+        }
+    }
+
+    if ($hasSnapshotCol) {
+        $stmt = $pdo->prepare("SELECT re.resultados, COALESCE(re.adicional_snapshot, e.adicional) AS adicional
+            FROM resultados_examenes re
+            JOIN examenes e ON re.id_examen = e.id
+            WHERE re.id_cotizacion = ?");
+    } else {
+        $stmt = $pdo->prepare("SELECT re.resultados, e.adicional AS adicional
+            FROM resultados_examenes re
+            JOIN examenes e ON re.id_examen = e.id
+            WHERE re.id_cotizacion = ?");
+    }
     $stmt->execute([$idCotizacion]);
     $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $total_parametros = 0;

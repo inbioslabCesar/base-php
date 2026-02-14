@@ -1,0 +1,183 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../conexion/conexion.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: dashboard.php?vista=inventario');
+    exit;
+}
+
+$itemId = (int)($_POST['item_id'] ?? 0);
+$tipo = trim((string)($_POST['tipo'] ?? ''));
+$cantidad = round((float)($_POST['cantidad'] ?? 0), 2);
+$cantidadPresentacionRaw = trim((string)($_POST['cantidad_presentacion'] ?? ''));
+$cantidadPresentacion = $cantidadPresentacionRaw === '' ? 0.0 : (float)$cantidadPresentacionRaw;
+$observacion = trim((string)($_POST['observacion'] ?? ''));
+$loteCodigo = trim((string)($_POST['lote_codigo'] ?? ''));
+$fechaVencimiento = trim((string)($_POST['fecha_vencimiento'] ?? ''));
+$usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+
+$tiposEntrada = ['entrada', 'ajuste_pos'];
+$tiposSalida = ['salida', 'ajuste_neg', 'merma', 'vencido'];
+$tiposValidos = array_merge($tiposEntrada, $tiposSalida);
+
+if ($itemId <= 0 || !in_array($tipo, $tiposValidos, true) || ($cantidad <= 0 && $cantidadPresentacion <= 0)) {
+    $_SESSION['mensaje'] = 'Datos inválidos para registrar movimiento.';
+    header('Location: dashboard.php?vista=inventario');
+    exit;
+}
+
+if ($cantidadPresentacion < 0) {
+    $_SESSION['mensaje'] = 'Cantidad por presentación inválida.';
+    header('Location: dashboard.php?vista=inventario');
+    exit;
+}
+
+if ($fechaVencimiento !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencimiento)) {
+    $_SESSION['mensaje'] = 'Formato de fecha de vencimiento inválido.';
+    header('Location: dashboard.php?vista=inventario');
+    exit;
+}
+
+$fechaVencimientoVal = $fechaVencimiento === '' ? null : $fechaVencimiento;
+
+try {
+    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_lotes','inventario_movimientos')");
+    $stmtTbl->execute();
+    if ((int)$stmtTbl->fetchColumn() < 3) {
+        $_SESSION['mensaje'] = 'Faltan tablas de inventario. Ejecuta sql/agregar_tablas_inventario.sql.';
+        header('Location: dashboard.php?vista=inventario');
+        exit;
+    }
+
+    $stmtColFactor = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME = 'factor_presentacion'");
+    $stmtColFactor->execute();
+    $hasFactorPresentacionCol = ((int)$stmtColFactor->fetchColumn() > 0);
+
+    $stmtItem = $pdo->prepare(
+        "SELECT id, nombre, unidad_medida, activo, " .
+        ($hasFactorPresentacionCol ? "factor_presentacion" : "1 AS factor_presentacion") .
+        " FROM inventario_items WHERE id = ? LIMIT 1"
+    );
+    $stmtItem->execute([$itemId]);
+    $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+
+    if (!$item || (int)($item['activo'] ?? 0) !== 1) {
+        $_SESSION['mensaje'] = 'Ítem no disponible para movimientos.';
+        header('Location: dashboard.php?vista=inventario');
+        exit;
+    }
+
+    $factorPresentacion = (float)($item['factor_presentacion'] ?? 1);
+    if ($factorPresentacion <= 0) {
+        $factorPresentacion = 1;
+    }
+
+    if ($cantidadPresentacion > 0) {
+        $cantidad = round($cantidadPresentacion * $factorPresentacion, 2);
+        $notaConversion = 'Conversión automática: ' .
+            rtrim(rtrim(number_format($cantidadPresentacion, 4, '.', ''), '0'), '.') .
+            ' presentación x factor ' .
+            rtrim(rtrim(number_format($factorPresentacion, 4, '.', ''), '0'), '.') .
+            ' = ' .
+            rtrim(rtrim(number_format($cantidad, 2, '.', ''), '0'), '.') .
+            ' ' .
+            (string)($item['unidad_medida'] ?? 'unid');
+        $observacion = $observacion !== '' ? ($observacion . ' | ' . $notaConversion) : $notaConversion;
+    }
+
+    if ($cantidad <= 0) {
+        $_SESSION['mensaje'] = 'Cantidad inválida para registrar movimiento.';
+        header('Location: dashboard.php?vista=inventario');
+        exit;
+    }
+
+    $pdo->beginTransaction();
+
+    if (in_array($tipo, $tiposEntrada, true)) {
+        if ($loteCodigo === '') {
+            $loteCodigo = 'L-' . date('Ymd-His');
+        }
+
+        $stmtLote = $pdo->prepare("SELECT id FROM inventario_lotes WHERE item_id = ? AND lote_codigo = ? AND ((fecha_vencimiento IS NULL AND ? IS NULL) OR fecha_vencimiento = ?) ORDER BY id DESC LIMIT 1");
+        $stmtLote->execute([$itemId, $loteCodigo, $fechaVencimientoVal, $fechaVencimientoVal]);
+        $loteId = (int)$stmtLote->fetchColumn();
+
+        if ($loteId > 0) {
+            $stmtUpd = $pdo->prepare("UPDATE inventario_lotes SET cantidad_inicial = cantidad_inicial + ?, cantidad_actual = cantidad_actual + ?, updated_at = NOW() WHERE id = ?");
+            $stmtUpd->execute([$cantidad, $cantidad, $loteId]);
+        } else {
+            $stmtIns = $pdo->prepare("INSERT INTO inventario_lotes (item_id, lote_codigo, fecha_vencimiento, cantidad_inicial, cantidad_actual, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmtIns->execute([$itemId, $loteCodigo, $fechaVencimientoVal, $cantidad, $cantidad]);
+            $loteId = (int)$pdo->lastInsertId();
+        }
+
+        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmtMov->execute([
+            $itemId,
+            $loteId > 0 ? $loteId : null,
+            $tipo,
+            $cantidad,
+            $observacion !== '' ? $observacion : null,
+            $usuarioId > 0 ? $usuarioId : null,
+        ]);
+    } else {
+        $stmtSuma = $pdo->prepare("SELECT IFNULL(SUM(cantidad_actual),0) FROM inventario_lotes WHERE item_id = ? AND cantidad_actual > 0");
+        $stmtSuma->execute([$itemId]);
+        $stockTotal = round((float)$stmtSuma->fetchColumn(), 2);
+
+        if ($stockTotal < $cantidad) {
+            $pdo->rollBack();
+            $_SESSION['mensaje'] = 'Stock insuficiente. Disponible: ' . number_format($stockTotal, 2);
+            header('Location: dashboard.php?vista=inventario');
+            exit;
+        }
+
+        $stmtLotes = $pdo->prepare("SELECT id, cantidad_actual FROM inventario_lotes WHERE item_id = ? AND cantidad_actual > 0 ORDER BY (fecha_vencimiento IS NULL) ASC, fecha_vencimiento ASC, id ASC");
+        $stmtLotes->execute([$itemId]);
+        $lotes = $stmtLotes->fetchAll(\PDO::FETCH_ASSOC);
+
+        $restante = $cantidad;
+        $stmtUpdLote = $pdo->prepare("UPDATE inventario_lotes SET cantidad_actual = cantidad_actual - ?, updated_at = NOW() WHERE id = ?");
+        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+
+        foreach ($lotes as $lote) {
+            if ($restante <= 0) {
+                break;
+            }
+
+            $actual = (float)($lote['cantidad_actual'] ?? 0);
+            if ($actual <= 0) {
+                continue;
+            }
+
+            $consumo = min($actual, $restante);
+            $stmtUpdLote->execute([$consumo, (int)$lote['id']]);
+
+            $stmtMov->execute([
+                $itemId,
+                (int)$lote['id'],
+                $tipo,
+                $consumo,
+                $observacion !== '' ? $observacion : null,
+                $usuarioId > 0 ? $usuarioId : null,
+            ]);
+
+            $restante = round($restante - $consumo, 2);
+        }
+    }
+
+    $pdo->commit();
+    $_SESSION['mensaje'] = 'Movimiento registrado correctamente.';
+} catch (\Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    $_SESSION['mensaje'] = 'No se pudo registrar el movimiento: ' . $e->getMessage();
+}
+
+header('Location: dashboard.php?vista=inventario');
+exit;

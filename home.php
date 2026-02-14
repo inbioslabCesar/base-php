@@ -1,4 +1,4 @@
- <!-- Carrusel dinámico y amigable -->
+<!-- Carrusel dinámico y amigable -->
  <?php if (count($imagenes_carrusel) > 0): ?>
      <div id="sliderEmpresa" class="carousel slide mt-3" data-bs-ride="carousel">
          <div class="carousel-indicators">
@@ -260,16 +260,48 @@
      </div>
  </section>
 
-    <!-- Ubicación del Laboratorio  https://maps.app.goo.gl/DQreeBmVBVarrj8V9-->
+ <!-- Ubicación del Laboratorio -->
  <div class="container mt-4">
-     <h4 class="titulo-ubicacion">Ubicación del Laboratorio</h4>
+    <h4>Ubicación del Laboratorio</h4>
     <div style="width:100%;max-width:600px;margin:auto;">
-        <iframe src="https://www.google.com/maps?q=INBIOSLAB+LABORATORIO+CLINICO&output=embed" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-     </div>
+        <?php
+        $maps_embed_raw = trim((string)($config_empresa['maps_embed'] ?? ''));
+        $maps_embed_src = '';
 
+        if ($maps_embed_raw !== '') {
+            if (stripos($maps_embed_raw, '<iframe') !== false) {
+                if (preg_match('/\s+src\s*=\s*("([^"]+)"|\'([^\']+)\')/i', $maps_embed_raw, $m)) {
+                    $maps_embed_src = $m[2] ?: ($m[3] ?? '');
+                }
+            } else {
+                $maps_embed_src = $maps_embed_raw;
+            }
+
+            $maps_embed_src = trim($maps_embed_src);
+            if ($maps_embed_src !== '') {
+                $u = @parse_url($maps_embed_src);
+                $host = strtolower((string)($u['host'] ?? ''));
+                $path = (string)($u['path'] ?? '');
+                $is_google = $host === 'www.google.com' || $host === 'google.com' || str_ends_with($host, '.google.com');
+                $is_embed_path = str_starts_with($path, '/maps/embed');
+                if (!$is_google || !$is_embed_path) {
+                    $maps_embed_src = '';
+                }
+            }
+        }
+
+        $maps_fallback_query = trim((string)($config_empresa['direccion'] ?? ($config_empresa['nombre'] ?? '')));
+        if ($maps_fallback_query === '') {
+            $maps_fallback_query = 'Perú';
+        }
+
+        $maps_iframe_src = $maps_embed_src !== ''
+            ? $maps_embed_src
+            : ('https://www.google.com/maps?q=' . urlencode($maps_fallback_query) . '&z=16&output=embed');
+        ?>
+        <iframe src="<?= htmlspecialchars($maps_iframe_src, ENT_QUOTES, 'UTF-8') ?>" width="100%" height="350" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
 </div>
-
-
 
  <!-- Botón flotante de WhatsApp -->
 

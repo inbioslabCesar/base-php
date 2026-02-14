@@ -17,6 +17,7 @@ $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 $examenes = [];
 $referencia_personalizada = '';
 $datos_paciente = [];
+$areas_disponibles = [];
 
 if ($cotizacion_id) {
     $examenesService = new ExamenesService($pdo);
@@ -24,17 +25,20 @@ if ($cotizacion_id) {
     $examenes = $examenesService->obtenerExamenesPorCotizacion($cotizacion_id);
     $referencia_personalizada = $cotizacionService->obtenerReferenciaPersonalizada($cotizacion_id);
     $datos_paciente = $cotizacionService->obtenerDatosPaciente($cotizacion_id);
+    $areas_disponibles = $examenesService->obtenerAreasDisponibles();
 }
+
+$v_formulario_css = @filemtime(__DIR__ . '/recursos/formulario.css') ?: time();
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados de Exámenes - InbiosLab</title>
+    <title>Resultados de Exámeness - InbiosLab</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="<?= BASE_URL ?>resultados/recursos/formulario.css">
+    <link rel="stylesheet" href="<?= BASE_URL ?>resultados/recursos/formulario.css?v=<?= $v_formulario_css ?>">
 </head>
 <body>
 <div class="header-container">
@@ -54,7 +58,7 @@ if ($cotizacion_id) {
 <div class="container mb-5">
     <?php
     if (!empty($examenes)) {
-        echo FormView::render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente);
+        echo FormView::render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente, $areas_disponibles);
     } else {
         echo AlertView::render('No hay exámenes asociados');
     }

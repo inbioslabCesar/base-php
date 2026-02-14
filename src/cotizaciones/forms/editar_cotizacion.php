@@ -317,10 +317,26 @@ if (!empty($_POST['id_cotizacion'])) {
         $pdo->prepare($sqlDel)->execute(array_merge([$id_cotizacion], $examenes_eliminados));
     }
     // Insertar resultados vacíos solo para exámenes nuevos
+    $hasSnapshotCol = false;
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'adicional_snapshot'")->fetch(PDO::FETCH_ASSOC);
+        $hasSnapshotCol = !empty($col);
+    } catch (Exception $e) {
+        $hasSnapshotCol = false;
+    }
     foreach ($examenes_nuevos as $id_examen) {
-        $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-        $stmtRes = $pdo->prepare($sql);
-        $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+        if ($hasSnapshotCol) {
+            $stmtAd = $pdo->prepare('SELECT adicional FROM examenes WHERE id = ?');
+            $stmtAd->execute([$id_examen]);
+            $adicional_snapshot = $stmtAd->fetchColumn();
+            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
+            $stmtRes = $pdo->prepare($sql);
+            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
+        } else {
+            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
+            $stmtRes = $pdo->prepare($sql);
+            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+        }
     }
     // Redirigir según el rol
     $rol = $_SESSION['rol'] ?? null;

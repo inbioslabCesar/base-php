@@ -120,6 +120,95 @@ document.addEventListener('DOMContentLoaded', function () {
         calcular();
     });
 
+    // Cabeceras por paciente (se insertan en el snapshot al guardar)
+    document.querySelectorAll('.header-builder').forEach((builder) => {
+        const titleSelect = builder.querySelector('.header-title-select');
+        const titleCustom = builder.querySelector('.header-title-custom');
+        const colorInput = builder.querySelector('.header-color-new');
+        const beforeSelect = builder.querySelector('.header-insert-before');
+        const addBtn = builder.querySelector('.add-header-btn');
+        const preview = builder.querySelector('.header-preview-list');
+        const hidden = builder.querySelector('.headers-hidden');
+
+        if (!hidden) return;
+
+        const getNextIndex = () => {
+            const n = parseInt(hidden.dataset.nextIndex || '0', 10);
+            hidden.dataset.nextIndex = String(n + 1);
+            return n;
+        };
+
+        const getTitle = () => {
+            const v = titleSelect ? titleSelect.value : '';
+            if (v === '__custom__') {
+                return (titleCustom && titleCustom.value ? titleCustom.value : '').trim();
+            }
+            return (v || '').trim();
+        };
+
+        if (titleSelect && titleCustom) {
+            titleSelect.addEventListener('change', () => {
+                const isCustom = titleSelect.value === '__custom__';
+                titleCustom.classList.toggle('d-none', !isCustom);
+                if (!isCustom) {
+                    titleCustom.value = '';
+                } else {
+                    titleCustom.focus();
+                }
+            });
+        }
+
+        const examId = builder.dataset.examId;
+        if (!examId || !addBtn || !preview) return;
+
+        addBtn.addEventListener('click', () => {
+            const titulo = getTitle();
+            const color = (colorInput && colorInput.value ? colorInput.value : '#0923E1').trim();
+            const before = (beforeSelect && beforeSelect.value ? beforeSelect.value : '__END__').trim();
+            if (!titulo) {
+                alert('Escribe o selecciona un nombre de cabecera.');
+                return;
+            }
+
+            const idx = getNextIndex();
+
+            const makeHidden = (name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                input.dataset.hdrIdx = String(idx);
+                hidden.appendChild(input);
+            };
+
+            makeHidden(`examenes[${examId}][cabeceras_nuevas][${idx}][titulo]`, titulo);
+            makeHidden(`examenes[${examId}][cabeceras_nuevas][${idx}][color]`, color);
+            makeHidden(`examenes[${examId}][cabeceras_nuevas][${idx}][before]`, before);
+
+            const row = document.createElement('div');
+            row.className = 'header-preview-item';
+            row.dataset.hdrIdx = String(idx);
+            row.innerHTML = `
+                <span class="header-preview-dot" style="background:${color}"></span>
+                <span class="header-preview-text">${titulo}</span>
+                <button type="button" class="btn btn-sm btn-link header-preview-remove">Quitar</button>
+            `;
+            row.querySelector('.header-preview-remove').addEventListener('click', () => {
+                const key = row.dataset.hdrIdx;
+                row.remove();
+                hidden.querySelectorAll(`input[data-hdr-idx="${key}"]`).forEach((el) => el.remove());
+            });
+            preview.appendChild(row);
+
+            // reset simple
+            if (titleSelect) titleSelect.value = '';
+            if (titleCustom) {
+                titleCustom.value = '';
+                titleCustom.classList.add('d-none');
+            }
+        });
+    });
+
     // Validación del formulario antes de enviar
     const form = document.querySelector('form');
     if (form) {

@@ -9,6 +9,12 @@ $search = isset($_GET['search']['value']) ? trim($_GET['search']['value']) : '';
 $orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : 0;
 $orderDir = isset($_GET['order'][0]['dir']) ? $_GET['order'][0]['dir'] : 'asc';
 
+// Soporte para exportar todo el filtrado (DataTables puede enviar length=-1)
+$isExportAll = ($length === -1);
+if ($start < 0) {
+    $start = 0;
+}
+
 $columns = [
     'codigo', 'fecha', 'metodo_pago', 'cliente', 'tipo_paciente', 'referencia', 'total', 'adelanto', 'deuda'
 ];
@@ -53,7 +59,8 @@ $total = (int)$countStmt->fetchColumn();
 
 // Consulta paginada
 $sql = "SELECT 
-        c.codigo AS codigo_cotizacion,
+    c.id AS id_cotizacion,
+    c.codigo AS codigo_cotizacion,
         c.fecha,
         (SELECT GROUP_CONCAT(DISTINCT p3.metodo_pago SEPARATOR ', ') FROM pagos p3 WHERE p3.id_cotizacion = c.id) AS metodo_pago,
         CONCAT(cl.nombre, ' ', cl.apellido) AS cliente,
@@ -75,8 +82,15 @@ $sql = "SELECT
     LEFT JOIN convenios conv ON c.id_convenio = conv.id
     LEFT JOIN empresas emp ON c.id_empresa = emp.id
     $where
-    ORDER BY c.$orderBy $orderDir
-    LIMIT $start, $length";
+    ORDER BY c.$orderBy $orderDir";
+
+if (!$isExportAll) {
+    // Normal: paginación
+    if ($length < 0) {
+        $length = 10;
+    }
+    $sql .= "\n    LIMIT $start, $length";
+}
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -84,6 +98,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $data = [];
 foreach ($rows as $r) {
     $data[] = [
+        'id_cotizacion' => $r['id_cotizacion'],
         'codigo_cotizacion' => $r['codigo_cotizacion'],
         'fecha' => $r['fecha'],
         'metodo_pago' => $r['metodo_pago'],

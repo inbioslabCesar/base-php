@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Evitar listado de directorios
+Options -Indexes
+
 # Redirección 301 a HTTPS (compatible con proxy/CDN), excepto localhost
 RewriteCond %{HTTP_HOST} !^localhost$ [NC]
 RewriteCond %{HTTP_HOST} !^127\.0\.0\.1$ [NC]
@@ -9,6 +12,15 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Bloquear acceso público a vendor (opcional pero recomendado)
 RedirectMatch 404 ^/vendor/.*$
+
+# Bloquear carpetas que no deben ser públicas (no afecta includes PHP)
+RedirectMatch 404 ^/(tmp|sql|scripts|docs|clients)/.*$
+
+# Bloquear acceso directo a configuraciones sensibles dentro de /src
+RedirectMatch 404 ^/src/(config|conexion)/.*$
+
+# Bloquear archivos sensibles en la raíz
+RedirectMatch 404 ^/(composer\.(json|lock)|\.env(\..*)?|\.git(ignore|attributes)?|README\.md|.*\.sql)$
 
 # Cabeceras de seguridad
 <IfModule mod_headers.c>

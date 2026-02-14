@@ -13,10 +13,14 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                 <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Pacientes</a>
                 <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
                 <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
+                <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=estadisticas"><i class="bi bi-bar-chart"></i> Estadística</a>
+                <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=inventario"><i class="bi bi-box-seam"></i> Inventario</a>
             <?php elseif ($_SESSION['rol'] == 'empresa'): ?>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresa"><i class="bi bi-building"></i> Panel Empresa</a>
             <?php elseif ($_SESSION['rol'] == 'recepcionista'): ?>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=recepcionista"><i class="bi bi-person-badge"></i> Panel Recepción</a>
+                <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=estadisticas"><i class="bi bi-bar-chart"></i> Estadística</a>
+                <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=inventario"><i class="bi bi-box-seam"></i> Inventario</a>
             <?php elseif ($_SESSION['rol'] == 'laboratorista'): ?>
                 <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=laboratorista"><i class="bi bi-eyedropper"></i> Panel Laboratorio</a>
             <?php elseif ($_SESSION['rol'] == 'cliente'): ?>
@@ -67,11 +71,15 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                     <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=clientes"><i class="bi bi-person"></i> Pacientes</a>
                     <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=convenios"><i class="bi bi-person"></i> Convenios</a>
                     <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=examenes"><i class="bi bi-person"></i> Examenes</a>
+                    <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=estadisticas"><i class="bi bi-bar-chart"></i> Estadística</a>
+                    <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=inventario"><i class="bi bi-box-seam"></i> Inventario</a>
 
                 <?php elseif ($_SESSION['rol'] == 'empresa'): ?>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=empresa"><i class="bi bi-building"></i> Panel Empresa</a>
                 <?php elseif ($_SESSION['rol'] == 'recepcionista'): ?>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=recepcionista"><i class="bi bi-person-badge"></i> Panel Recepción</a>
+                    <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=estadisticas"><i class="bi bi-bar-chart"></i> Estadística</a>
+                    <a class="nav-link sidebar-link" href="<?= BASE_URL ?>dashboard.php?vista=inventario"><i class="bi bi-box-seam"></i> Inventario</a>
                 <?php elseif ($_SESSION['rol'] == 'laboratorista'): ?>
                     <a class="nav-link" href="<?= BASE_URL ?>dashboard.php?vista=laboratorista"><i class="bi bi-eyedropper"></i> Panel Laboratorio</a>
                 <?php elseif ($_SESSION['rol'] == 'cliente'): ?>

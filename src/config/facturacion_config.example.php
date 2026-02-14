@@ -42,4 +42,11 @@ return [
         'status_factura' => '/api/v1/invoices/{id}/status',
     ],
     'token_ttl_seconds' => 3600,
+    // Habilitador opcional de AI (ejemplo): Claude Haiku 4.5 global
+    // Para usarlo, configura en src/config/ai_config.php
+    'ai' => [
+        'enabled' => true,
+        'provider' => 'anthropic',
+        'model' => 'claude-haiku-4.5',
+    ],
 ];

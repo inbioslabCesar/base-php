@@ -83,7 +83,11 @@ foreach ($rows as $row) {
     $stmt2->execute(['id_examen' => $row['id_examen']]);
     $examen = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-    $adicional = $examen && $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
+    $adicional_src = $row['adicional_snapshot'] ?? null;
+    if ($adicional_src === null || $adicional_src === '') {
+        $adicional_src = $examen['adicional'] ?? null;
+    }
+    $adicional = $adicional_src ? json_decode($adicional_src, true) : [];
     $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
 
     usort($adicional, function ($a, $b) {
@@ -162,6 +166,32 @@ foreach ($rows as $row) {
         }
     };
 
+    // Índice normalizado para compatibilidad cuando cambia el nombre solo en mayúsculas/minúsculas o signos.
+    $resultadosNorm = [];
+    foreach ($resultados_json as $k => $v) {
+        if ($k === 'imprimir_examen') {
+            continue;
+        }
+        $nk = $normKey($k);
+        if ($nk !== '' && !array_key_exists($nk, $resultadosNorm)) {
+            $resultadosNorm[$nk] = $v;
+        }
+    }
+    $getResultado = function ($nombre, $default = '') use ($resultados_json, $resultadosNorm, $normKey) {
+        if (isset($resultados_json[$nombre])) {
+            return $resultados_json[$nombre];
+        }
+        $upper = mb_strtoupper((string) $nombre, 'UTF-8');
+        if (isset($resultados_json[$upper])) {
+            return $resultados_json[$upper];
+        }
+        $nk = $normKey($nombre);
+        if ($nk !== '' && array_key_exists($nk, $resultadosNorm)) {
+            return $resultadosNorm[$nk];
+        }
+        return $default;
+    };
+
     $valores = [];
     $valoresNorm = [];
     $ordered = [];
@@ -174,7 +204,7 @@ foreach ($rows as $row) {
         $nombre = $item['nombre'];
 
         if ($item['tipo'] === 'Parámetro') {
-            $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
+            $valor = $getResultado($nombre, '');
             $valores[$nombre] = $valor;
             $valoresNorm[$normKey($nombre)] = $valor;
             $ordered[] = ['kind' => 'param', 'item' => $item, 'nombre' => $nombre];
@@ -222,8 +252,9 @@ foreach ($rows as $row) {
             if (empty($item['formula'])) {
                 $valor = $formatValor($valor, $item);
             } else {
-                if (($valor === '' || $valor === null) && isset($resultados_json[$nombre]) && $resultados_json[$nombre] !== '') {
-                    $valor = $formatValor($resultados_json[$nombre], $item);
+                $raw = $getResultado($nombre, '');
+                if (($valor === '' || $valor === null) && $raw !== '') {
+                    $valor = $formatValor($raw, $item);
                 }
             }
             $examen_items[] = array_merge($item, [
@@ -232,7 +263,7 @@ foreach ($rows as $row) {
                 'tipo' => 'Parámetro'
             ]);
         } elseif ($entry['kind'] === 'texto') {
-            $valor = isset($resultados_json[$nombre]) ? $resultados_json[$nombre] : '';
+            $valor = $getResultado($nombre, '');
             $examen_items[] = array_merge($item, [
                 'prueba' => $nombre,
                 'valor' => $valor,

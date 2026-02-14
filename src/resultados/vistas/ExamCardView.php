@@ -1,7 +1,7 @@
 
 <?php
 class ExamCardView {
-    public static function render($examen, $index, $datos_paciente = []) {
+    public static function render($examen, $index, $datos_paciente = [], $areas_disponibles = []) {
         $toNullableFloat = function ($value) {
             if ($value === null) {
                 return null;
@@ -17,8 +17,95 @@ class ExamCardView {
             return is_numeric($value) ? floatval($value) : null;
         };
 
+        $normKey = function ($s) {
+            $s = (string) $s;
+            $s = trim($s);
+            if ($s === '') {
+                return '';
+            }
+            $s = preg_replace('/\s+/u', ' ', $s);
+            $s = mb_strtolower($s, 'UTF-8');
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+            if ($ascii !== false && $ascii !== null) {
+                $s = $ascii;
+            }
+            $s = preg_replace('/[^a-z0-9 ]/', '', $s);
+            return $s;
+        };
+
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
+
+        // Índice normalizado para compatibilidad cuando cambian mayúsculas/minúsculas o signos
+        // (ej. "PROLACTINA" vs "Prolactina").
+        $resultadosNorm = [];
+        if (is_array($resultados)) {
+            foreach ($resultados as $k => $v) {
+                if ($k === 'imprimir_examen') {
+                    continue;
+                }
+                $nk = $normKey($k);
+                if ($nk !== '' && !array_key_exists($nk, $resultadosNorm)) {
+                    $resultadosNorm[$nk] = $v;
+                }
+            }
+        }
+
+        $getResultado = function ($nombre, $default = '') use ($resultados, $resultadosNorm, $normKey) {
+            if (!is_array($resultados)) {
+                return $default;
+            }
+            if (array_key_exists($nombre, $resultados)) {
+                return $resultados[$nombre];
+            }
+            $upper = mb_strtoupper((string) $nombre, 'UTF-8');
+            if (array_key_exists($upper, $resultados)) {
+                return $resultados[$upper];
+            }
+            $nk = $normKey($nombre);
+            if ($nk !== '' && array_key_exists($nk, $resultadosNorm)) {
+                return $resultadosNorm[$nk];
+            }
+            return $default;
+        };
+
         $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
+        if (!is_array($adicional)) {
+            $adicional = [];
+        }
+
+        $cabecerasExistentes = [];
+        $posiciones = [];
+        foreach ($adicional as $idx => $it) {
+            $tipo = $it['tipo'] ?? '';
+            $nombre = $it['nombre'] ?? '';
+            if (($tipo === 'Título' || $tipo === 'Subtítulo') && $nombre !== '') {
+                $before = '__END__';
+                if ($idx === 0) {
+                    $before = '__FIRST__';
+                }
+                // Detectar posición actual: "antes de" el siguiente parámetro/campo/texto
+                for ($j = $idx + 1; $j < count($adicional); $j++) {
+                    $t2 = $adicional[$j]['tipo'] ?? '';
+                    if (in_array($t2, ['Parámetro', 'Campo', 'Texto Largo'], true)) {
+                        $n2 = $adicional[$j]['nombre'] ?? '';
+                        if ($n2 !== '') {
+                            $before = $n2;
+                        }
+                        break;
+                    }
+                }
+                $cabecerasExistentes[] = [
+                    'idx' => $idx,
+                    'tipo' => $tipo,
+                    'nombre' => $nombre,
+                    'color_texto' => $it['color_texto'] ?? '#dc2626',
+                    'before' => $before,
+                ];
+            }
+            if (in_array($tipo, ['Parámetro', 'Campo', 'Texto Largo'], true) && $nombre !== '') {
+                $posiciones[] = $nombre;
+            }
+        }
         // Si el examen tiene datos de paciente propios, usarlos; si no, usar los globales
         $edad_paciente = null;
         $sexo_paciente = '';
@@ -55,6 +142,81 @@ class ExamCardView {
             <div class="exam-card-body">
                 <input type="hidden" name="examenes[<?= $examen['id_resultado'] ?>][id_resultado]" 
                        value="<?= htmlspecialchars($examen['id_resultado']) ?>">
+
+                <div class="header-builder" data-exam-id="<?= htmlspecialchars($examen['id_resultado']) ?>">
+                    <div class="header-builder-title">
+                        <i class="bi bi-layout-text-window-reverse me-2"></i>
+                        Cabeceras del reporte (solo para este paciente)
+                    </div>
+
+                    <?php if (!empty($cabecerasExistentes)): ?>
+                        <div class="header-existing">
+                            <?php foreach ($cabecerasExistentes as $h): ?>
+                                <div class="header-existing-row">
+                                    <input type="text" class="form-control form-control-sm" 
+                                           name="examenes[<?= $examen['id_resultado'] ?>][cabeceras_editar][<?= $h['idx'] ?>][nombre]"
+                                           value="<?= htmlspecialchars($h['nombre']) ?>"
+                                           placeholder="Título">
+                                    <input type="color" class="form-control form-control-sm header-color" 
+                                           name="examenes[<?= $examen['id_resultado'] ?>][cabeceras_editar][<?= $h['idx'] ?>][color]"
+                                         value="<?= htmlspecialchars($h['color_texto'] ?: '#0923E1') ?>">
+                                    <select class="form-select form-select-sm" name="examenes[<?= $examen['id_resultado'] ?>][cabeceras_editar][<?= $h['idx'] ?>][before]">
+                                        <option value="__FIRST__" <?= ($h['before'] === '__FIRST__') ? 'selected' : '' ?>>Al inicio</option>
+                                        <?php foreach ($posiciones as $p): ?>
+                                            <option value="<?= htmlspecialchars($p) ?>" <?= ($h['before'] === $p) ? 'selected' : '' ?>>Antes de: <?= htmlspecialchars($p) ?></option>
+                                        <?php endforeach; ?>
+                                        <option value="__END__" <?= ($h['before'] === '__END__') ? 'selected' : '' ?>>Al final</option>
+                                    </select>
+                                    <label class="header-remove">
+                                        <input type="checkbox" value="1" 
+                                               name="examenes[<?= $examen['id_resultado'] ?>][cabeceras_editar][<?= $h['idx'] ?>][eliminar]">
+                                        Quitar
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="header-add">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Nombre</label>
+                                <select class="form-select form-select-sm header-title-select">
+                                    <option value="">-- Seleccionar --</option>
+                                    <?php foreach (($areas_disponibles ?? []) as $a): ?>
+                                        <option value="<?= htmlspecialchars($a) ?>"><?= htmlspecialchars($a) ?></option>
+                                    <?php endforeach; ?>
+                                    <option value="__custom__">Personalizado...</option>
+                                </select>
+                                <input type="text" class="form-control form-control-sm header-title-custom d-none" placeholder="Escribe la cabecera">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label mb-1">Color</label>
+                                <input type="color" class="form-control form-control-sm header-color header-color-new" value="#0923E1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label mb-1">Ubicación</label>
+                                <select class="form-select form-select-sm header-insert-before">
+                                    <option value="__FIRST__">Al inicio del examen</option>
+                                    <?php foreach ($posiciones as $p): ?>
+                                        <option value="<?= htmlspecialchars($p) ?>">Antes de: <?= htmlspecialchars($p) ?></option>
+                                    <?php endforeach; ?>
+                                    <option value="__END__">Al final</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-grid">
+                                <button type="button" class="btn btn-sm btn-outline-primary add-header-btn">
+                                    <i class="bi bi-plus-circle me-1"></i>
+                                    Agregar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="header-preview-list mt-2"></div>
+                        <div class="headers-hidden" data-next-index="0"></div>
+                    </div>
+                </div>
+
                 <?php foreach ($adicional as $item) {
                     if ($item['tipo'] === 'Título') {
                         echo '<div class="title-section" style="background: ' . (isset($item['color_fondo']) ? $item['color_fondo'] : 'var(--primary-gradient)') . '; color: ' . (isset($item['color_texto']) ? $item['color_texto'] : 'white') . ';">
@@ -75,7 +237,7 @@ class ExamCardView {
                             <input type="text"
                                 class="form-control"
                                 name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']"
-                                value="' . htmlspecialchars($resultados[$item['nombre']] ?? '') . '"
+                                value="' . htmlspecialchars($getResultado($item['nombre'], '')) . '"
                                 placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">
                         </div>';
                     } elseif ($item['tipo'] === 'Texto Largo') {
@@ -85,7 +247,7 @@ class ExamCardView {
                                 <i class="bi bi-textarea-t me-2"></i>
                                 ' . htmlspecialchars($item['nombre']) . '
                             </label>
-                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($resultados[$item['nombre']] ?? '') . '</textarea>
+                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($getResultado($item['nombre'], '')) . '</textarea>
                         </div>';
                     } elseif ($item['tipo'] === 'Parámetro') {
                         // Refuerza la lógica: si no hay edad o sexo, nunca aplica
@@ -105,7 +267,7 @@ class ExamCardView {
                                 }
                             }
                         }
-                        $valor_resultado = isset($resultados[$item['nombre']]) ? $resultados[$item['nombre']] : '';
+                        $valor_resultado = $getResultado($item['nombre'], '');
                         $valor_resultado_num = str_replace(',', '', $valor_resultado);
                         $fuera_rango = false;
                         if ($referencia_aplicada && is_numeric($valor_resultado_num)) {
@@ -125,10 +287,11 @@ class ExamCardView {
                         }
                         echo '</label>';
                         if (!empty($item['opciones'])) {
+                            $valorSelect = $getResultado($item['nombre'], '');
                             echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control">
                                     <option value="">Seleccione una opción...</option>';
                             foreach ($item['opciones'] as $opcion) {
-                                echo '<option value="' . htmlspecialchars($opcion) . '"' . ((isset($resultados[$item['nombre']]) && $resultados[$item['nombre']] == $opcion) ? ' selected' : '') . '>' . htmlspecialchars($opcion) . '</option>';
+                                echo '<option value="' . htmlspecialchars($opcion) . '"' . (($valorSelect !== '' && $valorSelect == $opcion) ? ' selected' : '') . '>' . htmlspecialchars($opcion) . '</option>';
                             }
                             echo '</select>';
                         } else {
@@ -138,7 +301,7 @@ class ExamCardView {
                             } else {
                                 echo '<i class="bi bi-123"></i>';
                             }
-                            $value = $resultados[$item['nombre']] ?? '';
+                            $value = $getResultado($item['nombre'], '');
                             // Formatea con coma si es numérico y mayor a 999
                             if (is_numeric(str_replace(',', '', $value)) && $value !== '' && floatval(str_replace(',', '', $value)) >= 1000) {
                                 $value = number_format(str_replace(',', '', $value), 0, '.', ',');

@@ -8,6 +8,21 @@ $msg = $_GET['msg'] ?? '';
 $totalPagado = 0;
 $saldo = 0;
 $isPagada = false;
+$hayCajaAbierta = false;
+
+try {
+    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cajas'");
+    $stmtTbl->execute();
+    $tieneTablaCajas = ((int)$stmtTbl->fetchColumn() > 0);
+    if ($tieneTablaCajas) {
+        $stmtCaja = $pdo->prepare("SELECT id FROM cajas WHERE estado = 'abierta' ORDER BY fecha_hora_apertura DESC LIMIT 1");
+        $stmtCaja->execute();
+        $hayCajaAbierta = (bool)$stmtCaja->fetchColumn();
+    }
+} catch (\Throwable $e) {
+    $hayCajaAbierta = false;
+}
+
 if ($idCotizacion) {
     $stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
     $stmt->execute([$idCotizacion]);
@@ -182,6 +197,28 @@ if ($idCotizacion) {
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
+            <?php elseif ($msg == "no_caja" || (!$hayCajaAbierta && !$isPagada)): ?>
+                <div class="alert alert-warning alert-modern d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                    <div>
+                        <i class="bi bi-exclamation-octagon me-2"></i>
+                        No hay caja abierta. Para registrar pagos debes abrir una caja primero.
+                    </div>
+                    <a href="dashboard.php?vista=contabilidad" class="btn btn-dark btn-sm">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>
+                        Ir a Contabilidad
+                    </a>
+                </div>
+            <?php elseif ($msg == "no_caja_tablas"): ?>
+                <div class="alert alert-warning alert-modern d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                    <div>
+                        <i class="bi bi-database-exclamation me-2"></i>
+                        Falta configurar tablas de caja. Ejecuta el script SQL de caja antes de registrar pagos.
+                    </div>
+                    <a href="dashboard.php?vista=contabilidad" class="btn btn-dark btn-sm">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>
+                        Ir a Contabilidad
+                    </a>
+                </div>
             <?php elseif ($msg == "success"): ?>
                 <div class="alert alert-success alert-modern">
                     <i class="bi bi-check-circle me-2"></i>
@@ -269,7 +306,7 @@ if ($idCotizacion) {
                 </div>
 
                 <!-- Formulario de pago -->
-                <?php if ($saldo > 0): ?>
+                <?php if ($saldo > 0 && $hayCajaAbierta): ?>
                     <form method="post" action="dashboard.php?action=pago_cotizacion_guardar" class="p-4" id="formPago">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($idCotizacion) ?>">
                         
@@ -307,7 +344,7 @@ if ($idCotizacion) {
                                     <option value="efectivo">💵 Efectivo</option>
                                     <option value="tarjeta">💳 Tarjeta</option>
                                     <option value="transferencia">🏦 Transferencia</option>
-                                    <option value="yape">📱 Yape</option>
+                                    <option value="yape">📱 Yape/Plin</option>
                                     <option value="descarga_anticipada">⏰ Descarga anticipada (pago pendiente)</option>
                                 </select>
                             </div>
@@ -339,6 +376,16 @@ if ($idCotizacion) {
                             </div>
                         </div>
                     </form>
+                <?php elseif ($saldo > 0 && !$hayCajaAbierta): ?>
+                    <div class="payment-info text-center">
+                        <i class="bi bi-safe2 display-4 text-warning mb-3"></i>
+                        <h4 class="text-warning">Caja cerrada</h4>
+                        <p class="mb-3">No se pueden registrar pagos hasta abrir caja.</p>
+                        <a href="dashboard.php?vista=contabilidad" class="btn btn-warning-modern">
+                            <i class="bi bi-box-arrow-up-right me-2"></i>
+                            Abrir Caja en Contabilidad
+                        </a>
+                    </div>
                 <?php else: ?>
                     <div class="payment-info text-center">
                         <i class="bi bi-check-circle-fill display-4 text-success mb-3"></i>
@@ -411,7 +458,7 @@ if ($idCotizacion) {
                                                         'efectivo' => '💵 Efectivo',
                                                         'tarjeta' => '💳 Tarjeta',
                                                         'transferencia' => '🏦 Transferencia',
-                                                        'yape' => '📱 Yape',
+                                                        'yape' => '📱 Yape/Plin',
                                                         'descarga_anticipada' => '⏰ Descarga Anticipada'
                                                     ];
                                                     echo $metodos[$pago['metodo_pago']] ?? ucfirst(str_replace('_', ' ', $pago['metodo_pago']));

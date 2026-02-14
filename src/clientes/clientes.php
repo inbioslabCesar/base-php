@@ -631,6 +631,7 @@ $(document).ready(function() {
                     let btns = `<div class='btn-group gap-2' role='group' style='display: flex;'>`;
                     btns += `<a href='dashboard.php?vista=form_cliente&id=${row.id}' class='btn btn-warning btn-sm' title='Editar'><i class='bi bi-pencil-square'></i></a>`;
                     btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm(\"¿Seguro de eliminar este paciente?\");'><i class='bi bi-trash'></i></a>`;
+                    btns += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id}' class='btn btn-info btn-sm' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
                     <?php if (in_array($rol, ['admin', 'recepcionista'])): ?>
                     btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
                     <?php endif; ?>
@@ -667,6 +668,7 @@ function renderClienteCard(cliente) {
     let acciones = `<div class='d-flex gap-2'>`;
     acciones += `<a href='dashboard.php?vista=form_cliente&id=${cliente.id}' class='action-btn btn-edit' title='Editar'><i class='bi bi-pencil-square'></i>Editar</a>`;
     acciones += `<a href='clientes/eliminar.php?id=${cliente.id}' class='action-btn btn-delete' title='Eliminar' onclick='return confirm(\'¿Estás seguro de eliminar este paciente?\');'><i class='bi bi-trash'></i>Eliminar</a>`;
+    acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${cliente.id}' class='action-btn btn-cotizar' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i>Comparar</a>`;
     acciones += `</div>`;
     if (rolUsuario === 'admin' || rolUsuario === 'recepcionista') {
         acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${cliente.id}' class='action-btn btn-cotizar' title='Crear Cotización'><i class='bi bi-file-earmark-plus me-1'></i>Cotizar</a>`;

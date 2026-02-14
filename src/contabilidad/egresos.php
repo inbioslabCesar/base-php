@@ -1,4 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../conexion/conexion.php';
 
 // Filtros por fecha (por defecto mes actual)
@@ -7,29 +11,75 @@ $hasta = $_GET['hasta'] ?? date('Y-m-d');
 
 // Registrar egreso si se envió el formulario
 $msg = '';
+$msgTipo = 'info';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $monto = floatval($_POST['monto'] ?? 0);
     $descripcion = trim($_POST['descripcion'] ?? '');
     $fecha = $_POST['fecha'] ?? date('Y-m-d');
     if ($monto > 0 && $descripcion !== '') {
-        $stmt = $pdo->prepare("INSERT INTO egresos (monto, descripcion, fecha) VALUES (?, ?, ?)");
-        $stmt->execute([$monto, $descripcion, $fecha]);
-        $msg = "Egreso registrado correctamente.";
+        $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cajas'");
+        $stmtTbl->execute();
+        $tieneTablaCajas = ((int)$stmtTbl->fetchColumn() > 0);
+
+        if (!$tieneTablaCajas) {
+            $msg = "Falta crear tablas de caja. Ejecuta sql/agregar_tablas_caja.sql (y si ya existían, sql/actualizar_caja_robusta.sql).";
+            $msgTipo = 'warning';
+        } else {
+            $stmtCaja = $pdo->prepare("SELECT id FROM cajas WHERE estado = 'abierta' ORDER BY fecha_hora_apertura DESC LIMIT 1");
+            $stmtCaja->execute();
+            $cajaAbiertaId = (int)$stmtCaja->fetchColumn();
+
+            if ($cajaAbiertaId <= 0) {
+                $msg = "No hay caja abierta. Abre una caja en Contabilidad para registrar egresos.";
+                $msgTipo = 'warning';
+            } else {
+                $pdo->beginTransaction();
+                $stmt = $pdo->prepare("INSERT INTO egresos (monto, descripcion, fecha) VALUES (?, ?, ?)");
+                $stmt->execute([$monto, $descripcion, $fecha]);
+                $idEgreso = (int)$pdo->lastInsertId();
+
+                $stmtMovTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_movimientos'");
+                $stmtMovTbl->execute();
+                $existsMov = (int)$stmtMovTbl->fetchColumn() > 0;
+
+                if ($existsMov) {
+                    $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+                    $stmtMov = $pdo->prepare("INSERT INTO caja_movimientos (caja_id, tipo, origen, metodo_pago, monto, afecta_efectivo, referencia_tipo, referencia_id, descripcion, usuario_id, fecha_hora) VALUES (?, 'egreso', 'egreso_manual', 'efectivo', ?, 1, 'egreso', ?, ?, ?, NOW())");
+                    $stmtMov->execute([
+                        $cajaAbiertaId,
+                        $monto,
+                        $idEgreso,
+                        $descripcion,
+                        $usuarioId > 0 ? $usuarioId : null,
+                    ]);
+                }
+
+                $pdo->commit();
+                $msg = "Egreso registrado correctamente.";
+                $msgTipo = 'success';
+            }
+        }
     } else {
         $msg = "Completa todos los campos correctamente.";
+        $msgTipo = 'danger';
     }
 }
 
 // Consultar egresos filtrados
 $stmt = $pdo->prepare("SELECT id, monto, descripcion, fecha FROM egresos WHERE DATE(fecha) BETWEEN ? AND ? ORDER BY fecha DESC");
 $stmt->execute([$desde, $hasta]);
-$egresos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$egresos = $stmt->fetchAll();
 ?>
 <div class="container mt-4">
     <h3 class="mb-4">Registro y Listado de Egresos</h3>
 
     <?php if ($msg): ?>
-        <div class="alert alert-info"><?= htmlspecialchars($msg) ?></div>
+        <div class="alert alert-<?= htmlspecialchars($msgTipo) ?> d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span><?= htmlspecialchars($msg) ?></span>
+            <?php if ($msgTipo === 'warning'): ?>
+                <a href="dashboard.php?vista=contabilidad" class="btn btn-sm btn-dark">Ir a Contabilidad</a>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
 
     <form method="get" class="row g-2 align-items-end mb-3">
