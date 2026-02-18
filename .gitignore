@@ -9,6 +9,9 @@
 # Facturacion config (local secrets)
 /src/config/facturacion_config.php
 
+# WhatsApp local secrets
+/scripts/.whatsapp.env
+
 # OS / editor
 .DS_Store
 Thumbs.db
