@@ -39,7 +39,8 @@ $gananciaHoy = $ingresosHoy - $egresosHoy;
 $stmt = $pdo->query("
     SELECT SUM(c.total - IFNULL((SELECT SUM(p.monto) FROM pagos p WHERE p.id_cotizacion = c.id), 0)) AS deuda_total
     FROM cotizaciones c
-    WHERE (c.total - IFNULL((SELECT SUM(p.monto) FROM pagos p WHERE p.id_cotizacion = c.id), 0)) > 0
+        WHERE (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
+            AND (c.total - IFNULL((SELECT SUM(p.monto) FROM pagos p WHERE p.id_cotizacion = c.id), 0)) > 0
 ");
 $deudaTotal = floatval($stmt->fetchColumn());
 

@@ -18,12 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->beginTransaction();
         
         // Obtener el total actual
-        $stmt = $pdo->prepare("SELECT total FROM cotizaciones WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT total, estado_pago FROM cotizaciones WHERE id = ?");
         $stmt->execute([$id_cotizacion]);
         $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$cotizacion) {
             throw new Exception("Cotización no encontrada");
+        }
+
+        if (isset($cotizacion['estado_pago']) && strtolower((string)$cotizacion['estado_pago']) === 'anulada') {
+            throw new Exception("No se puede modificar una cotización anulada");
         }
         
         $total_anterior = $cotizacion['total'];

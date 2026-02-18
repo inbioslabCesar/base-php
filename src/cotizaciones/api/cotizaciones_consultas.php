@@ -14,6 +14,7 @@ $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente
         LEFT JOIN convenios v ON c.id_convenio = v.id";
 $condiciones = [];
 $params = [];
+$condiciones[] = "(c.estado_pago IS NULL OR c.estado_pago <> 'anulada')";
 if ($dniFiltro !== '') {
     $condiciones[] = "cl.dni LIKE ?";
     $params[] = "%$dniFiltro%";

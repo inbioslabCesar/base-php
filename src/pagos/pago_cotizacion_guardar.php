@@ -35,12 +35,17 @@ $metodo = $_POST['metodo'] ?? '';
 $fecha_pago = $_POST['fecha_pago'] ?? date('Y-m-d');
 
 // Consulta la cotización
-$stmt = $pdo->prepare("SELECT total FROM cotizaciones WHERE id = ?");
+$stmt = $pdo->prepare("SELECT total, estado_pago FROM cotizaciones WHERE id = ?");
 $stmt->execute([$idCotizacion]);
 $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$cotizacion) {
     header("Location: dashboard.php?vista=cotizaciones&error=1");
+    exit;
+}
+
+if (isset($cotizacion['estado_pago']) && strtolower((string)$cotizacion['estado_pago']) === 'anulada') {
+    header("Location: dashboard.php?vista=pago_cotizacion&id=$idCotizacion&msg=anulada");
     exit;
 }
 

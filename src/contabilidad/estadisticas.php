@@ -59,10 +59,43 @@ if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
             </tbody>
         </table>
     </div>
+    <div class="d-flex justify-content-between align-items-center gap-2 mt-2" id="estPaginationWrap" style="display:none !important;">
+        <div class="d-flex align-items-center gap-2">
+            <small class="text-muted">Mostrar</small>
+            <select id="estPageSize" class="form-select form-select-sm" style="width:90px;">
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="estPrev">Anterior</button>
+            <small class="text-muted" id="estPageInfo">Página 1 de 1</small>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="estNext">Siguiente</button>
+        </div>
+    </div>
 </div>
 
 <script>
 (function() {
+    const storageKeyPageSize = 'estadisticas_examenes_page_size';
+    let currentPage = 1;
+    let rowsCache = [];
+
+    const pageSizeSelect = document.getElementById('estPageSize');
+    const pageWrap = document.getElementById('estPaginationWrap');
+    const pageInfo = document.getElementById('estPageInfo');
+    const btnPrev = document.getElementById('estPrev');
+    const btnNext = document.getElementById('estNext');
+
+    try {
+        const saved = localStorage.getItem(storageKeyPageSize);
+        if (saved && pageSizeSelect.querySelector('option[value="' + saved + '"]')) {
+            pageSizeSelect.value = saved;
+        }
+    } catch (e) {
+    }
+
     function buildExportUrl(format) {
         const month = document.getElementById('monthPick').value;
         const top10 = document.getElementById('chkTop10').checked ? '1' : '0';
@@ -92,6 +125,45 @@ if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
         document.getElementById('estBody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Cargando...</td></tr>';
         document.getElementById('estTotalCantidad').textContent = '—';
         document.getElementById('estTotalMonto').textContent = '—';
+        if (pageWrap) {
+            pageWrap.style.display = 'none';
+        }
+    }
+
+    function renderPagination() {
+        const body = document.getElementById('estBody');
+        const pageSize = Math.max(10, parseInt(pageSizeSelect.value || '10', 10));
+        const totalRows = rowsCache.length;
+        const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+
+        if (totalRows === 0) {
+            body.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Sin datos para este mes</td></tr>';
+            pageWrap.style.display = 'none';
+            return;
+        }
+
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageRows = rowsCache.slice(start, end);
+
+        body.innerHTML = pageRows.map(r => {
+            const examen = (r.examen || '').toString();
+            const cantidad = Number(r.cantidad || 0);
+            const monto = Number(r.monto || 0);
+            return '<tr>' +
+                '<td>' + examen.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>' +
+                '<td class="text-end">' + cantidad.toLocaleString('es-PE') + '</td>' +
+                '<td class="text-end">' + formatMoney(monto) + '</td>' +
+            '</tr>';
+        }).join('');
+
+        pageWrap.style.display = 'flex';
+        pageInfo.textContent = 'Página ' + currentPage + ' de ' + totalPages;
+        btnPrev.disabled = currentPage <= 1;
+        btnNext.disabled = currentPage >= totalPages;
     }
 
     async function cargar() {
@@ -119,25 +191,42 @@ if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
             if (top10 && rows.length > 10) {
                 rows = rows.slice(0, 10);
             }
-            if (!rows.length) {
-                document.getElementById('estBody').innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Sin datos para este mes</td></tr>';
-                return;
-            }
 
-            document.getElementById('estBody').innerHTML = rows.map(r => {
-                const examen = (r.examen || '').toString();
-                const cantidad = Number(r.cantidad || 0);
-                const monto = Number(r.monto || 0);
-                return '<tr>' +
-                    '<td>' + examen.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>' +
-                    '<td class="text-end">' + cantidad.toLocaleString('es-PE') + '</td>' +
-                    '<td class="text-end">' + formatMoney(monto) + '</td>' +
-                '</tr>';
-            }).join('');
+            rowsCache = rows;
+            currentPage = 1;
+            renderPagination();
         } catch (e) {
             document.getElementById('estBody').innerHTML = '<tr><td colspan="3" class="text-center text-danger py-4">Error al cargar la estadística</td></tr>';
+            if (pageWrap) {
+                pageWrap.style.display = 'none';
+            }
         }
     }
+
+    pageSizeSelect.addEventListener('change', function() {
+        currentPage = 1;
+        try {
+            localStorage.setItem(storageKeyPageSize, pageSizeSelect.value);
+        } catch (e) {
+        }
+        renderPagination();
+    });
+
+    btnPrev.addEventListener('click', function() {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPagination();
+        }
+    });
+
+    btnNext.addEventListener('click', function() {
+        const pageSize = Math.max(10, parseInt(pageSizeSelect.value || '10', 10));
+        const totalPages = Math.max(1, Math.ceil(rowsCache.length / pageSize));
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderPagination();
+        }
+    });
 
     document.getElementById('btnCargarEst').addEventListener('click', cargar);
     document.getElementById('monthPick').addEventListener('change', cargar);

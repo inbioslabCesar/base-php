@@ -165,7 +165,7 @@ if ($esEdicion) {
                 <i class="bi bi-layout-text-window-reverse"></i> Compacta
             </button>
             <button type="submit" class="btn btn-primary" id="mobileSaveFormat">
-                <i class="bi bi-check2-circle"></i> Guardar
+                <i class="bi bi-check2-circle"></i> <?= $esEdicion ? 'Actualizar' : 'Guardar' ?>
             </button>
         </div>
     </form>

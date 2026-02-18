@@ -16,22 +16,22 @@ $filtroQ = trim((string)($_GET['q'] ?? ''));
 $filtroCategoria = trim((string)($_GET['categoria'] ?? 'todos'));
 $filtroEstado = trim((string)($_GET['estado_stock'] ?? 'todos'));
 $paginaItems = max(1, (int)($_GET['page'] ?? 1));
-$itemsPorPaginaSolicitado = (int)($_GET['per_page'] ?? 10);
-$itemsPorPaginaPermitidos = [10, 20, 50];
+$itemsPorPaginaSolicitado = (int)($_GET['per_page'] ?? 3);
+$itemsPorPaginaPermitidos = [3, 5, 10];
 $usaPerPageUsuario = isset($_GET['per_page_user']) && (int)$_GET['per_page_user'] === 1;
-$itemsPorPagina = ($usaPerPageUsuario && in_array($itemsPorPaginaSolicitado, $itemsPorPaginaPermitidos, true)) ? $itemsPorPaginaSolicitado : 10;
+$itemsPorPagina = ($usaPerPageUsuario && in_array($itemsPorPaginaSolicitado, $itemsPorPaginaPermitidos, true)) ? $itemsPorPaginaSolicitado : 3;
 $totalItemsTabla = 0;
 $totalPaginasItems = 1;
 $paginaLotes = max(1, (int)($_GET['page_lotes'] ?? 1));
-$lotesPorPaginaSolicitado = (int)($_GET['per_page_lotes'] ?? 5);
-$lotesPorPaginaPermitidos = [5, 10, 20];
-$lotesPorPagina = in_array($lotesPorPaginaSolicitado, $lotesPorPaginaPermitidos, true) ? $lotesPorPaginaSolicitado : 5;
+$lotesPorPaginaSolicitado = (int)($_GET['per_page_lotes'] ?? 3);
+$lotesPorPaginaPermitidos = [3, 5, 10];
+$lotesPorPagina = in_array($lotesPorPaginaSolicitado, $lotesPorPaginaPermitidos, true) ? $lotesPorPaginaSolicitado : 3;
 $totalLotesPorVencer = 0;
 $totalPaginasLotes = 1;
 $paginaMovimientos = max(1, (int)($_GET['page_mov'] ?? 1));
-$movimientosPorPaginaSolicitado = (int)($_GET['per_page_mov'] ?? 10);
-$movimientosPorPaginaPermitidos = [5, 10, 20];
-$movimientosPorPagina = in_array($movimientosPorPaginaSolicitado, $movimientosPorPaginaPermitidos, true) ? $movimientosPorPaginaSolicitado : 10;
+$movimientosPorPaginaSolicitado = (int)($_GET['per_page_mov'] ?? 3);
+$movimientosPorPaginaPermitidos = [3, 5, 10];
+$movimientosPorPagina = in_array($movimientosPorPaginaSolicitado, $movimientosPorPaginaPermitidos, true) ? $movimientosPorPaginaSolicitado : 3;
 $totalMovimientos = 0;
 $totalPaginasMovimientos = 1;
 $editarId = isset($_GET['editar_id']) ? (int)$_GET['editar_id'] : 0;
@@ -39,6 +39,7 @@ $itemEditar = null;
 $hasMarcaCol = false;
 $hasPresentacionCol = false;
 $hasFactorPresentacionCol = false;
+$hasCreatedAtCol = false;
 
 try {
     $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_lotes','inventario_movimientos')");
@@ -52,6 +53,10 @@ try {
         $hasMarcaCol = in_array('marca', $cols, true);
         $hasPresentacionCol = in_array('presentacion', $cols, true);
         $hasFactorPresentacionCol = in_array('factor_presentacion', $cols, true);
+
+        $stmtColCreatedAt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME = 'created_at'");
+        $stmtColCreatedAt->execute();
+        $hasCreatedAtCol = ((int)$stmtColCreatedAt->fetchColumn() > 0);
 
         if ($editarId > 0) {
             $sqlEditar = "SELECT id, codigo, nombre, categoria, " .
@@ -92,7 +97,15 @@ try {
             $params[] = $filtroCategoria;
         }
 
-        $sqlItems = "SELECT
+        $whereSqlItems = !empty($where) ? (' WHERE ' . implode(' AND ', $where)) : '';
+        $estadoParams = [];
+        $whereEstadoSql = '';
+        if (in_array($filtroEstado, ['sin_stock', 'critico', 'bajo', 'ok'], true)) {
+            $whereEstadoSql = ' WHERE t.estado_stock = ?';
+            $estadoParams[] = $filtroEstado;
+        }
+
+        $sqlItemsBase = "SELECT
             i.id,
             i.codigo,
             i.nombre,
@@ -104,68 +117,90 @@ try {
             i.stock_minimo,
             i.stock_critico,
             i.activo,
-            IFNULL(SUM(l.cantidad_actual),0) AS stock_actual
+            " . ($hasCreatedAtCol ? "i.created_at" : "NULL AS created_at") . ",
+            IFNULL(SUM(l.cantidad_actual),0) AS stock_actual,
+            CASE
+                WHEN IFNULL(SUM(l.cantidad_actual),0) <= 0 THEN 'sin_stock'
+                WHEN IFNULL(SUM(l.cantidad_actual),0) <= i.stock_critico AND i.stock_critico > 0 THEN 'critico'
+                WHEN IFNULL(SUM(l.cantidad_actual),0) <= i.stock_minimo AND i.stock_minimo > 0 THEN 'bajo'
+                ELSE 'ok'
+            END AS estado_stock
         FROM inventario_items i
-        LEFT JOIN inventario_lotes l ON l.item_id = i.id
-        GROUP BY i.id, i.codigo, i.nombre, i.categoria, " .
+        LEFT JOIN inventario_lotes l ON l.item_id = i.id" .
+        $whereSqlItems .
+        " GROUP BY i.id, i.codigo, i.nombre, i.categoria, " .
             ($hasMarcaCol ? "i.marca, " : "") .
             ($hasPresentacionCol ? "i.presentacion, " : "") .
             ($hasFactorPresentacionCol ? "i.factor_presentacion, " : "") .
+            ($hasCreatedAtCol ? "i.created_at, " : "") .
             "i.unidad_medida, i.stock_minimo, i.stock_critico, i.activo";
 
-        if (!empty($where)) {
-            $sqlItems .= " HAVING " . implode(' AND ', array_map(function ($cond) {
-                return str_replace('i.', '', $cond);
-            }, $where));
-        }
+        $sqlCountItems = "SELECT COUNT(*) FROM (" . $sqlItemsBase . ") t" . $whereEstadoSql;
+        $stmtCountItems = $pdo->prepare($sqlCountItems);
+        $stmtCountItems->execute(array_merge($params, $estadoParams));
+        $totalItemsTabla = (int)$stmtCountItems->fetchColumn();
 
-        $sqlItems .= " ORDER BY i.nombre ASC";
+        $sqlResumenItems = "SELECT
+            IFNULL(SUM(CASE WHEN t.activo = 1 THEN 1 ELSE 0 END),0) AS items_activos,
+            IFNULL(SUM(CASE WHEN t.estado_stock = 'critico' THEN 1 ELSE 0 END),0) AS stock_critico,
+            IFNULL(SUM(CASE WHEN t.estado_stock = 'sin_stock' THEN 1 ELSE 0 END),0) AS sin_stock
+            FROM (" . $sqlItemsBase . ") t" . $whereEstadoSql;
+        $stmtResumenItems = $pdo->prepare($sqlResumenItems);
+        $stmtResumenItems->execute(array_merge($params, $estadoParams));
+        $rowResumenItems = $stmtResumenItems->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $resumen['items_activos'] = (int)($rowResumenItems['items_activos'] ?? 0);
+        $resumen['stock_critico'] = (int)($rowResumenItems['stock_critico'] ?? 0);
+        $resumen['sin_stock'] = (int)($rowResumenItems['sin_stock'] ?? 0);
 
-        $stmtItems = $pdo->prepare($sqlItems);
-        $stmtItems->execute($params);
-        $rowsItems = $stmtItems->fetchAll(\PDO::FETCH_ASSOC);
-
-        foreach ($rowsItems as $r) {
-            $stockActual = round((float)($r['stock_actual'] ?? 0), 2);
-            $stockMinimo = round((float)($r['stock_minimo'] ?? 0), 2);
-            $stockCritico = round((float)($r['stock_critico'] ?? 0), 2);
-
-            $estadoStock = 'ok';
-            if ($stockActual <= 0) {
-                $estadoStock = 'sin_stock';
-            } elseif ($stockActual <= $stockCritico && $stockCritico > 0) {
-                $estadoStock = 'critico';
-            } elseif ($stockActual <= $stockMinimo && $stockMinimo > 0) {
-                $estadoStock = 'bajo';
-            }
-
-            if ($filtroEstado !== 'todos' && $filtroEstado !== $estadoStock) {
-                continue;
-            }
-
-            $r['stock_actual'] = $stockActual;
-            $r['estado_stock'] = $estadoStock;
-            $r['marca'] = $r['marca'] ?? null;
-            $r['presentacion'] = $r['presentacion'] ?? null;
-            $r['factor_presentacion'] = isset($r['factor_presentacion']) ? (float)$r['factor_presentacion'] : 1.0;
-            $items[] = $r;
-
-            if ((int)$r['activo'] === 1) {
-                $itemsActivos[] = $r;
-            }
-
-            $resumen['items_activos'] += ((int)$r['activo'] === 1) ? 1 : 0;
-            $resumen['stock_critico'] += ($estadoStock === 'critico') ? 1 : 0;
-            $resumen['sin_stock'] += ($estadoStock === 'sin_stock') ? 1 : 0;
-        }
-
-        $totalItemsTabla = count($items);
         $totalPaginasItems = max(1, (int)ceil($totalItemsTabla / $itemsPorPagina));
         if ($paginaItems > $totalPaginasItems) {
             $paginaItems = $totalPaginasItems;
         }
         $offsetItems = ($paginaItems - 1) * $itemsPorPagina;
-        $items = array_slice($items, $offsetItems, $itemsPorPagina);
+        $orderItemsSql = $hasCreatedAtCol
+            ? ' ORDER BY t.created_at DESC, t.id DESC'
+            : ' ORDER BY t.id DESC';
+
+        $sqlItemsPage = "SELECT t.* FROM (" . $sqlItemsBase . ") t" .
+            $whereEstadoSql .
+            $orderItemsSql .
+            " LIMIT ? OFFSET ?";
+        $stmtItemsPage = $pdo->prepare($sqlItemsPage);
+        $bindPos = 1;
+        foreach ($params as $param) {
+            $stmtItemsPage->bindValue($bindPos++, $param);
+        }
+        foreach ($estadoParams as $param) {
+            $stmtItemsPage->bindValue($bindPos++, $param);
+        }
+        $stmtItemsPage->bindValue($bindPos++, $itemsPorPagina, \PDO::PARAM_INT);
+        $stmtItemsPage->bindValue($bindPos++, $offsetItems, \PDO::PARAM_INT);
+        $stmtItemsPage->execute();
+        $rowsItems = $stmtItemsPage->fetchAll(\PDO::FETCH_ASSOC);
+
+        foreach ($rowsItems as $r) {
+            $r['stock_actual'] = round((float)($r['stock_actual'] ?? 0), 2);
+            $r['marca'] = $r['marca'] ?? null;
+            $r['presentacion'] = $r['presentacion'] ?? null;
+            $r['factor_presentacion'] = isset($r['factor_presentacion']) ? (float)$r['factor_presentacion'] : 1.0;
+            $items[] = $r;
+        }
+
+        $sqlItemsActivos = "SELECT
+            i.id,
+            i.codigo,
+            i.nombre,
+            " . ($hasMarcaCol ? "i.marca" : "NULL AS marca") . ",
+            " . ($hasPresentacionCol ? "i.presentacion" : "NULL AS presentacion") . ",
+            " . ($hasFactorPresentacionCol ? "i.factor_presentacion" : "1 AS factor_presentacion") . ",
+            i.unidad_medida,
+            i.activo
+        FROM inventario_items i
+        WHERE i.activo = 1
+        ORDER BY i.nombre ASC";
+        $stmtItemsActivos = $pdo->prepare($sqlItemsActivos);
+        $stmtItemsActivos->execute();
+        $itemsActivos = $stmtItemsActivos->fetchAll(\PDO::FETCH_ASSOC);
 
         $stmtCountVencer = $pdo->query("SELECT COUNT(*)
             FROM inventario_lotes l
@@ -254,7 +289,12 @@ function label_tipo_mov(string $tipo): string
             <h3 class="mb-1">Inventario de Reactivos e Insumos</h3>
             <small class="text-muted">Control de stock, lotes, vencimientos y movimientos</small>
         </div>
-        <span class="badge bg-dark">MVP Inventario</span>
+        <div class="d-flex gap-2">
+            <a href="dashboard.php?vista=inventario_interno" class="btn btn-outline-dark btn-sm">
+                <i class="bi bi-diagram-3"></i> Inventario Interno
+            </a>
+            <span class="badge bg-dark d-flex align-items-center">MVP Inventario</span>
+        </div>
     </div>
 
     <?php if (!$tablesReady): ?>
@@ -421,6 +461,9 @@ function label_tipo_mov(string $tipo): string
                 <form method="get" class="row g-2 align-items-end mb-3" autocomplete="off">
                     <input type="hidden" name="vista" value="inventario">
                     <input type="hidden" name="per_page_user" value="1">
+                    <?php if ($itemEditar): ?>
+                        <input type="hidden" name="editar_id" value="<?= (int)$itemEditar['id'] ?>">
+                    <?php endif; ?>
                     <div class="col-md-3">
                         <label class="form-label">Buscar</label>
                         <input type="text" name="q" value="<?= htmlspecialchars($filtroQ) ?>" class="form-control" placeholder="Código o nombre">
@@ -447,9 +490,9 @@ function label_tipo_mov(string $tipo): string
                     <div class="col-md-2">
                         <label class="form-label">Por página</label>
                         <select name="per_page" class="form-select" id="inventarioPerPage" data-current="<?= (int)$itemsPorPagina ?>">
+                            <option value="3" <?= $itemsPorPagina === 3 ? 'selected' : '' ?>>3</option>
+                            <option value="5" <?= $itemsPorPagina === 5 ? 'selected' : '' ?>>5</option>
                             <option value="10" <?= $itemsPorPagina === 10 ? 'selected' : '' ?>>10</option>
-                            <option value="20" <?= $itemsPorPagina === 20 ? 'selected' : '' ?>>20</option>
-                            <option value="50" <?= $itemsPorPagina === 50 ? 'selected' : '' ?>>50</option>
                         </select>
                     </div>
                     <div class="col-md-3 d-grid">
@@ -497,7 +540,20 @@ function label_tipo_mov(string $tipo): string
                                         <td><?= number_format((float)$it['stock_critico'], 2) ?></td>
                                         <td><span class="badge <?= badge_estado_stock((string)$it['estado_stock']) ?>"><?= htmlspecialchars(label_estado_stock((string)$it['estado_stock'])) ?></span></td>
                                         <td>
-                                            <a href="dashboard.php?vista=inventario&editar_id=<?= (int)$it['id'] ?>" class="btn btn-sm btn-outline-warning" title="Editar ítem">
+                                            <a href="dashboard.php?<?= htmlspecialchars(http_build_query([
+                                                'vista' => 'inventario',
+                                                'editar_id' => (int)$it['id'],
+                                                'q' => $filtroQ,
+                                                'categoria' => $filtroCategoria,
+                                                'estado_stock' => $filtroEstado,
+                                                'page' => $paginaItems,
+                                                'per_page' => $itemsPorPagina,
+                                                'per_page_user' => 1,
+                                                'page_lotes' => $paginaLotes,
+                                                'per_page_lotes' => $lotesPorPagina,
+                                                'page_mov' => $paginaMovimientos,
+                                                'per_page_mov' => $movimientosPorPagina,
+                                            ])) ?>" class="btn btn-sm btn-outline-warning" title="Editar ítem">
                                                 <i class="bi bi-pencil-square"></i>
                                             </a>
                                         </td>
@@ -551,6 +607,9 @@ function label_tipo_mov(string $tipo): string
                         <strong>Lotes por vencer (30 días)</strong>
                         <form method="get" class="d-flex align-items-center gap-1 w-100 w-md-auto">
                             <input type="hidden" name="vista" value="inventario">
+                            <?php if ($itemEditar): ?>
+                                <input type="hidden" name="editar_id" value="<?= (int)$itemEditar['id'] ?>">
+                            <?php endif; ?>
                             <input type="hidden" name="q" value="<?= htmlspecialchars($filtroQ) ?>">
                             <input type="hidden" name="categoria" value="<?= htmlspecialchars($filtroCategoria) ?>">
                             <input type="hidden" name="estado_stock" value="<?= htmlspecialchars($filtroEstado) ?>">
@@ -561,10 +620,10 @@ function label_tipo_mov(string $tipo): string
                             <input type="hidden" name="per_page_mov" value="<?= (int)$movimientosPorPagina ?>">
                             <input type="hidden" name="page_lotes" value="1">
                             <label class="small text-muted mb-0 me-1">Por página</label>
-                            <select name="per_page_lotes" class="form-select form-select-sm" style="max-width: 90px;" onchange="this.form.submit()">
+                            <select id="inventarioPerPageLotes" name="per_page_lotes" class="form-select form-select-sm" style="max-width: 90px;" onchange="this.form.submit()">
+                                <option value="3" <?= $lotesPorPagina === 3 ? 'selected' : '' ?>>3</option>
                                 <option value="5" <?= $lotesPorPagina === 5 ? 'selected' : '' ?>>5</option>
                                 <option value="10" <?= $lotesPorPagina === 10 ? 'selected' : '' ?>>10</option>
-                                <option value="20" <?= $lotesPorPagina === 20 ? 'selected' : '' ?>>20</option>
                             </select>
                         </form>
                     </div>
@@ -634,6 +693,9 @@ function label_tipo_mov(string $tipo): string
                         <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
                             <form method="get" class="d-flex align-items-center gap-1">
                                 <input type="hidden" name="vista" value="inventario">
+                                <?php if ($itemEditar): ?>
+                                    <input type="hidden" name="editar_id" value="<?= (int)$itemEditar['id'] ?>">
+                                <?php endif; ?>
                                 <input type="hidden" name="q" value="<?= htmlspecialchars($filtroQ) ?>">
                                 <input type="hidden" name="categoria" value="<?= htmlspecialchars($filtroCategoria) ?>">
                                 <input type="hidden" name="estado_stock" value="<?= htmlspecialchars($filtroEstado) ?>">
@@ -644,10 +706,10 @@ function label_tipo_mov(string $tipo): string
                                 <input type="hidden" name="per_page_lotes" value="<?= (int)$lotesPorPagina ?>">
                                 <input type="hidden" name="page_mov" value="1">
                                 <label class="small text-muted mb-0 me-1">Por página</label>
-                                <select name="per_page_mov" class="form-select form-select-sm" style="max-width: 90px;" onchange="this.form.submit()">
+                                <select id="inventarioPerPageMov" name="per_page_mov" class="form-select form-select-sm" style="max-width: 90px;" onchange="this.form.submit()">
+                                    <option value="3" <?= $movimientosPorPagina === 3 ? 'selected' : '' ?>>3</option>
                                     <option value="5" <?= $movimientosPorPagina === 5 ? 'selected' : '' ?>>5</option>
                                     <option value="10" <?= $movimientosPorPagina === 10 ? 'selected' : '' ?>>10</option>
-                                    <option value="20" <?= $movimientosPorPagina === 20 ? 'selected' : '' ?>>20</option>
                                 </select>
                             </form>
                             <a href="dashboard.php?action=inventario_export&format=excel" class="btn btn-outline-success btn-sm">
@@ -727,9 +789,52 @@ function label_tipo_mov(string $tipo): string
 <script>
 (function () {
     var perPageSelect = document.getElementById('inventarioPerPage');
+    var perPageLotes = document.getElementById('inventarioPerPageLotes');
+    var perPageMov = document.getElementById('inventarioPerPageMov');
+    var isEditMode = false;
+
+    try {
+        var params = new URLSearchParams(window.location.search || '');
+        isEditMode = params.has('editar_id') && String(params.get('editar_id') || '').trim() !== '';
+    } catch (error) {
+        isEditMode = false;
+    }
+
+    var applySavedValue = function (selectEl, storageKey) {
+        if (!selectEl) return;
+
+        var allowed = Array.from(selectEl.options).map(function (opt) {
+            return opt.value;
+        });
+
+        try {
+            var saved = localStorage.getItem(storageKey);
+            if (saved && allowed.indexOf(saved) !== -1) {
+                var current = selectEl.value;
+                selectEl.value = saved;
+                if (!isEditMode && saved !== current && selectEl.form) {
+                    selectEl.form.submit();
+                    return;
+                }
+            }
+        } catch (error) {
+        }
+
+        selectEl.addEventListener('change', function () {
+            try {
+                localStorage.setItem(storageKey, selectEl.value);
+            } catch (error) {
+            }
+        });
+    };
+
     if (perPageSelect && perPageSelect.dataset.current) {
         perPageSelect.value = perPageSelect.dataset.current;
     }
+
+    applySavedValue(perPageSelect, 'inventario_per_page_items');
+    applySavedValue(perPageLotes, 'inventario_per_page_lotes');
+    applySavedValue(perPageMov, 'inventario_per_page_movimientos');
 })();
 
 (function () {

@@ -49,9 +49,15 @@ document.addEventListener('DOMContentLoaded', function () {
             return map;
         };
 
-        function calcular() {
+        function calcular(force = false) {
             if (calculado.dataset.calculating === '1') return;
             calculado.dataset.calculating = '1';
+
+            const currentValue = String(calculado.value ?? '').trim();
+            if (!force && currentValue !== '') {
+                calculado.dataset.calculating = '0';
+                return;
+            }
 
             const inputsMap = getInputsMap();
 
@@ -99,13 +105,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     calculado.style.background = 'linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%)';
                 }, 300);
 
-                // Importante: si este valor cambió, notificar para recalcular fórmulas dependientes
-                if (calculado.value !== prevValue) {
-                    calculado.dispatchEvent(new Event('input', { bubbles: true }));
-                }
+                // Evitar cascadas recursivas entre campos calculados.
             } catch (e) {
                 calculado.value = '';
-                calculado.dispatchEvent(new Event('input', { bubbles: true }));
             } finally {
                 calculado.dataset.calculating = '0';
             }
@@ -114,10 +116,12 @@ document.addEventListener('DOMContentLoaded', function () {
             let nombre = variable.replace(/[\[\]]/g, '');
             const input = getInputsMap().get(normalizeKey(nombre));
             if (input) {
-                input.addEventListener('input', calcular);
+                input.addEventListener('input', function() {
+                    calcular(true);
+                });
             }
         });
-        calcular();
+        calcular(false);
     });
 
     // Cabeceras por paciente (se insertan en el snapshot al guardar)
@@ -209,10 +213,210 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    const normalizarValor = (v) => {
+        if (v === null || v === undefined) return '';
+        return String(v).trim();
+    };
+
+    const examenTieneCambio = (card) => {
+        const campos = card.querySelectorAll('[name*="[resultados]["]');
+        for (const campo of campos) {
+            const inicial = normalizarValor(campo.getAttribute('data-initial-value') || '');
+            const actual = normalizarValor(campo.value);
+            if (inicial !== actual) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+        const showDecisionModal = (examenNombre) => {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.inset = '0';
+                overlay.style.background = 'rgba(0,0,0,0.45)';
+                overlay.style.zIndex = '9999';
+                overlay.style.display = 'flex';
+                overlay.style.alignItems = 'center';
+                overlay.style.justifyContent = 'center';
+                overlay.innerHTML = `
+                    <div class="card shadow" style="width:min(92vw,520px);border-radius:12px;">
+                        <div class="card-body">
+                            <h5 class="card-title mb-2">Cambio detectado</h5>
+                            <p class="card-text mb-3">Se detectó cambio en <strong>${examenNombre}</strong>.<br>¿Cómo deseas registrarlo?</p>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="applyDecisionToAll">
+                                <label class="form-check-label" for="applyDecisionToAll">
+                                    Aplicar esta decisión a los demás exámenes modificados
+                                </label>
+                            </div>
+                            <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                                <button type="button" class="btn btn-outline-secondary" data-choice="correction">No, solo corrección</button>
+                                <button type="button" class="btn btn-primary" data-choice="repeat">Sí, prueba repetida</button>
+                                <button type="button" class="btn btn-outline-danger" data-choice="cancel">Cancelar guardado</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+
+                const checkboxApply = overlay.querySelector('#applyDecisionToAll');
+
+                const close = (choice) => {
+                    overlay.remove();
+                    resolve({
+                        choice,
+                        applyAll: checkboxApply ? checkboxApply.checked : false,
+                    });
+                };
+
+                overlay.querySelectorAll('button[data-choice]').forEach((btn) => {
+                    btn.addEventListener('click', () => close(btn.getAttribute('data-choice')));
+                });
+
+                overlay.addEventListener('click', (ev) => {
+                    if (ev.target === overlay) {
+                        close('cancel');
+                    }
+                });
+            });
+        };
+
+        const showReasonModal = (examenNombre) => {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.position = 'fixed';
+                overlay.style.inset = '0';
+                overlay.style.background = 'rgba(0,0,0,0.45)';
+                overlay.style.zIndex = '10000';
+                overlay.style.display = 'flex';
+                overlay.style.alignItems = 'center';
+                overlay.style.justifyContent = 'center';
+                overlay.innerHTML = `
+                    <div class="card shadow" style="width:min(92vw,560px);border-radius:12px;">
+                        <div class="card-body">
+                            <h5 class="card-title mb-2">Motivo de repetición</h5>
+                            <p class="card-text mb-3">Indica el motivo para registrar consumo adicional en <strong>${examenNombre}</strong>.</p>
+                            <textarea class="form-control mb-3" rows="3" placeholder="Ej: Control por resultado fuera de rango"></textarea>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="applyReasonToAll">
+                                <label class="form-check-label" for="applyReasonToAll">
+                                    Reutilizar este motivo para los demás exámenes repetidos
+                                </label>
+                            </div>
+                            <div class="d-flex gap-2 justify-content-end">
+                                <button type="button" class="btn btn-outline-secondary" data-action="cancel">Cancelar</button>
+                                <button type="button" class="btn btn-primary" data-action="ok">Confirmar repetición</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                const textarea = overlay.querySelector('textarea');
+                const checkboxApply = overlay.querySelector('#applyReasonToAll');
+                textarea.focus();
+
+                const close = (value) => {
+                    overlay.remove();
+                    resolve(value);
+                };
+
+                overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(null));
+                overlay.querySelector('[data-action="ok"]').addEventListener('click', () => {
+                    const motivo = normalizarValor(textarea.value);
+                    if (!motivo) {
+                        window.alert('Debe ingresar motivo para registrar consumo por repetición.');
+                        textarea.focus();
+                        return;
+                    }
+                    close({
+                        motivo,
+                        applyAll: checkboxApply ? checkboxApply.checked : false,
+                    });
+                });
+
+                overlay.addEventListener('click', (ev) => {
+                    if (ev.target === overlay) {
+                        close(null);
+                    }
+                });
+            });
+        };
+
     // Validación del formulario antes de enviar
-    const form = document.querySelector('form');
+    const form = document.querySelector('form[action="dashboard.php?action=guardar"]');
     if (form) {
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
+            if (form.dataset.submitting === '1') {
+                return;
+            }
+            e.preventDefault();
+
+            let decisionGlobal = null;
+            let motivoGlobalRepeticion = null;
+
+            const cards = Array.from(document.querySelectorAll('.exam-card'));
+            for (const card of cards) {
+                const hasReceta = card.getAttribute('data-has-receta') === '1';
+                const teniaPrevio = card.getAttribute('data-tenia-previo') === '1';
+                if (!hasReceta || !teniaPrevio) {
+                    continue;
+                }
+
+                const cambio = examenTieneCambio(card);
+                if (!cambio) {
+                    continue;
+                }
+
+                const examenNombre = card.getAttribute('data-examen-nombre') || 'este examen';
+                const confirmadaInput = card.querySelector('.js-repeticion-confirmada');
+                const motivoInput = card.querySelector('.js-repeticion-motivo');
+                if (!confirmadaInput || !motivoInput) {
+                    continue;
+                }
+
+                let choiceData = null;
+                if (decisionGlobal !== null) {
+                    choiceData = { choice: decisionGlobal, applyAll: true };
+                } else {
+                    choiceData = await showDecisionModal(examenNombre);
+                }
+
+                const choice = choiceData ? choiceData.choice : 'cancel';
+                if (choice === 'repeat') {
+                    let motivoTxt = motivoGlobalRepeticion;
+                    if (!motivoTxt) {
+                        const reasonData = await showReasonModal(examenNombre);
+                        if (!reasonData || !reasonData.motivo) {
+                            return false;
+                        }
+                        motivoTxt = reasonData.motivo;
+                        if (reasonData.applyAll) {
+                            motivoGlobalRepeticion = motivoTxt;
+                        }
+                    }
+
+                    if (!motivoTxt) {
+                        return false;
+                    }
+
+                    if (choiceData && choiceData.applyAll) {
+                        decisionGlobal = 'repeat';
+                    }
+                    confirmadaInput.value = '1';
+                    motivoInput.value = motivoTxt;
+                } else if (choice === 'correction') {
+                    if (choiceData && choiceData.applyAll) {
+                        decisionGlobal = 'correction';
+                    }
+                    confirmadaInput.value = '0';
+                    motivoInput.value = '';
+                } else {
+                    return false;
+                }
+            }
+
             let valid = true;
             // Ejemplo: marcar campos obligatorios
             form.querySelectorAll('.form-control[required]').forEach(input => {
@@ -224,7 +428,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
             if (!valid) {
-                e.preventDefault();
                 alert('Por favor, completa todos los campos obligatorios.');
                 return false;
             }
@@ -235,6 +438,8 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => {
                 submitBtn.style.transform = 'scale(0.95)';
             }, 100);
+            form.dataset.submitting = '1';
+            form.submit();
         });
     }
 

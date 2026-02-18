@@ -44,14 +44,6 @@ if ($factorPresentacion <= 0) {
 $activo = $activo === 0 ? 0 : 1;
 
 try {
-    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items'");
-    $stmtTbl->execute();
-    if ((int)$stmtTbl->fetchColumn() <= 0) {
-        $_SESSION['mensaje'] = 'Faltan tablas de inventario. Ejecuta sql/agregar_tablas_inventario.sql.';
-        header('Location: dashboard.php?vista=inventario');
-        exit;
-    }
-
     $stmtDup = $pdo->prepare("SELECT COUNT(*) FROM inventario_items WHERE codigo = ? AND id <> ?");
     $stmtDup->execute([$codigo, $itemId]);
     if ((int)$stmtDup->fetchColumn() > 0) {

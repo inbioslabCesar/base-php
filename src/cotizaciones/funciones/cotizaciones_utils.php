@@ -34,11 +34,21 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
             if ($item['tipo'] === 'Parámetro' || $item['tipo'] === 'Campo' || $item['tipo'] === 'Texto Largo') {
                 $total_parametros++;
                 $nombre = $item['nombre'];
+                $stableKey = '';
+                if (is_array($item) && !empty($item['id_parametro'])) {
+                    $stableKey = 'id_parametro_' . trim((string)$item['id_parametro']);
+                }
+                $valor = null;
+                if ($stableKey !== '' && array_key_exists($stableKey, $resultados)) {
+                    $valor = $resultados[$stableKey];
+                } elseif (array_key_exists($nombre, $resultados)) {
+                    $valor = $resultados[$nombre];
+                }
                 if (
-                    isset($resultados[$nombre]) && (
-                        $resultados[$nombre] !== '' && $resultados[$nombre] !== null
-                        || $resultados[$nombre] === 0
-                        || $resultados[$nombre] === '0'
+                    ($valor !== null || $valor === 0 || $valor === '0') && (
+                        $valor !== '' && $valor !== null
+                        || $valor === 0
+                        || $valor === '0'
                     )
                 ) {
                     $parametros_llenados++;
@@ -52,9 +62,12 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
 
 // Funciones utilitarias para cotizaciones
 function obtenerSaldoCotizacion($pdo, $idCotizacion) {
-    $stmt = $pdo->prepare('SELECT total, (SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = c.id) AS pagado FROM cotizaciones c WHERE c.id = ?');
+    $stmt = $pdo->prepare('SELECT total, estado_pago, (SELECT IFNULL(SUM(monto),0) FROM pagos WHERE id_cotizacion = c.id) AS pagado FROM cotizaciones c WHERE c.id = ?');
     $stmt->execute([$idCotizacion]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) return 0;
+    if (isset($row['estado_pago']) && strtolower((string)$row['estado_pago']) === 'anulada') {
+        return 0;
+    }
     return max(0, floatval($row['total']) - floatval($row['pagado']));
 }

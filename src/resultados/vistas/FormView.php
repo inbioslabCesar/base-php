@@ -11,12 +11,13 @@ class FormView {
         </div>
         <form method="post" action="dashboard.php?action=guardar">
             <input type="hidden" name="cotizacion_id" value="<?= htmlspecialchars($cotizacion_id) ?>">
+            <input type="hidden" name="stay_on_form" value="1">
             <input type="hidden" id="edad-paciente" value="<?= htmlspecialchars($datos_paciente['edad'] ?? '') ?>">
             <input type="hidden" id="sexo-paciente" value="<?= htmlspecialchars($datos_paciente['sexo'] ?? '') ?>">
             <?php foreach ($examenes as $index => $examen): ?>
-                <?= ExamCardView::render($examen, $index, $datos_paciente, $areas_disponibles) ?>
+                <?= \ExamCardView::render($examen, $index, $datos_paciente, $areas_disponibles) ?>
             <?php endforeach; ?>
-            <?= PdfConfigView::render($referencia_personalizada) ?>
+            <?= \PdfConfigView::render($referencia_personalizada) ?>
             <div class="text-center">
                 <button type="submit" class="save-btn">
                     <i class="bi bi-save me-2"></i>
@@ -24,6 +25,35 @@ class FormView {
                 </button>
             </div>
         </form>
+
+        <script>
+        document.addEventListener('change', function (event) {
+            const target = event.target;
+            if (!target.classList.contains('js-alarma-switch')) {
+                return;
+            }
+
+            const card = target.closest('.exam-card');
+            if (!card) {
+                return;
+            }
+
+            const daysInput = card.querySelector('.js-alarma-dias');
+            if (!daysInput) {
+                return;
+            }
+
+            daysInput.disabled = !target.checked;
+            if (!target.checked) {
+                daysInput.value = '';
+                return;
+            }
+
+            if (!daysInput.value) {
+                daysInput.value = '1';
+            }
+        });
+        </script>
 
         <div class="text-center update-format-form">
             <form method="post" action="dashboard.php?action=actualizar_snapshot_resultados" class="d-inline" onsubmit="return confirm('Actualiza el formato con el examen actual y CONSERVA las cabeceras personalizadas del paciente (si existen). Los resultados guardados se mantienen. ¿Continuar?');">
@@ -44,6 +74,7 @@ class FormView {
                 </button>
             </form>
         </div>
+
         <?php
         return ob_get_clean();
     }

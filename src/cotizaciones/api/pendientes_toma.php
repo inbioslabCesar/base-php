@@ -26,6 +26,7 @@ try {
         FROM cotizaciones c
         LEFT JOIN clientes cl ON c.id_cliente = cl.id
         WHERE c.estado_muestra = 'pendiente'
+                    AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
           AND c.fecha_toma IS NOT NULL
           AND c.hora_toma IS NOT NULL
           AND (

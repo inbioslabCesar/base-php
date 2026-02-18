@@ -32,7 +32,7 @@ if (!$hasSnapshotCol) {
 
 try {
     if ($preserve_headers === 1) {
-        $sql = "SELECT re.id, re.adicional_snapshot, e.adicional
+        $sql = "SELECT re.id, re.adicional_snapshot, re.resultados, e.adicional
                 FROM resultados_examenes re
                 JOIN examenes e ON e.id = re.id_examen
                 WHERE re.id_cotizacion = :cotizacion_id";
@@ -54,16 +54,49 @@ try {
             return '__END__';
         };
 
+        $normKey = function ($s) {
+            $s = (string)$s;
+            $s = trim($s);
+            if ($s === '') {
+                return '';
+            }
+            $s = preg_replace('/\s+/u', ' ', $s);
+            $s = mb_strtolower($s, 'UTF-8');
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+            if ($ascii !== false && $ascii !== null) {
+                $s = $ascii;
+            }
+            $s = preg_replace('/[^a-z0-9 ._-]/', '', $s);
+            return $s;
+        };
+
+        $isCampoValor = function ($tipo) {
+            return in_array((string)$tipo, ['Parámetro', 'Campo', 'Texto Largo'], true);
+        };
+
         $upd = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
 
         foreach ($rows as $r) {
             $old = $r['adicional_snapshot'] ?? '';
             $base = $r['adicional'] ?? '';
+            $resultadosRaw = $r['resultados'] ?? '';
 
             $oldArr = $old ? json_decode($old, true) : [];
             if (!is_array($oldArr)) $oldArr = [];
             $baseArr = $base ? json_decode($base, true) : [];
             if (!is_array($baseArr)) $baseArr = [];
+
+            $resultadosArr = $resultadosRaw ? json_decode($resultadosRaw, true) : [];
+            if (!is_array($resultadosArr)) {
+                $resultadosArr = [];
+            }
+
+            $resultadosStable = [];
+            foreach ($resultadosArr as $k => $v) {
+                if (preg_match('/^id_parametro_(.+)$/', (string)$k, $m)) {
+                    $resultadosStable[] = trim((string)$m[1]);
+                }
+            }
 
             // Extraer cabeceras personalizadas: títulos/subtítulos SIN id_parametro
             $custom = [];
@@ -100,6 +133,56 @@ try {
                     $baseArr[] = $c['item'];
                 } else {
                     array_splice($baseArr, $insertAt, 0, [$c['item']]);
+                }
+            }
+
+            $oldByName = [];
+            $oldByOrder = [];
+            foreach ($oldArr as $itOld) {
+                if (!is_array($itOld)) continue;
+                if (!$isCampoValor($itOld['tipo'] ?? '')) continue;
+                $idOld = trim((string)($itOld['id_parametro'] ?? ''));
+                if ($idOld === '') continue;
+
+                $nameOld = trim((string)($itOld['nombre'] ?? ''));
+                $nkOld = $normKey($nameOld);
+                if ($nkOld !== '' && !isset($oldByName[$nkOld])) {
+                    $oldByName[$nkOld] = $idOld;
+                }
+
+                $ordenOld = isset($itOld['orden']) ? (string)$itOld['orden'] : '';
+                if ($ordenOld !== '' && !isset($oldByOrder[$ordenOld])) {
+                    $oldByOrder[$ordenOld] = $idOld;
+                }
+            }
+
+            $baseParamIdx = [];
+            foreach ($baseArr as $idxBase => $itBase) {
+                if (!is_array($itBase)) continue;
+                if ($isCampoValor($itBase['tipo'] ?? '')) {
+                    $baseParamIdx[] = $idxBase;
+                }
+            }
+
+            foreach ($baseParamIdx as $idxBase) {
+                $itBase = $baseArr[$idxBase];
+                $idBase = trim((string)($itBase['id_parametro'] ?? ''));
+                $nameBase = trim((string)($itBase['nombre'] ?? ''));
+                $nkBase = $normKey($nameBase);
+                $ordenBase = isset($itBase['orden']) ? (string)$itBase['orden'] : '';
+
+                $idElegido = $idBase;
+
+                if ($nkBase !== '' && isset($oldByName[$nkBase])) {
+                    $idElegido = $oldByName[$nkBase];
+                } elseif ($ordenBase !== '' && isset($oldByOrder[$ordenBase])) {
+                    $idElegido = $oldByOrder[$ordenBase];
+                } elseif (count($baseParamIdx) === 1 && count($resultadosStable) === 1) {
+                    $idElegido = $resultadosStable[0];
+                }
+
+                if ($idElegido !== '') {
+                    $baseArr[$idxBase]['id_parametro'] = $idElegido;
                 }
             }
 

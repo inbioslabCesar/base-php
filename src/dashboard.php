@@ -17,10 +17,10 @@ if (!isset($_SESSION['rol'])) {
 
 
 $acciones_por_rol = [
-    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf', 'actualizar_snapshot_resultados', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export'],
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_transferencia_guardar'],
 
-    'laboratorista' => ['api_listado', 'guardar', 'descarga-pdf', 'actualizar_snapshot_resultados', 'cotizaciones_api', 'examenes_api'],
-    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf', 'actualizar_snapshot_resultados', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export'],
+    'laboratorista' => ['api_listado', 'guardar', 'descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'cotizaciones_api', 'examenes_api'],
+    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_transferencia_guardar'],
     'empresa' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'cliente' => ['crear_cotizacion', 'procesar_agenda', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'convenio' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion']
@@ -60,6 +60,7 @@ $acciones = [
     'api_listado' => __DIR__ . '/resultados/api_listado.php',    
     'guardar' => __DIR__ . '/resultados/guardar.php',
     'actualizar_snapshot_resultados' => __DIR__ . '/resultados/actualizar_snapshot_resultados.php',
+    'resultados_repetir_prueba' => __DIR__ . '/resultados/repetir_prueba.php',
     'descarga-pdf' => __DIR__ . '/resultados/descarga-pdf.php',
     'eliminar_cotizacion' => __DIR__ . '/cotizaciones/forms/eliminar_cotizacion.php',
     'pago_cotizacion_guardar' => __DIR__ . '/pagos/pago_cotizacion_guardar.php',
@@ -84,6 +85,9 @@ $acciones = [
     'inventario_item_actualizar' => __DIR__ . '/inventario/item_actualizar.php',
     'inventario_movimiento_guardar' => __DIR__ . '/inventario/movimiento_guardar.php',
     'inventario_export' => __DIR__ . '/inventario/inventario_export.php',
+    'inventario_receta_guardar' => __DIR__ . '/inventario/receta_guardar.php',
+    'inventario_receta_eliminar' => __DIR__ . '/inventario/receta_eliminar.php',
+    'inventario_transferencia_guardar' => __DIR__ . '/inventario/transferencia_guardar.php',
     'caja_abrir' => __DIR__ . '/contabilidad/caja_abrir.php',
     'caja_cerrar' => __DIR__ . '/contabilidad/caja_cerrar.php',
     'caja_ajuste' => __DIR__ . '/contabilidad/caja_ajuste.php',
@@ -112,10 +116,10 @@ if (isset($_SESSION['mensaje'])) {
 }
 // Lista de vistas permitidas por rol
 $acceso_por_rol = [
-    'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'config_empresa_datos', 'agendar_cita', 'listado','formulario','ver', 'vista-reporte-pdf','pago_cotizacion','contabilidad', 'ingresos', 'ingresos_diario', 'comparar_resultados_cliente', 'inventario', 'egresos','egresos_editar','estadisticas','pendientes_toma','buscar_cliente','cotizaciones_empresas','cotizaciones_convenios','clientes_empresa','clientes_convenio','buscar_paciente'],
+    'admin' => ['empresas', 'empresa', 'form_empresa', 'admin', 'usuarios', 'form_usuario', 'clientes', 'cliente', 'form_cliente', 'laboratorista', 'recepcionista', 'convenios', 'convenio', 'form_convenio', 'examenes', 'form_examen', 'cotizaciones', 'cotizaciones_anuladas', 'form_cotizacion', 'promociones', 'form_promocion', 'boton_cotizar', 'form_cotizacion_recepcionista', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'config_empresa_datos', 'agendar_cita', 'listado','formulario','ver', 'vista-reporte-pdf','pago_cotizacion','contabilidad', 'ingresos', 'ingresos_diario', 'comparar_resultados_cliente', 'inventario', 'inventario_interno', 'egresos','egresos_editar','estadisticas','pendientes_toma','buscar_cliente','cotizaciones_empresas','cotizaciones_convenios','clientes_empresa','clientes_convenio','buscar_paciente'],
 
     'laboratorista' => ['laboratorista','cotizaciones','listado','formulario','ver'],
-    'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'agendar_cita', 'listado','formulario','ver', 'vista-reporte-pdf','pago_cotizacion','contabilidad', 'ingresos', 'ingresos_diario', 'comparar_resultados_cliente', 'inventario', 'egresos', 'egresos_editar','estadisticas','pendientes_toma','buscar_paciente'],
+    'recepcionista' => ['recepcionista', 'cotizaciones', 'form_cotizacion', 'form_cotizacion_recepcionista', 'clientes', 'cliente', 'form_cliente', 'boton_cotizar', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'agendar_cita', 'listado','formulario','ver', 'vista-reporte-pdf','pago_cotizacion','contabilidad', 'ingresos', 'ingresos_diario', 'comparar_resultados_cliente', 'inventario', 'inventario_interno', 'egresos', 'egresos_editar','estadisticas','pendientes_toma','buscar_paciente'],
     'empresa' => ['empresa', 'empresas','buscar_cliente','form_cotizacion','agendar_cita','cotizaciones_empresas','detalle_cotizacion','form_cliente','clientes_empresa','detalle_promocion'],
     'cliente' => ['clientes', 'cliente', 'cotizaciones', 'form_cotizacion', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'cotizaciones_clientes', 'agendar_cita', 'detalle_promocion'],
     'convenio' => ['convenio','buscar_cliente','form_cotizacion','agendar_cita','cotizaciones_convenios','detalle_cotizacion','form_cliente','clientes_convenio','detalle_promocion']
@@ -128,6 +132,7 @@ $vistas = [
     'clientes' => __DIR__ . '/clientes/clientes.php',
     'comparar_resultados_cliente' => __DIR__ . '/clientes/comparar_resultados.php',
     'inventario' => __DIR__ . '/inventario/inventario.php',
+    'inventario_interno' => __DIR__ . '/inventario/inventario_interno.php',
     'form_cliente' => __DIR__ . '/clientes/form_cliente.php',
     'empresas' => __DIR__ . '/empresas/empresas.php',
     'form_empresa' => __DIR__ . '/empresas/form_empresa.php',
@@ -141,6 +146,7 @@ $vistas = [
     'cliente' => __DIR__ . '/clientes/vistas/panel_cliente.php',
     'convenio' => __DIR__ . '/convenios/vistas/panel_convenio.php',
     'cotizaciones' => __DIR__ . '/cotizaciones/views/cotizaciones.php',
+    'cotizaciones_anuladas' => __DIR__ . '/cotizaciones/views/cotizaciones_anuladas.php',
     'form_cotizacion' => __DIR__ . '/cotizaciones/forms/form_cotizacion.php',
     'detalle_cotizacion' => __DIR__ . '/cotizaciones/views/detalle_cotizacion.php',
     'promociones' => __DIR__ . '/promociones/promociones.php',

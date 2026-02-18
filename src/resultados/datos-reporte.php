@@ -177,7 +177,22 @@ foreach ($rows as $row) {
             $resultadosNorm[$nk] = $v;
         }
     }
-    $getResultado = function ($nombre, $default = '') use ($resultados_json, $resultadosNorm, $normKey) {
+    $buildStableKey = function ($item) {
+        if (!is_array($item)) {
+            return '';
+        }
+        $idParametro = trim((string)($item['id_parametro'] ?? ''));
+        if ($idParametro === '') {
+            return '';
+        }
+        return 'id_parametro_' . $idParametro;
+    };
+
+    $getResultado = function ($nombre, $item = null, $default = '') use ($resultados_json, $resultadosNorm, $normKey, $buildStableKey) {
+        $stableKey = $buildStableKey($item);
+        if ($stableKey !== '' && array_key_exists($stableKey, $resultados_json)) {
+            return $resultados_json[$stableKey];
+        }
         if (isset($resultados_json[$nombre])) {
             return $resultados_json[$nombre];
         }
@@ -204,7 +219,7 @@ foreach ($rows as $row) {
         $nombre = $item['nombre'];
 
         if ($item['tipo'] === 'Parámetro') {
-            $valor = $getResultado($nombre, '');
+            $valor = $getResultado($nombre, $item, '');
             $valores[$nombre] = $valor;
             $valoresNorm[$normKey($nombre)] = $valor;
             $ordered[] = ['kind' => 'param', 'item' => $item, 'nombre' => $nombre];
@@ -227,6 +242,10 @@ foreach ($rows as $row) {
         foreach ($formulaItems as $fi) {
             $nombre = $fi['nombre'];
             $item = $fi['item'];
+            $actualGuardado = $getResultado($nombre, $item, '');
+            if ($actualGuardado !== '' && $actualGuardado !== null) {
+                continue;
+            }
             $res = $evalFormula($item['formula'], $valoresNorm);
             if ($res === null) {
                 continue;
@@ -252,7 +271,7 @@ foreach ($rows as $row) {
             if (empty($item['formula'])) {
                 $valor = $formatValor($valor, $item);
             } else {
-                $raw = $getResultado($nombre, '');
+                $raw = $getResultado($nombre, $item, '');
                 if (($valor === '' || $valor === null) && $raw !== '') {
                     $valor = $formatValor($raw, $item);
                 }
@@ -263,7 +282,7 @@ foreach ($rows as $row) {
                 'tipo' => 'Parámetro'
             ]);
         } elseif ($entry['kind'] === 'texto') {
-            $valor = $getResultado($nombre, '');
+            $valor = $getResultado($nombre, $item, '');
             $examen_items[] = array_merge($item, [
                 'prueba' => $nombre,
                 'valor' => $valor,

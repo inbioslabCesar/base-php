@@ -80,24 +80,57 @@ try {
 }
 
 $sqlResultados = $hasSnapshotCol
-    ? "SELECT re.id, re.id_examen, re.resultados, re.fecha_ingreso, re.estado,
-              COALESCE(re.adicional_snapshot, e.adicional) AS adicional,
-              e.nombre AS nombre_examen
-       FROM resultados_examenes re
-       JOIN examenes e ON e.id = re.id_examen
-       WHERE re.id_cliente = ? AND re.estado = 'completado'
-       ORDER BY re.fecha_ingreso ASC, re.id ASC"
-    : "SELECT re.id, re.id_examen, re.resultados, re.fecha_ingreso, re.estado,
-              e.adicional AS adicional,
-              e.nombre AS nombre_examen
-       FROM resultados_examenes re
-       JOIN examenes e ON e.id = re.id_examen
-       WHERE re.id_cliente = ? AND re.estado = 'completado'
-       ORDER BY re.fecha_ingreso ASC, re.id ASC";
+    ? "SELECT re.id, re.id_examen, re.id_cotizacion, re.resultados, re.fecha_ingreso, re.estado,
+        COALESCE(re.adicional_snapshot, e.adicional) AS adicional,
+        e.nombre AS nombre_examen,
+        c.fecha AS fecha_cotizacion,
+        c.estado_pago
+    FROM resultados_examenes re
+    JOIN examenes e ON e.id = re.id_examen
+    LEFT JOIN cotizaciones c ON c.id = re.id_cotizacion
+    WHERE re.id_cliente = ?
+      AND re.estado = 'completado'
+      AND (c.id IS NULL OR c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
+    ORDER BY COALESCE(re.fecha_ingreso, c.fecha) ASC, re.id ASC"
+    : "SELECT re.id, re.id_examen, re.id_cotizacion, re.resultados, re.fecha_ingreso, re.estado,
+        e.adicional AS adicional,
+        e.nombre AS nombre_examen,
+        c.fecha AS fecha_cotizacion,
+        c.estado_pago
+    FROM resultados_examenes re
+    JOIN examenes e ON e.id = re.id_examen
+    LEFT JOIN cotizaciones c ON c.id = re.id_cotizacion
+    WHERE re.id_cliente = ?
+      AND re.estado = 'completado'
+      AND (c.id IS NULL OR c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
+    ORDER BY COALESCE(re.fecha_ingreso, c.fecha) ASC, re.id ASC";
 
 $stmtResultados = $pdo->prepare($sqlResultados);
 $stmtResultados->execute([$idCliente]);
 $rows = $stmtResultados->fetchAll(\PDO::FETCH_ASSOC);
+
+$alcance = strtolower(trim((string)($_GET['alcance'] ?? '90d')));
+if (!in_array($alcance, ['30d', '90d', 'all'], true)) {
+    $alcance = '90d';
+}
+
+if ($alcance !== 'all') {
+    $dias = $alcance === '30d' ? 30 : 90;
+    $cutoffTs = strtotime('-' . $dias . ' days');
+    if ($cutoffTs !== false) {
+        $rows = array_values(array_filter($rows, function ($row) use ($cutoffTs) {
+            $fecha = trim((string)($row['fecha_ingreso'] ?? ''));
+            if ($fecha === '') {
+                $fecha = trim((string)($row['fecha_cotizacion'] ?? ''));
+            }
+            if ($fecha === '') {
+                return false;
+            }
+            $ts = strtotime($fecha);
+            return $ts !== false && $ts >= $cutoffTs;
+        }));
+    }
+}
 
 $seleccionarReferencia = function (array $referencias, string $sexo, ?float $edad, $toNullableFloat): ?array {
     if (empty($referencias)) {
@@ -129,6 +162,19 @@ $seleccionarReferencia = function (array $referencias, string $sexo, ?float $eda
 
 $parametrosDisponibles = [];
 $seriesPorParametro = [];
+$legacyToStableMap = [];
+
+$buildStableItemKey = function (array $item, int $idExamen, string $nombreExamen) use ($normKey): string {
+    $idParametro = trim((string)($item['id_parametro'] ?? ''));
+    if ($idParametro !== '') {
+        return 'exam_' . $idExamen . '|id_parametro_' . $idParametro;
+    }
+
+    $nombreParametro = trim((string)($item['nombre'] ?? ''));
+    $nombreNorm = $normKey($nombreParametro);
+    $examenNorm = $normKey($nombreExamen);
+    return 'exam_' . $idExamen . '|param_' . $examenNorm . '_' . $nombreNorm;
+};
 
 foreach ($rows as $row) {
     $adicional = json_decode((string)($row['adicional'] ?? '[]'), true);
@@ -149,7 +195,22 @@ foreach ($rows as $row) {
         }
     }
 
-    $getResultado = function (string $nombre) use ($resultados, $resultadosNorm, $normKey) {
+    $buildStableKey = function ($item) {
+        if (!is_array($item)) {
+            return '';
+        }
+        $idParametro = trim((string)($item['id_parametro'] ?? ''));
+        if ($idParametro === '') {
+            return '';
+        }
+        return 'id_parametro_' . $idParametro;
+    };
+
+    $getResultado = function (string $nombre, array $item = []) use ($resultados, $resultadosNorm, $normKey, $buildStableKey) {
+        $stableKey = $buildStableKey($item);
+        if ($stableKey !== '' && array_key_exists($stableKey, $resultados)) {
+            return $resultados[$stableKey];
+        }
         if (array_key_exists($nombre, $resultados)) {
             return $resultados[$nombre];
         }
@@ -178,17 +239,24 @@ foreach ($rows as $row) {
         }
 
         $nombreExamen = trim((string)($row['nombre_examen'] ?? 'Examen'));
-        $llave = md5(mb_strtolower($nombreExamen . '|' . $nombreParametro, 'UTF-8'));
+        $idExamen = (int)($row['id_examen'] ?? 0);
+        $llave = $buildStableItemKey((array)$item, $idExamen, $nombreExamen);
+        $legacyLlave = md5(mb_strtolower($nombreExamen . '|' . $nombreParametro, 'UTF-8'));
+
+        if (!isset($legacyToStableMap[$legacyLlave])) {
+            $legacyToStableMap[$legacyLlave] = $llave;
+        }
 
         if (!isset($parametrosDisponibles[$llave])) {
             $parametrosDisponibles[$llave] = [
                 'llave' => $llave,
+                'llave_legacy' => $legacyLlave,
                 'examen' => $nombreExamen,
                 'parametro' => $nombreParametro,
             ];
         }
 
-        $valorRaw = (string)$getResultado($nombreParametro);
+        $valorRaw = (string)$getResultado($nombreParametro, $item);
         $valorNum = $toNullableFloat($valorRaw);
 
         $referencia = $seleccionarReferencia((array)($item['referencias'] ?? []), $sexoPaciente, $edadPaciente, $toNullableFloat);
@@ -207,9 +275,14 @@ foreach ($rows as $row) {
             }
         }
 
+        $fechaEvento = trim((string)($row['fecha_ingreso'] ?? ''));
+        if ($fechaEvento === '') {
+            $fechaEvento = trim((string)($row['fecha_cotizacion'] ?? ''));
+        }
+
         $seriesPorParametro[$llave][] = [
-            'fecha' => (string)($row['fecha_ingreso'] ?? ''),
-            'fecha_label' => !empty($row['fecha_ingreso']) ? date('d/m/Y H:i', strtotime((string)$row['fecha_ingreso'])) : '-',
+            'fecha' => $fechaEvento,
+            'fecha_label' => $fechaEvento !== '' ? date('d/m/Y H:i', strtotime($fechaEvento)) : '-',
             'examen' => $nombreExamen,
             'parametro' => $nombreParametro,
             'valor_raw' => $valorRaw,
@@ -232,9 +305,42 @@ usort($parametrosDisponibles, function ($a, $b) {
     return strcasecmp($a['parametro'], $b['parametro']);
 });
 
+$obtenerLlaveMasReciente = function (array $seriesPorParametro): string {
+    $bestKey = '';
+    $bestTs = 0;
+    foreach ($seriesPorParametro as $key => $serieTmp) {
+        if (!is_array($serieTmp) || empty($serieTmp)) {
+            continue;
+        }
+        foreach ($serieTmp as $rowTmp) {
+            $fechaTmp = trim((string)($rowTmp['fecha'] ?? ''));
+            if ($fechaTmp === '') {
+                continue;
+            }
+            $ts = strtotime($fechaTmp);
+            if ($ts !== false && $ts >= $bestTs) {
+                $bestTs = (int)$ts;
+                $bestKey = (string)$key;
+            }
+        }
+    }
+    return $bestKey;
+};
+
 $parametroSeleccionado = trim((string)($_GET['parametro'] ?? ''));
+if ($parametroSeleccionado !== '' && isset($legacyToStableMap[$parametroSeleccionado])) {
+    $parametroSeleccionado = $legacyToStableMap[$parametroSeleccionado];
+}
+
+if ($parametroSeleccionado === '' || !isset($seriesPorParametro[$parametroSeleccionado])) {
+    $parametroMasReciente = $obtenerLlaveMasReciente($seriesPorParametro);
+    if ($parametroMasReciente !== '') {
+        $parametroSeleccionado = $parametroMasReciente;
+    }
+}
+
 if ($parametroSeleccionado === '' && !empty($parametrosDisponibles[0]['llave'])) {
-    $parametroSeleccionado = $parametrosDisponibles[0]['llave'];
+    $parametroSeleccionado = (string)$parametrosDisponibles[0]['llave'];
 }
 
 $serie = $seriesPorParametro[$parametroSeleccionado] ?? [];
@@ -453,10 +559,10 @@ if (in_array($export, ['excel', 'pdf'], true)) {
 
     <?php if (!empty($parametrosDisponibles)): ?>
         <div class="mb-3 d-flex flex-column flex-md-row gap-2">
-            <a href="dashboard.php?action=comparar_resultados_export&id=<?= (int)$idCliente ?>&parametro=<?= urlencode($parametroSeleccionado) ?>&export=excel" class="btn btn-outline-success">
+            <a href="dashboard.php?action=comparar_resultados_export&id=<?= (int)$idCliente ?>&parametro=<?= urlencode($parametroSeleccionado) ?>&alcance=<?= urlencode($alcance) ?>&export=excel" class="btn btn-outline-success">
                 <i class="bi bi-file-earmark-excel"></i> Exportar Excel
             </a>
-            <a href="dashboard.php?action=comparar_resultados_export&id=<?= (int)$idCliente ?>&parametro=<?= urlencode($parametroSeleccionado) ?>&export=pdf" class="btn btn-outline-danger">
+            <a href="dashboard.php?action=comparar_resultados_export&id=<?= (int)$idCliente ?>&parametro=<?= urlencode($parametroSeleccionado) ?>&alcance=<?= urlencode($alcance) ?>&export=pdf" class="btn btn-outline-danger">
                 <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
             </a>
         </div>
@@ -467,7 +573,7 @@ if (in_array($export, ['excel', 'pdf'], true)) {
             <form method="get" class="row g-2 align-items-end">
                 <input type="hidden" name="vista" value="comparar_resultados_cliente">
                 <input type="hidden" name="id" value="<?= (int)$idCliente ?>">
-                <div class="col-12 col-md-8">
+                <div class="col-12 col-md-5">
                     <label class="form-label">Parámetro a comparar</label>
                     <select name="parametro" class="form-select" required>
                         <?php foreach ($parametrosDisponibles as $opt): ?>
@@ -475,6 +581,14 @@ if (in_array($export, ['excel', 'pdf'], true)) {
                                 <?= htmlspecialchars($opt['examen'] . ' · ' . $opt['parametro']) ?>
                             </option>
                         <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Alcance</label>
+                    <select name="alcance" class="form-select">
+                        <option value="30d" <?= $alcance === '30d' ? 'selected' : '' ?>>Últimos 30 días</option>
+                        <option value="90d" <?= $alcance === '90d' ? 'selected' : '' ?>>Últimos 90 días</option>
+                        <option value="all" <?= $alcance === 'all' ? 'selected' : '' ?>>Todo histórico</option>
                     </select>
                 </div>
                 <div class="col-12 col-md-4 d-grid">

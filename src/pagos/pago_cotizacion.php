@@ -8,6 +8,7 @@ $msg = $_GET['msg'] ?? '';
 $totalPagado = 0;
 $saldo = 0;
 $isPagada = false;
+$isAnulada = false;
 $hayCajaAbierta = false;
 
 try {
@@ -27,6 +28,7 @@ if ($idCotizacion) {
     $stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
     $stmt->execute([$idCotizacion]);
     $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
+    $isAnulada = !empty($cotizacion['estado_pago']) && strtolower((string)$cotizacion['estado_pago']) === 'anulada';
     $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
     $stmtPagos->execute([$idCotizacion]);
     $totalPagado = floatval($stmtPagos->fetchColumn());
@@ -171,13 +173,18 @@ if ($idCotizacion) {
                 <i class="bi bi-credit-card me-2"></i>
                 Gestión de Pagos - Cotización #<?= htmlspecialchars($idCotizacion) ?>
             </h2>
-            <button type="button" class="toggle-edit" onclick="toggleEditTotal()" <?= $isPagada ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
+            <button type="button" class="toggle-edit" onclick="toggleEditTotal()" <?= ($isPagada || $isAnulada) ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
                 <i class="bi bi-pencil-square me-1"></i>
                 Modificar Monto Total
             </button>
         </div>
         <div class="payment-card">
-            <?php if ($msg == "error"): ?>
+            <?php if ($isAnulada || $msg == "anulada"): ?>
+                <div class="alert alert-danger alert-modern">
+                    <i class="bi bi-x-octagon me-2"></i>
+                    Esta cotización está anulada. No se permiten nuevos pagos ni cambios de monto.
+                </div>
+            <?php elseif ($msg == "error"): ?>
                 <?php
                     $intento = isset($_GET['intento']) ? floatval($_GET['intento']) : null;
                     $saldoParam = isset($_GET['saldo']) ? floatval($_GET['saldo']) : null;
@@ -259,7 +266,7 @@ if ($idCotizacion) {
                            min="0.01" 
                            required
                            id="nuevoTotal"
-                           <?= $isPagada ? 'readonly' : '' ?> >
+                           <?= ($isPagada || $isAnulada) ? 'readonly' : '' ?> >
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label text-white">
@@ -273,7 +280,7 @@ if ($idCotizacion) {
                             </div>
                         </div>
                         <div class="mt-3 d-flex gap-2">
-                            <button type="submit" class="btn btn-warning-modern" <?= $isPagada ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
+                            <button type="submit" class="btn btn-warning-modern" <?= ($isPagada || $isAnulada) ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
                                 <i class="bi bi-save me-1"></i>
                                 Actualizar Monto
                             </button>
@@ -306,7 +313,7 @@ if ($idCotizacion) {
                 </div>
 
                 <!-- Formulario de pago -->
-                <?php if ($saldo > 0 && $hayCajaAbierta): ?>
+                <?php if ($saldo > 0 && $hayCajaAbierta && !$isAnulada): ?>
                     <form method="post" action="dashboard.php?action=pago_cotizacion_guardar" class="p-4" id="formPago">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($idCotizacion) ?>">
                         
@@ -376,7 +383,7 @@ if ($idCotizacion) {
                             </div>
                         </div>
                     </form>
-                <?php elseif ($saldo > 0 && !$hayCajaAbierta): ?>
+                <?php elseif ($saldo > 0 && !$hayCajaAbierta && !$isAnulada): ?>
                     <div class="payment-info text-center">
                         <i class="bi bi-safe2 display-4 text-warning mb-3"></i>
                         <h4 class="text-warning">Caja cerrada</h4>
@@ -389,8 +396,8 @@ if ($idCotizacion) {
                 <?php else: ?>
                     <div class="payment-info text-center">
                         <i class="bi bi-check-circle-fill display-4 text-success mb-3"></i>
-                        <h4 class="text-success">¡Cotización Completamente Pagada!</h4>
-                        <p class="mb-3">Esta cotización no tiene saldo pendiente.</p>
+                        <h4 class="text-success"><?= $isAnulada ? 'Cotización anulada' : '¡Cotización Completamente Pagada!' ?></h4>
+                        <p class="mb-3"><?= $isAnulada ? 'Esta cotización fue anulada y quedó bloqueada para pagos.' : 'Esta cotización no tiene saldo pendiente.' ?></p>
                         <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary-modern">
                             <i class="bi bi-arrow-left me-2"></i>
                             Volver a Cotizaciones

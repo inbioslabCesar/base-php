@@ -51,7 +51,7 @@ $orderMap = [
 ];
 $orderBy = $orderMap[$orderCol] ?? 'c.fecha';
 
-$where = "WHERE DATE(c.fecha) BETWEEN ? AND ?";
+$where = "WHERE DATE(c.fecha) BETWEEN ? AND ? AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')";
 $params = [$desde, $hasta];
 
 if ($tipo_paciente === 'convenio') {

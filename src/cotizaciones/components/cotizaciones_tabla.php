@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
-$empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
-$convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+$modoCotizaciones = strtolower(trim((string)($modoCotizaciones ?? 'activas')));
+$soloAnuladas = ($modoCotizaciones === 'anuladas');
+$rolActualCot = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$puedeAnularCot = ($rolActualCot === 'admin');
+$empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(\PDO::FETCH_ASSOC);
+$convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(\PDO::FETCH_ASSOC);
 ?>
 <style>
 .btn-cotizacion-accion {
@@ -31,6 +35,74 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
     border-radius: 10px;
     border: 1.5px solid #90caf9;
     font-size: 1rem;
+}
+.alerta-resumen-cotizaciones {
+    display: flex;
+    gap: 1.25rem;
+    justify-content: center;
+    align-items: center;
+    margin: 1rem 0 1.25rem;
+    flex-wrap: wrap;
+}
+.alerta-resumen-cotizaciones.has-vencidos {
+    background: linear-gradient(90deg, rgba(220,53,69,.08), rgba(253,126,20,.06));
+    border: 1px solid rgba(220,53,69,.22);
+    border-radius: 12px;
+    padding: .55rem .85rem;
+}
+.alerta-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 2px solid rgba(0,0,0,0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.alerta-circle:hover { transform: translateY(-2px); }
+.alerta-circle.active { outline: 3px solid rgba(13,110,253,.25); }
+.alerta-circle.red { background: #dc3545; }
+.alerta-circle.orange { background: #fd7e14; }
+.alerta-circle.green { background: #198754; }
+.alerta-circle.pulse-red {
+    animation: alertaPulseRed 1.1s ease-in-out infinite;
+}
+@keyframes alertaPulseRed {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    50% {
+        transform: scale(1.12);
+        box-shadow: 0 0 0 10px rgba(220,53,69,.18);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+}
+.alerta-caption {
+    font-size: .8rem;
+    color: #4b5563;
+    text-align: center;
+    margin-top: .25rem;
+}
+.alerta-hint {
+    margin-top: .2rem;
+    font-size: .72rem;
+    font-weight: 700;
+    color: #dc3545;
+    text-align: center;
+    opacity: 0;
+    transition: opacity .2s ease;
+}
+.alerta-hint.show {
+    opacity: 1;
 }
 @media (max-width: 768px) {
     .table-responsive { display: none; }
@@ -142,6 +214,21 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
         </div>
     </div>
 </div>
+<div class="alerta-resumen-cotizaciones" id="alertaResumenCotizaciones">
+    <div>
+        <button type="button" class="alerta-circle red" id="alertaFiltroVencido" data-alerta="vencido" title="Filtrar vencidos">0</button>
+        <div class="alerta-caption">Vencidos</div>
+        <div class="alerta-hint" id="alertaVencidosHint">¡Atención!</div>
+    </div>
+    <div>
+        <button type="button" class="alerta-circle orange" id="alertaFiltroPorVencer" data-alerta="por_vencer" title="Filtrar por vencer">0</button>
+        <div class="alerta-caption">Por vencer</div>
+    </div>
+    <div>
+        <button type="button" class="alerta-circle green" id="alertaFiltroEnTiempo" data-alerta="en_tiempo" title="Filtrar en tiempo">0</button>
+        <div class="alerta-caption">En tiempo</div>
+    </div>
+</div>
 <div>
         <div class="table-responsive">
             <table id="tablaCotizaciones" class="table table-modern align-middle">
@@ -189,6 +276,10 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                         </div>
         </div>
     </div>
+    <form id="formAnularCotizacion" method="post" action="dashboard.php?action=eliminar_cotizacion" style="display:none;">
+        <input type="hidden" name="id" id="anularCotizacionId" value="">
+        <input type="hidden" name="motivo" id="anularCotizacionMotivo" value="">
+    </form>
     <!-- Buscador y cards para móvil -->
 <div class="mb-3 d-block d-md-none">
     <div class="input-group">
@@ -217,6 +308,93 @@ const modalTotalPago = document.getElementById('modalTotalPago');
 const cantidadSeleccionadas = document.getElementById('cantidadSeleccionadas');
 const confirmarPagoMasivo = document.getElementById('confirmarPagoMasivo');
 const selectAll = document.getElementById('selectAllCotizaciones');
+const puedeAnularCotizacion = <?= $puedeAnularCot ? 'true' : 'false' ?>;
+const modoCotizaciones = '<?= $soloAnuladas ? 'anuladas' : 'activas' ?>';
+const soloAnuladas = <?= $soloAnuladas ? 'true' : 'false' ?>;
+let filtroAlertaEstado = '';
+
+function renderEstadoExamenBadge(row) {
+    const estado = row.estado_examen;
+    const porcentaje = row.porcentaje_examen;
+    let base = "<span class='badge bg-secondary'>Sin datos</span>";
+
+    if (estado === 'completado_100' || estado === 'pendiente_100') {
+        base = "<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado 100%</span>";
+    } else if (estado === 'pendiente_0') {
+        base = "<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente 0%</span>";
+    } else if (estado && estado.startsWith('pendiente_')) {
+        base = `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente ${porcentaje}%</span>`;
+    }
+
+    const alertaTotal = parseInt(row.alerta_total || 0, 10);
+    if (!alertaTotal) {
+        return base;
+    }
+
+    if (row.alerta_estado === 'vencido') {
+        return `${base}<div class='mt-1'><span class='badge bg-danger'><i class='bi bi-bell-fill'></i> Vencido (${row.alerta_vencido})</span></div>`;
+    }
+    if (row.alerta_estado === 'por_vencer') {
+        return `${base}<div class='mt-1'><span class='badge bg-warning text-dark'><i class='bi bi-bell'></i> Por vencer (${row.alerta_por_vencer})</span></div>`;
+    }
+    return `${base}<div class='mt-1'><span class='badge bg-success'><i class='bi bi-bell'></i> En tiempo (${row.alerta_en_tiempo})</span></div>`;
+}
+
+function actualizarResumenAlertas() {
+    $.ajax({
+        url: 'dashboard.php?action=cotizaciones_api',
+        type: 'GET',
+        dataType: 'json',
+        data: {
+            resumen_alertas: 1,
+            modo: modoCotizaciones,
+            filtro_dni: $('#filtroDni').val(),
+            filtro_empresa: $('#filtroEmpresa').val(),
+            filtro_convenio: $('#filtroConvenio').val(),
+            filtro_fecha_desde: $('#filtroFechaDesde').val(),
+            filtro_fecha_hasta: $('#filtroFechaHasta').val()
+        },
+        success: function(resp) {
+            const vencido = parseInt(resp.vencido || 0, 10);
+            const porVencer = parseInt(resp.por_vencer || 0, 10);
+            const enTiempo = parseInt(resp.en_tiempo || 0, 10);
+
+            const $btnVencido = $('#alertaFiltroVencido');
+            $btnVencido.text(vencido);
+            $btnVencido.toggleClass('pulse-red', vencido > 0);
+            $('#alertaVencidosHint').toggleClass('show', vencido > 0);
+            $('#alertaResumenCotizaciones').toggleClass('has-vencidos', vencido > 0);
+
+            $('#alertaFiltroPorVencer').text(porVencer);
+            $('#alertaFiltroEnTiempo').text(enTiempo);
+        }
+    });
+}
+
+function actualizarEstadoBotonesAlerta() {
+    $('.alerta-circle').removeClass('active');
+    if (filtroAlertaEstado) {
+        $(`.alerta-circle[data-alerta="${filtroAlertaEstado}"]`).addClass('active');
+    }
+}
+
+function solicitarAnulacionCotizacion(id) {
+    if (!puedeAnularCotizacion) return;
+    const motivo = window.prompt('Ingresa el motivo de anulación:');
+    if (motivo === null) return;
+    const motivoTrim = (motivo || '').trim();
+    if (motivoTrim === '') {
+        alert('Debes ingresar un motivo para continuar.');
+        return;
+    }
+    const confirmar = window.confirm('¿Seguro que deseas anular esta cotización? Esta acción aplicará reversos de pagos y consumos.');
+    if (!confirmar) return;
+
+    const form = document.getElementById('formAnularCotizacion');
+    document.getElementById('anularCotizacionId').value = id;
+    document.getElementById('anularCotizacionMotivo').value = motivoTrim;
+    form.submit();
+}
 // --- Utilidades para selección manual ---
 function getSeleccionadasManual() {
     try {
@@ -273,6 +451,8 @@ function getSeleccionGlobal() {
                     d.filtro_convenio = $('#filtroConvenio').val();
                     d.filtro_fecha_desde = $('#filtroFechaDesde').val();
                     d.filtro_fecha_hasta = $('#filtroFechaHasta').val();
+                    d.filtro_alerta = filtroAlertaEstado;
+                    d.modo = modoCotizaciones;
                 }
             },
             "pageLength": 3,
@@ -336,7 +516,9 @@ function getSeleccionGlobal() {
                         // Calcular estado de pago usando total pagado y descarga anticipada
                         const total = parseFloat(row.total) || 0;
                         const pagado = parseFloat(row.total_pagado) || 0;
-                        if (row.tiene_descarga_anticipada == 1) {
+                        if (soloAnuladas) {
+                            return `<span class='badge bg-secondary'><i class='bi bi-x-octagon'></i> Anulada</span>`;
+                        } else if (row.tiene_descarga_anticipada == 1) {
                             return `<span class='badge bg-warning text-dark'><i class='bi bi-clock'></i> Descarga anticipada</span>`;
                         } else if (pagado >= total && total > 0) {
                             return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
@@ -350,17 +532,7 @@ function getSeleccionGlobal() {
                 {
                     "data": null,
                     "render": function(row) {
-                        const estado = row.estado_examen;
-                        const porcentaje = row.porcentaje_examen;
-                        if (estado === 'completado_100' || estado === 'pendiente_100') {
-                            return `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado 100%</span>`;
-                        } else if (estado === 'pendiente_0') {
-                            return `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente 0%</span>`;
-                        } else if (estado && estado.startsWith('pendiente_')) {
-                            return `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente ${porcentaje}%</span>`;
-                        } else {
-                            return `<span class='badge bg-secondary'>Sin datos</span>`;
-                        }
+                        return renderEstadoExamenBadge(row);
                     }
                 },
                 { "data": "rol_creador" },
@@ -370,13 +542,22 @@ function getSeleccionGlobal() {
                     "render": function(data, type, row) {
                         let acciones = '';
                         acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm btn-cotizacion-accion' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
-                        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+                        if (parseInt(row.id_cliente || 0, 10) > 0) {
+                            acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id_cliente}' class='btn btn-secondary btn-sm btn-cotizacion-accion' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
+                        }
+                        if (!soloAnuladas) {
+                            acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+                        }
                         if (row.modificada == 1) {
                             acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modificada</span>`;
                         }
-                        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
-                        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
-                        acciones += `<a href='dashboard.php?action=eliminar_cotizacion&id=${row.id}' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Eliminar cotización' onclick='return confirm(\"¿Seguro que deseas eliminar esta cotización?\")'><i class='bi bi-trash'></i></a>`;
+                        if (!soloAnuladas) {
+                            acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+                            acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+                        }
+                        if (!soloAnuladas && puedeAnularCotizacion) {
+                            acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
+                        }
                         acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
                         return acciones;
                     }
@@ -387,6 +568,7 @@ function getSeleccionGlobal() {
         // Recargar tabla al cambiar cualquier filtro
         $('#filtroDni, #filtroEmpresa, #filtroConvenio, #filtroFechaDesde, #filtroFechaHasta').on('change keyup', function() {
             tabla.ajax.reload();
+            actualizarResumenAlertas();
         });
         // Limpiar filtros
         $('#btnLimpiarFiltros').on('click', function() {
@@ -395,10 +577,25 @@ function getSeleccionGlobal() {
             $('#filtroConvenio').val('');
             $('#filtroFechaDesde').val('');
             $('#filtroFechaHasta').val('');
+            filtroAlertaEstado = '';
+            actualizarEstadoBotonesAlerta();
             tabla.ajax.reload();
+            actualizarResumenAlertas();
         });
         $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
             tabla.ajax.reload();
+        });
+
+        $('.alerta-circle').on('click', function() {
+            const target = $(this).data('alerta');
+            filtroAlertaEstado = (filtroAlertaEstado === target) ? '' : target;
+            actualizarEstadoBotonesAlerta();
+            if (window.innerWidth < 768 && typeof cargarCardsCotizaciones === 'function') {
+                const busquedaMovil = $('#buscadorCotizacionesMovil').val() || '';
+                cargarCardsCotizaciones(1, busquedaMovil);
+            } else {
+                tabla.ajax.reload();
+            }
         });
 
         function actualizarTotal() {
@@ -415,7 +612,8 @@ function getSeleccionGlobal() {
                 ids: seleccionadas.join(','),
                 length: seleccionadas.length,
                 start: 0,
-                draw: 1
+                draw: 1,
+                modo: modoCotizaciones
             },
             success: function(resp) {
                 let data = resp.data || [];
@@ -480,7 +678,8 @@ function getSeleccionGlobal() {
                     filtro_dni: filtroDni,
                     length: 10000,
                     start: 0,
-                    draw: 1
+                    draw: 1,
+                    modo: modoCotizaciones
                 },
                 success: function(resp) {
                     let data = resp.data || [];
@@ -506,6 +705,7 @@ function getSeleccionGlobal() {
             selectAll.checked = seleccionadas.length > 0;
             restaurarSeleccionManual();
             actualizarTotal();
+            actualizarResumenAlertas();
         });
 
         // Actualizar datos del modal al abrirlo
@@ -560,6 +760,9 @@ function getSeleccionGlobal() {
                 });
             });
         });
+
+        actualizarEstadoBotonesAlerta();
+        actualizarResumenAlertas();
     });
     </script>
 
@@ -611,7 +814,8 @@ function actualizarTotalMovil() {
                 ids: seleccionadas.join(','),
                 length: seleccionadas.length,
                 start: 0,
-                draw: 1
+                draw: 1,
+                modo: modoCotizaciones
             },
             success: function(resp) {
                 let data = resp.data || [];
@@ -665,7 +869,9 @@ function renderCotizacionCard(row) {
     const total = parseFloat(row.total) || 0;
     const pagado = parseFloat(row.total_pagado) || 0;
     let estadoPago = '';
-    if (row.tiene_descarga_anticipada == 1) {
+    if (soloAnuladas) {
+        estadoPago = `<span class='badge bg-secondary'><i class='bi bi-x-octagon'></i> Anulada</span>`;
+    } else if (row.tiene_descarga_anticipada == 1) {
         estadoPago = `<span class='badge bg-warning text-dark'><i class='bi bi-clock'></i> Descarga anticipada</span>`;
     } else if (pagado >= total && total > 0) {
         estadoPago = `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Pagado</span>`;
@@ -675,28 +881,26 @@ function renderCotizacionCard(row) {
         estadoPago = `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente</span>`;
     }
     // Estado examen con porcentaje
-    let estadoExamen = '';
-    const estado = row.estado_examen;
-    const porcentaje = row.porcentaje_examen;
-    if (estado === 'completado_100' || estado === 'pendiente_100') {
-        estadoExamen = `<span class='badge bg-success'><i class='bi bi-check-circle-fill'></i> Completado 100%</span>`;
-    } else if (estado === 'pendiente_0') {
-        estadoExamen = `<span class='badge bg-danger'><i class='bi bi-x-circle-fill'></i> Pendiente 0%</span>`;
-    } else if (estado && estado.startsWith('pendiente_')) {
-        estadoExamen = `<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split'></i> Pendiente ${porcentaje}%</span>`;
-    } else {
-        estadoExamen = `<span class='badge bg-secondary'>Sin datos</span>`;
-    }
+    let estadoExamen = renderEstadoExamenBadge(row);
     // Acciones (todas como en escritorio)
     let acciones = '';
     acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm btn-cotizacion-accion' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
-    acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+    if ((parseInt(row.id_cliente || 0, 10)) > 0) {
+        acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id_cliente}' class='btn btn-secondary btn-sm btn-cotizacion-accion' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
+    }
+    if (!soloAnuladas) {
+        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
+    }
     if (row.modificada == 1) {
         acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modif.</span>`;
     }
-    acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
-    acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
-    acciones += `<a href='dashboard.php?action=eliminar_cotizacion&id=${row.id}' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Eliminar cotización' onclick='return confirm("¿Seguro que deseas eliminar esta cotización?")'><i class='bi bi-trash'></i></a>`;
+    if (!soloAnuladas) {
+        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+    }
+    if (!soloAnuladas && puedeAnularCotizacion) {
+        acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
+    }
     acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
     // Checkbox selección
     const seleccionadas = getSeleccionadasManualMovil();
@@ -732,7 +936,9 @@ function cargarCardsCotizaciones(pagina = 1, busqueda = '') {
         filtro_empresa: $('#filtroEmpresa').val(),
         filtro_convenio: $('#filtroConvenio').val(),
         filtro_fecha_desde: $('#filtroFechaDesde').val(),
-        filtro_fecha_hasta: $('#filtroFechaHasta').val()
+        filtro_fecha_hasta: $('#filtroFechaHasta').val(),
+        filtro_alerta: filtroAlertaEstado,
+        modo: modoCotizaciones
     };
     $.ajax({
         url: 'dashboard.php?action=cotizaciones_api',
@@ -751,6 +957,7 @@ function cargarCardsCotizaciones(pagina = 1, busqueda = '') {
                 renderPaginacionCotizacionesMovil(1, 1, busqueda);
             }
             actualizarTotalMovil();
+            actualizarResumenAlertas();
         },
         error: function() {
             document.getElementById('cardsCotizacionesAjax').innerHTML = '<div class="alert alert-danger">Error al cargar las cotizaciones.</div>';
@@ -794,7 +1001,8 @@ $(document).on('change', '#selectAllCotizacionesMovil', function() {
                 filtro_dni: filtroDni,
                 length: 10000,
                 start: 0,
-                draw: 1
+                draw: 1,
+                modo: modoCotizaciones
             },
             success: function(resp) {
                 let data = resp.data || [];

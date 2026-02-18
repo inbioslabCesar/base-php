@@ -59,7 +59,7 @@ if ($id_resultado && $id_examen) {
         if ($ascii !== false && $ascii !== null) {
             $s = $ascii;
         }
-        $s = preg_replace('/[^a-z0-9 ]/', '', $s);
+        $s = preg_replace('/[^a-z0-9 ._-]/', '', $s);
         return $s;
     };
     $resultadosNorm = [];
@@ -74,9 +74,24 @@ if ($id_resultado && $id_examen) {
             }
         }
     }
-    $getResultado = function ($nombre, $default = '-') use ($resultados, $resultadosNorm, $normKey) {
+    $buildStableKey = function ($item) {
+        if (!is_array($item)) {
+            return '';
+        }
+        $idParametro = trim((string)($item['id_parametro'] ?? ''));
+        if ($idParametro === '') {
+            return '';
+        }
+        return 'id_parametro_' . $idParametro;
+    };
+
+    $getResultado = function ($nombre, $item = null, $default = '-') use ($resultados, $resultadosNorm, $normKey, $buildStableKey) {
         if (!is_array($resultados)) {
             return $default;
+        }
+        $stableKey = $buildStableKey($item);
+        if ($stableKey !== '' && array_key_exists($stableKey, $resultados)) {
+            return $resultados[$stableKey];
         }
         if (array_key_exists($nombre, $resultados)) {
             return $resultados[$nombre];
@@ -100,7 +115,7 @@ if ($id_resultado && $id_examen) {
             $nombre_raw = $param['nombre'] ?? '';
             $unidad = htmlspecialchars($param['unidad'] ?? '');
             $referencia = isset($param['referencias'][0]['valor']) ? htmlspecialchars($param['referencias'][0]['valor']) : '';
-            $valor_raw = $getResultado($nombre_raw, '-');
+            $valor_raw = $getResultado($nombre_raw, $param, '-');
             $nombre = htmlspecialchars($nombre_raw);
             $valor = htmlspecialchars($valor_raw);
             echo "<tr><td>$nombre</td><td>$valor</td><td>$unidad</td><td>$referencia</td></tr>";

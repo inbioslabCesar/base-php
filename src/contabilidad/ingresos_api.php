@@ -27,7 +27,7 @@ $tipo_paciente = $_GET['tipo_paciente'] ?? 'todos';
 $filtro_convenio = $_GET['filtro_convenio'] ?? '';
 $filtro_empresa = $_GET['filtro_empresa'] ?? '';
 
-$where = "WHERE DATE(c.fecha) BETWEEN ? AND ?";
+$where = "WHERE DATE(c.fecha) BETWEEN ? AND ? AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')";
 $params = [$desde, $hasta];
 if ($tipo_paciente == 'convenio') {
     $where .= " AND c.id_convenio IS NOT NULL";

@@ -13,7 +13,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
 $empresas = $pdo->query("SELECT id, nombre_comercial FROM empresas ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
 
 // Construir condiciones dinámicas para cotizaciones
-$where = "WHERE DATE(c.fecha) BETWEEN ? AND ?";
+$where = "WHERE DATE(c.fecha) BETWEEN ? AND ? AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')";
 $params = [$desde, $hasta];
 
 if ($tipo_paciente == 'convenio') {

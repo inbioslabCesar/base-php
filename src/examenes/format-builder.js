@@ -73,6 +73,9 @@ function addRow(data = {}) {
   // ...existing code...
   const tbody = document.querySelector('#formatTable tbody');
   const tr = document.createElement('tr');
+  if (data.id_parametro) {
+    tr.setAttribute('data-id-parametro', data.id_parametro);
+  }
   // Tipo
   const tdType = document.createElement('td');
   tdType.setAttribute('data-label', 'Tipo');

@@ -80,6 +80,13 @@ try {
     $auth = new FacturacionAuthService();
     $svc = new FacturacionService($pdo, $auth);
     foreach ($cotizaciones as $idCotizacion) {
+        $stmtEstado = $pdo->prepare("SELECT estado_pago FROM cotizaciones WHERE id = ? LIMIT 1");
+        $stmtEstado->execute([$idCotizacion]);
+        $estadoPago = strtolower((string)($stmtEstado->fetchColumn() ?? ''));
+        if ($estadoPago === 'anulada') {
+            continue;
+        }
+
         $saldo = obtenerSaldoCotizacion($pdo, $idCotizacion);
         if ($saldo <= 0) continue; // Ya pagado
         // Registrar pago por el saldo pendiente

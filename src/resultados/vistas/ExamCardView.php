@@ -29,11 +29,37 @@ class ExamCardView {
             if ($ascii !== false && $ascii !== null) {
                 $s = $ascii;
             }
-            $s = preg_replace('/[^a-z0-9 ]/', '', $s);
+            $s = preg_replace('/[^a-z0-9 ._-]/', '', $s);
             return $s;
         };
 
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
+
+        $parseDiasDesdeTexto = function ($texto) {
+            $texto = strtolower(trim((string)$texto));
+            if ($texto === '') {
+                return null;
+            }
+
+            if (!preg_match('/(\d+(?:[\.,]\d+)?)/', $texto, $m)) {
+                return null;
+            }
+
+            $valor = (float)str_replace(',', '.', $m[1]);
+            if ($valor <= 0) {
+                return null;
+            }
+
+            if (strpos($texto, 'hora') !== false || preg_match('/\bhr?s?\b|\bh\b/', $texto)) {
+                return max(1, (int)ceil($valor / 24));
+            }
+
+            if (strpos($texto, 'dia') !== false || strpos($texto, 'días') !== false || strpos($texto, 'dias') !== false || preg_match('/\bd\b/', $texto)) {
+                return max(1, (int)ceil($valor));
+            }
+
+            return null;
+        };
 
         // Índice normalizado para compatibilidad cuando cambian mayúsculas/minúsculas o signos
         // (ej. "PROLACTINA" vs "Prolactina").
@@ -50,9 +76,25 @@ class ExamCardView {
             }
         }
 
-        $getResultado = function ($nombre, $default = '') use ($resultados, $resultadosNorm, $normKey) {
+        $buildStableKey = function ($item) {
+            if (!is_array($item)) {
+                return '';
+            }
+            $idParametro = (string)($item['id_parametro'] ?? '');
+            $idParametro = trim($idParametro);
+            if ($idParametro === '') {
+                return '';
+            }
+            return 'id_parametro_' . $idParametro;
+        };
+
+        $getResultado = function ($nombre, $default = '', $item = null) use ($resultados, $resultadosNorm, $normKey, $buildStableKey) {
             if (!is_array($resultados)) {
                 return $default;
+            }
+            $stableKey = $buildStableKey($item);
+            if ($stableKey !== '' && array_key_exists($stableKey, $resultados)) {
+                return $resultados[$stableKey];
             }
             if (array_key_exists($nombre, $resultados)) {
                 return $resultados[$nombre];
@@ -65,12 +107,51 @@ class ExamCardView {
             if ($nk !== '' && array_key_exists($nk, $resultadosNorm)) {
                 return $resultadosNorm[$nk];
             }
+
+            $keysNoPrint = [];
+            foreach ($resultados as $k => $v) {
+                if ($k === 'imprimir_examen') {
+                    continue;
+                }
+                $keysNoPrint[] = $k;
+            }
+            if (count($keysNoPrint) === 1) {
+                return $resultados[$keysNoPrint[0]];
+            }
             return $default;
         };
 
         $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
         if (!is_array($adicional)) {
             $adicional = [];
+        }
+
+        $hasReceta = ((int)($examen['has_receta'] ?? 0) === 1);
+        $alarmaActiva = ((int)($examen['alarma_activa'] ?? 0) === 1);
+        $alarmaDiasGuardados = isset($examen['alarma_dias']) && $examen['alarma_dias'] !== null ? (int)$examen['alarma_dias'] : null;
+        $alarmaDiasSugeridos = $parseDiasDesdeTexto($examen['tiempo_respuesta'] ?? '');
+        $alarmaDiasValor = $alarmaDiasGuardados !== null && $alarmaDiasGuardados > 0
+            ? $alarmaDiasGuardados
+            : ($alarmaDiasSugeridos ?? '');
+        $teniaResultadoPrevio = false;
+        if (is_array($resultados)) {
+            foreach ($resultados as $k => $v) {
+                if ($k === 'imprimir_examen') {
+                    continue;
+                }
+                if ($v === 0 || $v === '0') {
+                    $teniaResultadoPrevio = true;
+                    break;
+                }
+                if (is_string($v) && trim($v) !== '') {
+                    $teniaResultadoPrevio = true;
+                    break;
+                }
+                if (!is_string($v) && $v !== null && $v !== '') {
+                    $teniaResultadoPrevio = true;
+                    break;
+                }
+            }
         }
 
         $cabecerasExistentes = [];
@@ -121,27 +202,59 @@ class ExamCardView {
         }
         ob_start();
         ?>
-        <div class="exam-card" style="animation-delay: <?= $index * 0.1 ?>s;">
+           <div class="exam-card"
+               data-id-resultado="<?= htmlspecialchars((string)$examen['id_resultado']) ?>"
+               data-has-receta="<?= $hasReceta ? '1' : '0' ?>"
+               data-tenia-previo="<?= $teniaResultadoPrevio ? '1' : '0' ?>"
+               data-examen-nombre="<?= htmlspecialchars((string)$examen['nombre_examen']) ?>"
+               style="animation-delay: <?= $index * 0.1 ?>s;">
             <div class="exam-card-header d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center">
                     <i class="bi bi-clipboard-pulse me-2"></i>
                     <span><?= htmlspecialchars($examen['nombre_examen']) ?></span>
                 </div>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" 
-                           name="examenes[<?= $examen['id_resultado'] ?>][imprimir_examen]" 
-                           id="imprimir_examen_<?= $examen['id_resultado'] ?>" 
-                           value="1"
-                           <?= (!isset($resultados['imprimir_examen']) || $resultados['imprimir_examen']) ? 'checked' : '' ?>>
-                    <label class="form-check-label text-white" for="imprimir_examen_<?= $examen['id_resultado'] ?>">
-                        <i class="bi bi-printer me-1"></i>
-                        Imprimir
-                    </label>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" 
+                               name="examenes[<?= $examen['id_resultado'] ?>][imprimir_examen]" 
+                               id="imprimir_examen_<?= $examen['id_resultado'] ?>" 
+                               value="1"
+                               <?= (!isset($resultados['imprimir_examen']) || $resultados['imprimir_examen']) ? 'checked' : '' ?>>
+                        <label class="form-check-label text-white" for="imprimir_examen_<?= $examen['id_resultado'] ?>">
+                            <i class="bi bi-printer me-1"></i>
+                            Imprimir
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input js-alarma-switch" type="checkbox"
+                               name="examenes[<?= $examen['id_resultado'] ?>][alarma_activa]"
+                               id="alarma_activa_<?= $examen['id_resultado'] ?>"
+                               value="1"
+                               <?= $alarmaActiva ? 'checked' : '' ?>>
+                        <label class="form-check-label text-white" for="alarma_activa_<?= $examen['id_resultado'] ?>">
+                            <i class="bi bi-bell me-1"></i>
+                            Alarma
+                        </label>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <label class="text-white-50 small mb-0" for="alarma_dias_<?= $examen['id_resultado'] ?>">días</label>
+                        <input type="number"
+                               min="1"
+                               step="1"
+                               class="form-control form-control-sm js-alarma-dias"
+                               style="width: 78px;"
+                               name="examenes[<?= $examen['id_resultado'] ?>][alarma_dias]"
+                               id="alarma_dias_<?= $examen['id_resultado'] ?>"
+                               value="<?= htmlspecialchars((string)$alarmaDiasValor) ?>"
+                               <?= $alarmaActiva ? '' : 'disabled' ?>>
+                    </div>
                 </div>
             </div>
             <div class="exam-card-body">
                 <input type="hidden" name="examenes[<?= $examen['id_resultado'] ?>][id_resultado]" 
                        value="<?= htmlspecialchars($examen['id_resultado']) ?>">
+                  <input type="hidden" name="examenes[<?= $examen['id_resultado'] ?>][repeticion_confirmada]" class="js-repeticion-confirmada" value="0">
+                  <input type="hidden" name="examenes[<?= $examen['id_resultado'] ?>][motivo_repeticion]" class="js-repeticion-motivo" value="">
 
                 <div class="header-builder" data-exam-id="<?= htmlspecialchars($examen['id_resultado']) ?>">
                     <div class="header-builder-title">
@@ -229,6 +342,7 @@ class ExamCardView {
                             ' . htmlspecialchars($item['nombre']) . '
                         </div>';
                     } elseif ($item['tipo'] === 'Campo') {
+                        $valorCampo = $getResultado($item['nombre'], '', $item);
                         echo '<div class="mb-4">
                             <label class="form-label">
                                 <i class="bi bi-pencil-square me-2"></i>
@@ -237,17 +351,19 @@ class ExamCardView {
                             <input type="text"
                                 class="form-control"
                                 name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']"
-                                value="' . htmlspecialchars($getResultado($item['nombre'], '')) . '"
+                                value="' . htmlspecialchars($valorCampo) . '"
+                                data-initial-value="' . htmlspecialchars((string)$valorCampo) . '"
                                 placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">
                         </div>';
                     } elseif ($item['tipo'] === 'Texto Largo') {
                         $rows = isset($item['rows']) && is_numeric($item['rows']) ? intval($item['rows']) : 4;
+                        $valorTexto = $getResultado($item['nombre'], '', $item);
                         echo '<div class="mb-4">
                             <label class="form-label">
                                 <i class="bi bi-textarea-t me-2"></i>
                                 ' . htmlspecialchars($item['nombre']) . '
                             </label>
-                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($getResultado($item['nombre'], '')) . '</textarea>
+                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" data-initial-value="' . htmlspecialchars((string)$valorTexto) . '" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($valorTexto) . '</textarea>
                         </div>';
                     } elseif ($item['tipo'] === 'Parámetro') {
                         // Refuerza la lógica: si no hay edad o sexo, nunca aplica
@@ -267,7 +383,7 @@ class ExamCardView {
                                 }
                             }
                         }
-                        $valor_resultado = $getResultado($item['nombre'], '');
+                        $valor_resultado = $getResultado($item['nombre'], '', $item);
                         $valor_resultado_num = str_replace(',', '', $valor_resultado);
                         $fuera_rango = false;
                         if ($referencia_aplicada && is_numeric($valor_resultado_num)) {
@@ -287,8 +403,8 @@ class ExamCardView {
                         }
                         echo '</label>';
                         if (!empty($item['opciones'])) {
-                            $valorSelect = $getResultado($item['nombre'], '');
-                            echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control">
+                            $valorSelect = $getResultado($item['nombre'], '', $item);
+                                echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control" data-initial-value="' . htmlspecialchars((string)$valorSelect) . '">
                                     <option value="">Seleccione una opción...</option>';
                             foreach ($item['opciones'] as $opcion) {
                                 echo '<option value="' . htmlspecialchars($opcion) . '"' . (($valorSelect !== '' && $valorSelect == $opcion) ? ' selected' : '') . '>' . htmlspecialchars($opcion) . '</option>';
@@ -301,7 +417,7 @@ class ExamCardView {
                             } else {
                                 echo '<i class="bi bi-123"></i>';
                             }
-                            $value = $getResultado($item['nombre'], '');
+                            $value = $getResultado($item['nombre'], '', $item);
                             // Formatea con coma si es numérico y mayor a 999
                             if (is_numeric(str_replace(',', '', $value)) && $value !== '' && floatval(str_replace(',', '', $value)) >= 1000) {
                                 $value = number_format(str_replace(',', '', $value), 0, '.', ',');
@@ -310,6 +426,7 @@ class ExamCardView {
                                 name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']"
                                 class="form-control' . (!empty($item['formula']) ? ' campo-calculado calculated-field' : '') . ($fuera_rango ? ' is-invalid' : '') . '"
                                 value="' . htmlspecialchars($value) . '"
+                                data-initial-value="' . htmlspecialchars((string)$value) . '"
                                 placeholder="' . (!empty($item['formula']) ? 'Valor calculado automáticamente' : 'Ingrese el valor') . '"' .
                                 (!empty($item['formula']) ? ' data-formula="' . htmlspecialchars($item['formula']) . '" readonly' : '') .
                                 ' data-referencias=\'' . json_encode($item['referencias'] ?? []) . '\'' .

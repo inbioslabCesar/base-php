@@ -13,6 +13,26 @@ if (!in_array($rol, ['admin', 'recepcionista', 'laboratorista'])) {
     exit;
 }
 
+$stmtColsCot = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cotizaciones' AND COLUMN_NAME IN ('anulada_at','anulada_por','anulado_motivo')");
+$stmtColsCot->execute();
+$colsCot = $stmtColsCot->fetchAll(\PDO::FETCH_COLUMN);
+$hasAnuladaAt = in_array('anulada_at', $colsCot, true);
+$hasAnuladaPor = in_array('anulada_por', $colsCot, true);
+$hasAnuladoMotivo = in_array('anulado_motivo', $colsCot, true);
+
+$selectAnuladaAt = $hasAnuladaAt ? "c.anulada_at AS anulada_at" : "NULL AS anulada_at";
+$selectAnuladaPor = $hasAnuladaPor ? "c.anulada_por AS anulada_por" : "NULL AS anulada_por";
+$selectAnuladaPorNombre = $hasAnuladaPor ? "CONCAT(COALESCE(ua.nombre,''), ' ', COALESCE(ua.apellido,'')) AS anulada_por_nombre" : "NULL AS anulada_por_nombre";
+$selectAnuladoMotivo = $hasAnuladoMotivo ? "c.anulado_motivo AS anulado_motivo" : "NULL AS anulado_motivo";
+$joinAnuladaUser = $hasAnuladaPor ? " LEFT JOIN usuarios ua ON ua.id = c.anulada_por " : " ";
+
+$stmtColsRes = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resultados_examenes' AND COLUMN_NAME IN ('alarma_activa','alarma_dias','alarma_fecha_objetivo','alarma_estado')");
+$stmtColsRes->execute();
+$colsRes = $stmtColsRes->fetchAll(\PDO::FETCH_COLUMN);
+$hasAlarmColumns = in_array('alarma_activa', $colsRes, true)
+    && in_array('alarma_dias', $colsRes, true)
+    && in_array('alarma_fecha_objetivo', $colsRes, true);
+
 
 // Parámetros DataTables
 $draw = intval($_GET['draw'] ?? 1);
@@ -21,6 +41,10 @@ $length = intval($_GET['length'] ?? 10);
 $search = trim($_GET['search']['value'] ?? '');
 $orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : null;
 $orderDir = isset($_GET['order'][0]['dir']) && strtolower($_GET['order'][0]['dir']) === 'asc' ? 'ASC' : 'DESC';
+$modo = strtolower(trim((string)($_GET['modo'] ?? 'activas')));
+$soloAnuladas = ($modo === 'anuladas');
+$filtroAlerta = strtolower(trim((string)($_GET['filtro_alerta'] ?? '')));
+$resumenAlertas = isset($_GET['resumen_alertas']) && (int)$_GET['resumen_alertas'] === 1;
 
 // Mapeo de columnas (usar alias para evitar ambigüedad). Para columnas calculadas usar null.
 $columns = [
@@ -47,13 +71,17 @@ if (!empty($_GET['ids'])) {
     $ids = array_filter(array_map('trim', explode(',', $_GET['ids'])), 'is_numeric');
     if (count($ids) > 0) {
         $in = implode(',', array_fill(0, count($ids), '?'));
-        $sql = "SELECT c.id, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
-            c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada
-            FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id
-            WHERE c.id IN ($in)";
+        $sql = "SELECT c.id, c.id_cliente, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
+            c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada,
+            $selectAnuladaAt,
+            $selectAnuladaPor,
+            $selectAnuladaPorNombre,
+            $selectAnuladoMotivo
+            FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id $joinAnuladaUser
+            WHERE c.id IN ($in) " . ($soloAnuladas ? "AND c.estado_pago = 'anulada'" : "AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')");
         $stmt = $pdo->prepare($sql);
         $stmt->execute($ids);
-        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         $dataFinal = [];
         foreach ($data as $row) {
             $row['saldo'] = obtenerSaldoCotizacion($pdo, $row['id']);
@@ -79,11 +107,16 @@ if (!empty($_GET['ids'])) {
 }
 
 try {
-    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
-        c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada
-        FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id";
+    $sql = "SELECT SQL_CALC_FOUND_ROWS c.id, c.id_cliente, c.codigo, cl.codigo_cliente AS codigo_cliente, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni, c.fecha, c.total,
+        c.estado_muestra AS estado_examen, c.rol_creador, c.modificada, c.id_empresa, c.id_convenio, e.nombre_comercial, v.nombre AS nombre_convenio, c.referencia_personalizada,
+        $selectAnuladaAt,
+        $selectAnuladaPor,
+        $selectAnuladaPorNombre,
+        $selectAnuladoMotivo
+        FROM cotizaciones c LEFT JOIN clientes cl ON c.id_cliente = cl.id LEFT JOIN empresas e ON c.id_empresa = e.id LEFT JOIN convenios v ON c.id_convenio = v.id $joinAnuladaUser";
     $where = [];
     $params = [];
+    $where[] = $soloAnuladas ? "c.estado_pago = 'anulada'" : "(c.estado_pago IS NULL OR c.estado_pago <> 'anulada')";
     if ($search !== '') {
         $where[] = "(cl.codigo_cliente LIKE ? OR c.codigo LIKE ? OR cl.nombre LIKE ? OR cl.apellido LIKE ? OR cl.dni LIKE ?)";
         $params = ["%$search%", "%$search%", "%$search%", "%$search%", "%$search%"];
@@ -109,6 +142,90 @@ try {
         $where[] = "c.fecha <= ?";
         $params[] = $_GET['filtro_fecha_hasta'];
     }
+    if ($filtroAlerta !== '' && in_array($filtroAlerta, ['vencido', 'por_vencer', 'en_tiempo'], true)) {
+        if ($hasAlarmColumns) {
+            $estadoExpr = "CASE
+                WHEN NOW() > DATE_ADD(ra.fecha_ingreso, INTERVAL ra.alarma_dias DAY) THEN 'vencido'
+                WHEN NOW() >= DATE_ADD(ra.fecha_ingreso, INTERVAL GREATEST(ra.alarma_dias - 1, 0) DAY) THEN 'por_vencer'
+                ELSE 'en_tiempo'
+            END";
+            $where[] = "EXISTS (
+                SELECT 1
+                FROM resultados_examenes ra
+                WHERE ra.id_cotizacion = c.id
+                  AND (ra.estado IS NULL OR ra.estado <> 'completado')
+                  AND ra.alarma_activa = 1
+                  AND ra.alarma_dias IS NOT NULL
+                  AND ra.alarma_dias > 0
+                  AND {$estadoExpr} = ?
+            )";
+            $params[] = $filtroAlerta;
+        } else {
+            $where[] = "1 = 0";
+        }
+    }
+
+    if ($resumenAlertas) {
+        if (!$hasAlarmColumns) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'vencido' => 0,
+                'por_vencer' => 0,
+                'en_tiempo' => 0,
+                'total' => 0
+            ]);
+            exit;
+        }
+
+        $sqlResumen = "SELECT
+                SUM(CASE
+                    WHEN re.alarma_activa = 1
+                     AND re.alarma_dias IS NOT NULL
+                     AND re.alarma_dias > 0
+                     AND (re.estado IS NULL OR re.estado <> 'completado')
+                     AND NOW() > DATE_ADD(re.fecha_ingreso, INTERVAL re.alarma_dias DAY)
+                    THEN 1 ELSE 0 END) AS vencido,
+                SUM(CASE
+                    WHEN re.alarma_activa = 1
+                     AND re.alarma_dias IS NOT NULL
+                     AND re.alarma_dias > 0
+                     AND (re.estado IS NULL OR re.estado <> 'completado')
+                     AND NOW() <= DATE_ADD(re.fecha_ingreso, INTERVAL re.alarma_dias DAY)
+                     AND NOW() >= DATE_ADD(re.fecha_ingreso, INTERVAL GREATEST(re.alarma_dias - 1, 0) DAY)
+                    THEN 1 ELSE 0 END) AS por_vencer,
+                SUM(CASE
+                    WHEN re.alarma_activa = 1
+                     AND re.alarma_dias IS NOT NULL
+                     AND re.alarma_dias > 0
+                     AND (re.estado IS NULL OR re.estado <> 'completado')
+                     AND NOW() < DATE_ADD(re.fecha_ingreso, INTERVAL GREATEST(re.alarma_dias - 1, 0) DAY)
+                    THEN 1 ELSE 0 END) AS en_tiempo
+            FROM cotizaciones c
+            LEFT JOIN clientes cl ON c.id_cliente = cl.id
+            LEFT JOIN empresas e ON c.id_empresa = e.id
+            LEFT JOIN convenios v ON c.id_convenio = v.id
+            LEFT JOIN resultados_examenes re ON re.id_cotizacion = c.id";
+        if ($where) {
+            $sqlResumen .= " WHERE " . implode(' AND ', $where);
+        }
+
+        $stmtResumen = $pdo->prepare($sqlResumen);
+        $stmtResumen->execute($params);
+        $res = $stmtResumen->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $vencido = (int)($res['vencido'] ?? 0);
+        $porVencer = (int)($res['por_vencer'] ?? 0);
+        $enTiempo = (int)($res['en_tiempo'] ?? 0);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'vencido' => $vencido,
+            'por_vencer' => $porVencer,
+            'en_tiempo' => $enTiempo,
+            'total' => $vencido + $porVencer + $enTiempo,
+        ]);
+        exit;
+    }
+
     if ($where) {
         $sql .= " WHERE " . implode(' AND ', $where);
     }
@@ -116,7 +233,7 @@ try {
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $data = $stmt->fetchAll(\PDO::FETCH_ASSOC);
     // Procesar referencia para cada fila
     $dataFinal = [];
     foreach ($data as $row) {
@@ -145,6 +262,56 @@ try {
             $row['estado_examen'] = 'pendiente_' . $porcentaje;
         }
         $row['porcentaje_examen'] = $porcentaje;
+
+        $row['alerta_estado'] = 'sin_alarma';
+        $row['alerta_vencido'] = 0;
+        $row['alerta_por_vencer'] = 0;
+        $row['alerta_en_tiempo'] = 0;
+        $row['alerta_total'] = 0;
+
+        if ($hasAlarmColumns) {
+            $stmtAlarma = $pdo->prepare("SELECT
+                    SUM(CASE
+                        WHEN alarma_activa = 1
+                         AND alarma_dias IS NOT NULL
+                         AND alarma_dias > 0
+                         AND (estado IS NULL OR estado <> 'completado')
+                         AND NOW() > DATE_ADD(fecha_ingreso, INTERVAL alarma_dias DAY)
+                        THEN 1 ELSE 0 END) AS vencido,
+                    SUM(CASE
+                        WHEN alarma_activa = 1
+                         AND alarma_dias IS NOT NULL
+                         AND alarma_dias > 0
+                         AND (estado IS NULL OR estado <> 'completado')
+                         AND NOW() <= DATE_ADD(fecha_ingreso, INTERVAL alarma_dias DAY)
+                         AND NOW() >= DATE_ADD(fecha_ingreso, INTERVAL GREATEST(alarma_dias - 1, 0) DAY)
+                        THEN 1 ELSE 0 END) AS por_vencer,
+                    SUM(CASE
+                        WHEN alarma_activa = 1
+                         AND alarma_dias IS NOT NULL
+                         AND alarma_dias > 0
+                         AND (estado IS NULL OR estado <> 'completado')
+                         AND NOW() < DATE_ADD(fecha_ingreso, INTERVAL GREATEST(alarma_dias - 1, 0) DAY)
+                        THEN 1 ELSE 0 END) AS en_tiempo
+                FROM resultados_examenes
+                WHERE id_cotizacion = ?");
+            $stmtAlarma->execute([$row['id']]);
+            $alarm = $stmtAlarma->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+            $row['alerta_vencido'] = (int)($alarm['vencido'] ?? 0);
+            $row['alerta_por_vencer'] = (int)($alarm['por_vencer'] ?? 0);
+            $row['alerta_en_tiempo'] = (int)($alarm['en_tiempo'] ?? 0);
+            $row['alerta_total'] = $row['alerta_vencido'] + $row['alerta_por_vencer'] + $row['alerta_en_tiempo'];
+
+            if ($row['alerta_vencido'] > 0) {
+                $row['alerta_estado'] = 'vencido';
+            } elseif ($row['alerta_por_vencer'] > 0) {
+                $row['alerta_estado'] = 'por_vencer';
+            } elseif ($row['alerta_en_tiempo'] > 0) {
+                $row['alerta_estado'] = 'en_tiempo';
+            }
+        }
+
         $dataFinal[] = $row;
     }
     // Total filtrado
@@ -156,7 +323,11 @@ try {
     $stmtCount->execute($params);
     $totalFiltered = $stmtCount->fetchColumn();
     // Total general
-    $totalRecords = $pdo->query("SELECT COUNT(*) FROM cotizaciones") ->fetchColumn();
+    if ($soloAnuladas) {
+        $totalRecords = $pdo->query("SELECT COUNT(*) FROM cotizaciones WHERE estado_pago = 'anulada'")->fetchColumn();
+    } else {
+        $totalRecords = $pdo->query("SELECT COUNT(*) FROM cotizaciones WHERE estado_pago IS NULL OR estado_pago <> 'anulada'")->fetchColumn();
+    }
 
     // DEBUG: incluir parámetros y SQL en la respuesta si se solicita
     if (isset($_GET['debug']) && $_GET['debug'] == '1') {
@@ -187,7 +358,7 @@ try {
         "data" => $dataFinal
     ]);
     exit;
-} catch (Exception $e) {
+} catch (\Exception $e) {
     header('Content-Type: application/json');
     echo json_encode([
         "error" => $e->getMessage()
