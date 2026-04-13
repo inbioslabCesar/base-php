@@ -9,8 +9,8 @@ $stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
 $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Valores por defecto
-$logo = !empty($empresa['logo']) ? $empresa['logo'] : 'images/empresa/logo_empresa.png';
-$firma = !empty($empresa['firma']) ? $empresa['firma'] : 'images/empresa/firma.png';
+$logo = !empty($empresa['logo']) ? $empresa['logo'] : '../uploads/empresa/logo_empresa.png';
+$firma = !empty($empresa['firma']) ? $empresa['firma'] : '../uploads/empresa/firma.png';
 $color_principal = $empresa['color_principal'] ?? '#0d6efd';
 $color_secundario = $empresa['color_secundario'] ?? '#f8f9fa';
 $color_footer = $empresa['color_footer'] ?? '#343a40';
@@ -50,6 +50,33 @@ $menu_inicio = $empresa['menu_inicio'] ?? 'Inicio';
 $menu_servicios = $empresa['menu_servicios'] ?? 'Servicios';
 $menu_testimonios = $empresa['menu_testimonios'] ?? 'Testimonios';
 $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
+
+$moneda_codigo = strtoupper(trim((string)($empresa['moneda_codigo'] ?? 'PEN')));
+$moneda_simbolo = trim((string)($empresa['moneda_simbolo'] ?? 'S/'));
+$moneda_posicion = strtolower(trim((string)($empresa['moneda_posicion'] ?? 'prefix')));
+if (!in_array($moneda_posicion, ['prefix', 'suffix'], true)) {
+    $moneda_posicion = 'prefix';
+}
+$moneda_decimales = (int)($empresa['moneda_decimales'] ?? 2);
+if ($moneda_decimales < 0 || $moneda_decimales > 4) {
+    $moneda_decimales = 2;
+}
+$moneda_separador_decimal = (string)($empresa['moneda_separador_decimal'] ?? '.');
+$moneda_separador_miles = (string)($empresa['moneda_separador_miles'] ?? ',');
+
+$toPreviewUrl = static function (string $path): string {
+    $path = trim($path);
+    if ($path === '') {
+        return '';
+    }
+    if (preg_match('~^(https?:)?//~i', $path) || strpos($path, 'data:') === 0 || strpos($path, '/') === 0) {
+        return $path;
+    }
+    return $path;
+};
+
+$logoUrl = $toPreviewUrl((string)$logo);
+$firmaUrl = $toPreviewUrl((string)$firma);
 ?>
 <div class="container mt-4">
     <h4>Configuración de Empresa</h4>
@@ -101,6 +128,39 @@ $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
                 <input type="text" class="form-control" id="celular" name="celular"
                     value="<?= htmlspecialchars($empresa['celular'] ?? '') ?>">
             </div>
+            <div class="col-12"><hr></div>
+            <div class="col-md-3 mb-3">
+                <label for="moneda_codigo" class="form-label">Código moneda (ISO)</label>
+                <input type="text" class="form-control" id="moneda_codigo" name="moneda_codigo" maxlength="10"
+                    value="<?= htmlspecialchars($moneda_codigo) ?>" placeholder="PEN, USD, EUR...">
+            </div>
+            <div class="col-md-2 mb-3">
+                <label for="moneda_simbolo" class="form-label">Símbolo</label>
+                <input type="text" class="form-control" id="moneda_simbolo" name="moneda_simbolo" maxlength="10"
+                    value="<?= htmlspecialchars($moneda_simbolo) ?>" placeholder="S/">
+            </div>
+            <div class="col-md-2 mb-3">
+                <label for="moneda_posicion" class="form-label">Posición</label>
+                <select class="form-select" id="moneda_posicion" name="moneda_posicion">
+                    <option value="prefix" <?= $moneda_posicion === 'prefix' ? 'selected' : '' ?>>Antes (S/ 10.00)</option>
+                    <option value="suffix" <?= $moneda_posicion === 'suffix' ? 'selected' : '' ?>>Después (10.00 $)</option>
+                </select>
+            </div>
+            <div class="col-md-2 mb-3">
+                <label for="moneda_decimales" class="form-label">Decimales</label>
+                <input type="number" class="form-control" id="moneda_decimales" name="moneda_decimales" min="0" max="4"
+                    value="<?= htmlspecialchars((string)$moneda_decimales) ?>">
+            </div>
+            <div class="col-md-1 mb-3">
+                <label for="moneda_separador_decimal" class="form-label">Sep. dec.</label>
+                <input type="text" class="form-control" id="moneda_separador_decimal" name="moneda_separador_decimal" maxlength="1"
+                    value="<?= htmlspecialchars($moneda_separador_decimal) ?>">
+            </div>
+            <div class="col-md-2 mb-3">
+                <label for="moneda_separador_miles" class="form-label">Sep. miles</label>
+                <input type="text" class="form-control" id="moneda_separador_miles" name="moneda_separador_miles" maxlength="1"
+                    value="<?= htmlspecialchars($moneda_separador_miles) ?>">
+            </div>
             <!-- Colores y tipografía -->
             <div class="col-md-3 mb-3">
                 <label for="color_principal" class="form-label">Color principal</label>
@@ -135,11 +195,11 @@ $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
             <!-- Logo y firma -->
             <div class="col-md-6 mb-3 text-center">
                 <label class="form-label fw-bold">Logo actual:</label><br>
-                <img src="<?= htmlspecialchars($logo) ?>?v=<?= time() ?>" alt="Logo de la empresa" style="max-height: 80px;">
+                <img src="<?= htmlspecialchars($logoUrl) ?>?v=<?= time() ?>" alt="Logo de la empresa" style="max-height: 80px;">
             </div>
             <div class="col-md-6 mb-3 text-center">
                 <label class="form-label fw-bold">Firma actual:</label><br>
-                <img src="<?= htmlspecialchars($firma) ?>?v=<?= time() ?>" alt="Firma de la empresa" style="max-height: 80px;">
+                <img src="<?= htmlspecialchars($firmaUrl) ?>?v=<?= time() ?>" alt="Firma de la empresa" style="max-height: 80px;">
             </div>
             <div class="col-md-6 mb-3">
                 <label for="logo" class="form-label">Actualizar logo (PNG):</label>

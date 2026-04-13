@@ -11,7 +11,7 @@ if (!$config) {
         'direccion' => '',
         'celular' => '',
         'telefono' => '',
-        'logo' => '../images/empresa/logo_empresa.png',
+        'logo' => '../uploads/empresa/logo_empresa.png',
         'dominio' => ''
     ];
 }
@@ -20,7 +20,7 @@ if (!$config) {
 if (!empty($config['logo']) && strpos($config['logo'], '/') !== 0 && strpos($config['logo'], 'http') !== 0) {
     $config['logo'] = $config['logo'];
 } elseif (empty($config['logo'])) {
-    $config['logo'] = '../images/empresa/logo_empresa.png';
+    $config['logo'] = '../uploads/empresa/logo_empresa.png';
 }
 
 ?>

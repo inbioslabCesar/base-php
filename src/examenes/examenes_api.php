@@ -18,7 +18,12 @@ $start = intval($_GET['start'] ?? 0);
 $length = intval($_GET['length'] ?? 10);
 $search = trim($_GET['search']['value'] ?? '');
 $orderCol = $_GET['order'][0]['column'] ?? 0;
-$orderDir = $_GET['order'][0]['dir'] ?? 'asc';
+$orderDir = strtolower((string)($_GET['order'][0]['dir'] ?? 'asc'));
+$orderDir = in_array($orderDir, ['asc', 'desc'], true) ? strtoupper($orderDir) : 'ASC';
+
+if ($start < 0) {
+    $start = 0;
+}
 
 // Mapeo de columnas
 $columns = ['codigo', 'nombre', 'area', 'metodologia', 'precio_publico', 'tiempo_respuesta', 'id'];
@@ -35,7 +40,11 @@ try {
     if ($where) {
         $sql .= " WHERE " . implode(' AND ', $where);
     }
-    $sql .= " ORDER BY $orderBy $orderDir LIMIT $start, $length";
+
+    $sql .= " ORDER BY $orderBy $orderDir";
+    if ($length !== -1) {
+        $sql .= " LIMIT $start, $length";
+    }
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

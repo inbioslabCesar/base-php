@@ -11,9 +11,18 @@ if (!in_array($format, ['excel', 'pdf'], true)) {
 }
 
 try {
-    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_lotes','inventario_movimientos')");
-    $stmtTbl->execute();
-    if ((int)$stmtTbl->fetchColumn() < 3) {
+    $requiredTables = ['inventario_items', 'inventario_lotes', 'inventario_movimientos'];
+    $tablesReady = true;
+    $stmtTbl = $pdo->prepare("SHOW TABLES LIKE ?");
+    foreach ($requiredTables as $tblName) {
+        $stmtTbl->execute([$tblName]);
+        if (!$stmtTbl->fetchColumn()) {
+            $tablesReady = false;
+            break;
+        }
+    }
+
+    if (!$tablesReady) {
         header('Content-Type: text/html; charset=UTF-8');
         echo '<div style="padding:16px;font-family:Arial,sans-serif;">';
         echo '<h4>No se pudo exportar</h4>';
@@ -23,11 +32,22 @@ try {
         exit;
     }
 
-    $stmtCols = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME IN ('marca','presentacion')");
-    $stmtCols->execute();
-    $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+    $stmtCols = $pdo->query("SHOW COLUMNS FROM inventario_items");
+    $defs = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_ASSOC) : [];
+    $cols = [];
+    foreach ($defs as $def) {
+        if (!empty($def['Field'])) {
+            $cols[] = (string)$def['Field'];
+        }
+    }
     $hasMarca = in_array('marca', $cols, true);
     $hasPresentacion = in_array('presentacion', $cols, true);
+
+    $stmtColOrigenMov = $pdo->query("SHOW COLUMNS FROM inventario_movimientos LIKE 'origen'");
+    $hasOrigenMovCol = (bool)($stmtColOrigenMov && $stmtColOrigenMov->fetch(\PDO::FETCH_ASSOC));
+    $whereMovimientosInventario = $hasOrigenMovCol
+        ? "COALESCE(m.origen, CASE WHEN COALESCE(m.observacion, '') LIKE 'Transferencia interna #% a laboratorio%' THEN 'transferencia_interna' ELSE 'inventario' END) = 'inventario'"
+        : "COALESCE(m.observacion, '') NOT LIKE 'Transferencia interna #% a laboratorio%'";
 
     $stmt = $pdo->query("SELECT
         m.fecha_hora,
@@ -47,6 +67,7 @@ try {
     JOIN inventario_items i ON i.id = m.item_id
     LEFT JOIN inventario_lotes l ON l.id = m.lote_id
     LEFT JOIN usuarios u ON u.id = m.usuario_id
+    WHERE " . $whereMovimientosInventario . "
     ORDER BY m.fecha_hora DESC, m.id DESC
     LIMIT 10000");
 
@@ -82,7 +103,7 @@ try {
             $html .= '<td>' . htmlspecialchars((string)($r['nombre'] ?? '')) . '</td>';
             $html .= '<td>' . htmlspecialchars((string)($r['marca'] ?? '-')) . '</td>';
             $html .= '<td>' . htmlspecialchars((string)($r['presentacion'] ?? '-')) . '</td>';
-            $html .= '<td>' . htmlspecialchars(ucfirst((string)($r['categoria'] ?? ''))) . '</td>';
+            $html .= '<td>' . htmlspecialchars(ucfirst(str_replace('_', ' ', (string)($r['categoria'] ?? '')))) . '</td>';
             $html .= '<td>' . htmlspecialchars($labelTipo((string)($r['tipo'] ?? ''))) . '</td>';
             $html .= '<td>' . htmlspecialchars(number_format((float)($r['cantidad'] ?? 0), 2)) . '</td>';
             $html .= '<td>' . htmlspecialchars((string)($r['unidad_medida'] ?? '')) . '</td>';

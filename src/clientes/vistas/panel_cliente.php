@@ -6,7 +6,13 @@ require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../config/config.php';
 
 // Datos del cliente
-$nombre_cliente = $_SESSION['usuario'] ?? 'Cliente';
+$nombreSesion = $_SESSION['usuario'] ?? 'Cliente';
+$nombre_cliente = is_array($nombreSesion)
+    ? trim((string)($nombreSesion['nombre'] ?? 'Cliente'))
+    : trim((string)$nombreSesion);
+if ($nombre_cliente === '') {
+    $nombre_cliente = 'Cliente';
+}
 $id_cliente = $_SESSION['cliente_id'] ?? 0;
 
 // Consulta de promociones mejorada: incluye descuento y vigencia

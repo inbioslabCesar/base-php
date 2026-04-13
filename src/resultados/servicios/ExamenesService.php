@@ -35,8 +35,14 @@ class ExamenesService {
         ];
 
         try {
-            $stmt = $this->pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resultados_examenes'");
-            $dbCols = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+            $stmt = $this->pdo->query("SHOW COLUMNS FROM resultados_examenes");
+            $defs = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            $dbCols = [];
+            foreach ($defs as $def) {
+                if (!empty($def['Field'])) {
+                    $dbCols[] = (string)$def['Field'];
+                }
+            }
             foreach ($cols as $key => $_) {
                 $cols[$key] = in_array($key, $dbCols, true);
             }

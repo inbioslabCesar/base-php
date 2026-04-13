@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../auth/empresa_config.php';
+require_once __DIR__ . '/../../config/currency.php';
+
+$currencyCfg = currency_get_config($pdo);
 
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -410,7 +413,7 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         </div>
                     </div>
                     <div class="text-end">
-                        <div class="h4 mb-1">S/ <?= number_format($cotizacion['total'], 2) ?></div>
+                        <div class="h4 mb-1"><?= money_format_local((float)$cotizacion['total'], $currencyCfg) ?></div>
                         <small><?= htmlspecialchars($cotizacion['fecha']) ?></small>
                     </div>
                 </div>
@@ -592,15 +595,23 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                                         <tr>
                                             <td>
                                                 <div class="examen-nombre"><?= htmlspecialchars($examen['nombre_examen']) ?></div>
+                                                <?php if ((int)($examen['es_referenciado'] ?? 0) === 1): ?>
+                                                    <div class="mt-1">
+                                                        <span class="badge bg-warning text-dark">Referenciado</span>
+                                                        <?php if (!empty($examen['laboratorio_referenciado_nombre'])): ?>
+                                                            <small class="text-muted ms-1"><?= htmlspecialchars((string)$examen['laboratorio_referenciado_nombre']) ?></small>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <small class="text-muted"><?= nl2br(htmlspecialchars($examen['preanalitica_cliente'] ?? 'Sin condiciones especiales')) ?></small>
                                             </td>
-                                            <td class="text-end precio-cell">S/ <?= number_format($examen['precio_unitario'], 2) ?></td>
+                                            <td class="text-end precio-cell"><?= money_format_local((float)$examen['precio_unitario'], $currencyCfg) ?></td>
                                             <td class="text-center">
                                                 <span class="cantidad-badge"><?= $examen['cantidad'] ?></span>
                                             </td>
-                                            <td class="text-end subtotal-cell">S/ <?= number_format($examen['subtotal'], 2) ?></td>
+                                            <td class="text-end subtotal-cell"><?= money_format_local((float)$examen['subtotal'], $currencyCfg) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -609,7 +620,7 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         
                         <div class="total-section">
                             <div class="total-label">Total de la Cotización</div>
-                            <div class="total-amount">S/ <?= number_format($cotizacion['total'], 2) ?></div>
+                            <div class="total-amount"><?= money_format_local((float)$cotizacion['total'], $currencyCfg) ?></div>
                         </div>
                     <?php else: ?>
                         <div class="empty-state">
@@ -671,6 +682,9 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 function imprimirTicketCotizacion() {
+    const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
+        ? window.formatMoney(value)
+        : `S/ ${Number(value || 0).toFixed(2)}`;
     var codigo = "<?= htmlspecialchars($cotizacion['codigo']) ?>";
     var codigoPaciente = "<?= htmlspecialchars($cotizacion['codigo_cliente'] ?? '') ?>";
     var nombre = "<?= htmlspecialchars($cotizacion['nombre_cliente'] . ' ' . $cotizacion['apellido_cliente']) ?>";
@@ -688,7 +702,7 @@ function imprimirTicketCotizacion() {
         var rows = '';
         examenes.forEach(function(ex) {
                 var precio = ex.precio_unitario ? parseFloat(ex.precio_unitario) : (ex.precio ? parseFloat(ex.precio) : (ex.precio_publico ? parseFloat(ex.precio_publico) : 0));
-                rows += `<tr><td>${ex.nombre_examen}</td><td class='qty'>${ex.cantidad}</td><td class='price'>S/ ${precio.toFixed(2)}</td></tr>`;
+                rows += `<tr><td>${ex.nombre_examen}</td><td class='qty'>${ex.cantidad}</td><td class='price'>${formatMoneySafe(precio)}</td></tr>`;
         });
        var html = `
                 <div class="receipt">
@@ -736,7 +750,7 @@ function imprimirTicketCotizacion() {
                         <thead><tr><th>Examen</th><th class="qty">Cant</th><th class="price">Precio</th></tr></thead>
                         <tbody>${rows}</tbody>
                     </table>
-                    <div class="total-row"><span>TOTAL</span><span>S/ ${total}</span></div>
+                    <div class="total-row"><span>TOTAL</span><span>${formatMoneySafe(total)}</span></div>
                     <div class="footer center small">Gracias por su preferencia</div>
                 </div>`;
 

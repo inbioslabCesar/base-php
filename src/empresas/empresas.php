@@ -98,7 +98,7 @@ function capitalizar($texto) {
                     </div>
                     <div class="card-footer d-flex justify-content-end gap-2">
                         <a href="dashboard.php?vista=form_empresa&id=<?= $empresa['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                        <a href="dashboard.php?action=eliminar_empresa&id=<?= $empresa['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar esta empresa?');">Eliminar</a>
+                        <a href="dashboard.php?action=eliminar_empresa&id=<?= $empresa['id'] ?>" class="btn btn-danger btn-sm js-eliminar-empresa">Eliminar</a>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -140,6 +140,7 @@ function capitalizar($texto) {
 <!-- Incluye JS de Bootstrap y DataTables -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
@@ -188,7 +189,7 @@ $(document).ready(function() {
                 orderable: false,
                 render: function(data, type, row) {
                     return `<a href='dashboard.php?vista=form_empresa&id=${row.id}' class='btn btn-warning btn-sm'>Editar</a>
-                            <a href='dashboard.php?action=eliminar_empresa&id=${row.id}' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar esta empresa?\");'>Eliminar</a>`;
+                            <a href='dashboard.php?action=eliminar_empresa&id=${row.id}' class='btn btn-danger btn-sm js-eliminar-empresa'>Eliminar</a>`;
                 }
             }
         ],
@@ -210,6 +211,26 @@ $(document).ready(function() {
                 className: 'btn btn-info'
             }
         ]
+    });
+
+    $(document).on('click', 'a.js-eliminar-empresa', async function(e) {
+        e.preventDefault();
+        const href = $(this).attr('href');
+
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: 'Eliminar empresa',
+            text: 'Esta accion intentara eliminar la empresa seleccionada.',
+            confirmButtonText: 'Si, eliminar',
+            cancelButtonText: 'Cancelar',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (r.isConfirmed) {
+            window.location.href = href;
+        }
     });
 });
 </script>

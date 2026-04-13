@@ -1,4 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../conexion/conexion.php';
 $tablesReady = false;
 $items = [];
@@ -40,29 +44,59 @@ $hasMarcaCol = false;
 $hasPresentacionCol = false;
 $hasFactorPresentacionCol = false;
 $hasCreatedAtCol = false;
+$hasOrigenMovCol = false;
+$hasControlaStockCol = false;
+$flashMensaje = trim((string)($_SESSION['mensaje'] ?? ''));
+$flashTipo = (stripos($flashMensaje, 'no se pudo') !== false
+    || stripos($flashMensaje, 'inválido') !== false
+    || stripos($flashMensaje, 'insuficiente') !== false
+    || stripos($flashMensaje, 'faltan') !== false
+    || stripos($flashMensaje, 'error') !== false)
+    ? 'danger'
+    : 'success';
+unset($_SESSION['mensaje']);
+
+$_SESSION['inventario_mov_form_token'] = bin2hex(random_bytes(16));
+$movFormToken = (string)$_SESSION['inventario_mov_form_token'];
 
 try {
-    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_lotes','inventario_movimientos')");
-    $stmtTbl->execute();
-    $tablesReady = ((int)$stmtTbl->fetchColumn() === 3);
+    $requiredTables = ['inventario_items', 'inventario_lotes', 'inventario_movimientos'];
+    $tablesReady = true;
+    $stmtTbl = $pdo->prepare("SHOW TABLES LIKE ?");
+    foreach ($requiredTables as $tblName) {
+        $stmtTbl->execute([$tblName]);
+        if (!$stmtTbl->fetchColumn()) {
+            $tablesReady = false;
+            break;
+        }
+    }
 
     if ($tablesReady) {
-        $stmtCols = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME IN ('marca','presentacion','factor_presentacion')");
-        $stmtCols->execute();
-        $cols = $stmtCols->fetchAll(\PDO::FETCH_COLUMN);
+        $stmtCols = $pdo->query("SHOW COLUMNS FROM inventario_items");
+        $defs = $stmtCols ? $stmtCols->fetchAll(\PDO::FETCH_ASSOC) : [];
+        $cols = [];
+        foreach ($defs as $def) {
+            if (!empty($def['Field'])) {
+                $cols[] = (string)$def['Field'];
+            }
+        }
         $hasMarcaCol = in_array('marca', $cols, true);
         $hasPresentacionCol = in_array('presentacion', $cols, true);
         $hasFactorPresentacionCol = in_array('factor_presentacion', $cols, true);
+        $hasControlaStockCol = in_array('controla_stock', $cols, true);
 
-        $stmtColCreatedAt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME = 'created_at'");
-        $stmtColCreatedAt->execute();
-        $hasCreatedAtCol = ((int)$stmtColCreatedAt->fetchColumn() > 0);
+        $stmtColCreatedAt = $pdo->query("SHOW COLUMNS FROM inventario_items LIKE 'created_at'");
+        $hasCreatedAtCol = (bool)($stmtColCreatedAt && $stmtColCreatedAt->fetch(\PDO::FETCH_ASSOC));
+
+        $stmtColOrigenMov = $pdo->query("SHOW COLUMNS FROM inventario_movimientos LIKE 'origen'");
+        $hasOrigenMovCol = (bool)($stmtColOrigenMov && $stmtColOrigenMov->fetch(\PDO::FETCH_ASSOC));
 
         if ($editarId > 0) {
             $sqlEditar = "SELECT id, codigo, nombre, categoria, " .
                 ($hasMarcaCol ? "marca" : "NULL AS marca") . ", " .
                 ($hasPresentacionCol ? "presentacion" : "NULL AS presentacion") . ", " .
                 ($hasFactorPresentacionCol ? "factor_presentacion" : "1 AS factor_presentacion") . ", " .
+                ($hasControlaStockCol ? "i.controla_stock" : "1 AS controla_stock") . ", " .
                 "unidad_medida, stock_minimo, stock_critico, activo
                 FROM inventario_items
                 WHERE id = ?
@@ -92,7 +126,7 @@ try {
             }
         }
 
-        if (in_array($filtroCategoria, ['reactivo', 'insumo', 'material'], true)) {
+        if (in_array($filtroCategoria, ['reactivo', 'insumo', 'material', 'activo_fijo'], true)) {
             $where[] = "i.categoria = ?";
             $params[] = $filtroCategoria;
         }
@@ -113,6 +147,7 @@ try {
             " . ($hasMarcaCol ? "i.marca" : "NULL AS marca") . ",
             " . ($hasPresentacionCol ? "i.presentacion" : "NULL AS presentacion") . ",
             " . ($hasFactorPresentacionCol ? "i.factor_presentacion" : "1 AS factor_presentacion") . ",
+            " . ($hasControlaStockCol ? "i.controla_stock" : "1 AS controla_stock") . ",
             i.unidad_medida,
             i.stock_minimo,
             i.stock_critico,
@@ -120,6 +155,7 @@ try {
             " . ($hasCreatedAtCol ? "i.created_at" : "NULL AS created_at") . ",
             IFNULL(SUM(l.cantidad_actual),0) AS stock_actual,
             CASE
+                WHEN " . ($hasControlaStockCol ? "i.controla_stock" : "1") . " = 0 THEN 'ok'
                 WHEN IFNULL(SUM(l.cantidad_actual),0) <= 0 THEN 'sin_stock'
                 WHEN IFNULL(SUM(l.cantidad_actual),0) <= i.stock_critico AND i.stock_critico > 0 THEN 'critico'
                 WHEN IFNULL(SUM(l.cantidad_actual),0) <= i.stock_minimo AND i.stock_minimo > 0 THEN 'bajo'
@@ -132,6 +168,7 @@ try {
             ($hasMarcaCol ? "i.marca, " : "") .
             ($hasPresentacionCol ? "i.presentacion, " : "") .
             ($hasFactorPresentacionCol ? "i.factor_presentacion, " : "") .
+            ($hasControlaStockCol ? "i.controla_stock, " : "") .
             ($hasCreatedAtCol ? "i.created_at, " : "") .
             "i.unidad_medida, i.stock_minimo, i.stock_critico, i.activo";
 
@@ -228,7 +265,11 @@ try {
         $stmtVencer->execute();
         $lotesPorVencer = $stmtVencer->fetchAll(\PDO::FETCH_ASSOC);
 
-        $stmtCountMov = $pdo->query("SELECT COUNT(*) FROM inventario_movimientos");
+        $whereMovimientosInventario = $hasOrigenMovCol
+            ? "COALESCE(m.origen, CASE WHEN COALESCE(m.observacion, '') LIKE 'Transferencia interna #% a laboratorio%' THEN 'transferencia_interna' ELSE 'inventario' END) = 'inventario'"
+            : "COALESCE(m.observacion, '') NOT LIKE 'Transferencia interna #% a laboratorio%'";
+
+        $stmtCountMov = $pdo->query("SELECT COUNT(*) FROM inventario_movimientos m WHERE " . $whereMovimientosInventario);
         $totalMovimientos = (int)$stmtCountMov->fetchColumn();
         $totalPaginasMovimientos = max(1, (int)ceil($totalMovimientos / $movimientosPorPagina));
         if ($paginaMovimientos > $totalPaginasMovimientos) {
@@ -242,6 +283,7 @@ try {
             JOIN inventario_items i ON i.id = m.item_id
             LEFT JOIN inventario_lotes l ON l.id = m.lote_id
             LEFT JOIN usuarios u ON u.id = m.usuario_id
+            WHERE " . $whereMovimientosInventario . "
             ORDER BY m.fecha_hora DESC, m.id DESC
             LIMIT :limit OFFSET :offset");
         $stmtMov->bindValue(':limit', $movimientosPorPagina, \PDO::PARAM_INT);
@@ -297,6 +339,13 @@ function label_tipo_mov(string $tipo): string
         </div>
     </div>
 
+    <?php if ($flashMensaje !== ''): ?>
+        <div class="alert alert-<?= $flashTipo ?> alert-dismissible fade show" role="alert">
+            <?= htmlspecialchars($flashMensaje) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
     <?php if (!$tablesReady): ?>
         <div class="alert alert-warning">
             Faltan tablas de inventario. Ejecuta <strong>sql/agregar_tablas_inventario.sql</strong> y recarga la página.
@@ -344,6 +393,7 @@ function label_tipo_mov(string $tipo): string
                                     <option value="reactivo" <?= (($itemEditar['categoria'] ?? '') === 'reactivo') ? 'selected' : '' ?>>Reactivo</option>
                                     <option value="insumo" <?= (($itemEditar['categoria'] ?? '') === 'insumo') ? 'selected' : '' ?>>Insumo</option>
                                     <option value="material" <?= (($itemEditar['categoria'] ?? '') === 'material') ? 'selected' : '' ?>>Material</option>
+                                    <option value="activo_fijo" <?= (($itemEditar['categoria'] ?? '') === 'activo_fijo') ? 'selected' : '' ?>>Activo fijo (bien/equipo)</option>
                                 </select>
                             </div>
                             <div class="col-12">
@@ -368,12 +418,20 @@ function label_tipo_mov(string $tipo): string
                                 <small class="text-muted">Ej: caja x25 => factor 25.</small>
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label d-block">Control de stock</label>
+                                <?php $controlaStockActual = (int)($itemEditar['controla_stock'] ?? 1); ?>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="controlaStockSwitch" name="controla_stock" value="1" <?= $controlaStockActual === 1 ? 'checked' : '' ?>>
+                                    <label class="form-check-label" for="controlaStockSwitch">Aplicar alertas por mínimo/crítico</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label">Stock mínimo</label>
-                                <input type="number" step="0.01" min="0" name="stock_minimo" class="form-control" value="<?= htmlspecialchars((string)($itemEditar['stock_minimo'] ?? '0')) ?>">
+                                <input type="number" step="0.01" min="0" name="stock_minimo" id="stockMinimoInput" class="form-control" value="<?= htmlspecialchars((string)($itemEditar['stock_minimo'] ?? '0')) ?>">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Stock crítico</label>
-                                <input type="number" step="0.01" min="0" name="stock_critico" class="form-control" value="<?= htmlspecialchars((string)($itemEditar['stock_critico'] ?? '0')) ?>">
+                                <input type="number" step="0.01" min="0" name="stock_critico" id="stockCriticoInput" class="form-control" value="<?= htmlspecialchars((string)($itemEditar['stock_critico'] ?? '0')) ?>">
                             </div>
                             <?php if ($itemEditar): ?>
                             <div class="col-md-4">
@@ -401,7 +459,8 @@ function label_tipo_mov(string $tipo): string
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-light"><strong>Registrar movimiento</strong></div>
                     <div class="card-body">
-                        <form method="post" action="dashboard.php?action=inventario_movimiento_guardar" class="row g-2">
+                        <form method="post" action="dashboard.php?action=inventario_movimiento_guardar" class="row g-2" id="formInventarioMovimiento">
+                            <input type="hidden" name="form_token" value="<?= htmlspecialchars($movFormToken) ?>">
                             <div class="col-md-6">
                                 <label class="form-label">Ítem</label>
                                 <select name="item_id" class="form-select" required>
@@ -446,7 +505,7 @@ function label_tipo_mov(string $tipo): string
                                 <small class="text-muted" id="inventarioHintConversion">Tip: en entradas puedes usar "Cant. presentación" y el sistema convertirá por factor.</small>
                             </div>
                             <div class="col-12 d-grid">
-                                <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-left-right"></i> Registrar movimiento</button>
+                                <button type="submit" class="btn btn-primary" id="btnRegistrarMovimiento"><i class="bi bi-arrow-left-right"></i> Registrar movimiento</button>
                             </div>
                         </form>
                     </div>
@@ -475,6 +534,7 @@ function label_tipo_mov(string $tipo): string
                             <option value="reactivo" <?= $filtroCategoria === 'reactivo' ? 'selected' : '' ?>>Reactivo</option>
                             <option value="insumo" <?= $filtroCategoria === 'insumo' ? 'selected' : '' ?>>Insumo</option>
                             <option value="material" <?= $filtroCategoria === 'material' ? 'selected' : '' ?>>Material</option>
+                            <option value="activo_fijo" <?= $filtroCategoria === 'activo_fijo' ? 'selected' : '' ?>>Activo fijo</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -528,7 +588,7 @@ function label_tipo_mov(string $tipo): string
                                         <td><?= htmlspecialchars((string)$it['nombre']) ?></td>
                                         <td><?= htmlspecialchars((string)($it['marca'] ?? '-')) ?></td>
                                         <td><?= htmlspecialchars((string)($it['presentacion'] ?? '-')) ?></td>
-                                        <td><?= htmlspecialchars(ucfirst((string)$it['categoria'])) ?></td>
+                                        <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', (string)$it['categoria']))) ?></td>
                                         <td>
                                             <span class="badge <?= ((int)($it['activo'] ?? 1) === 1) ? 'bg-success' : 'bg-secondary' ?>">
                                                 <?= ((int)($it['activo'] ?? 1) === 1) ? 'Activo' : 'Inactivo' ?>
@@ -730,12 +790,13 @@ function label_tipo_mov(string $tipo): string
                                         <th>Tipo</th>
                                         <th>Cantidad</th>
                                         <th>Lote</th>
+                                        <th>Observación</th>
                                         <th>Usuario</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($movimientos)): ?>
-                                        <tr><td colspan="6" class="text-center text-muted py-3">Sin movimientos aún.</td></tr>
+                                        <tr><td colspan="7" class="text-center text-muted py-3">Sin movimientos aún.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($movimientos as $m): ?>
                                             <tr>
@@ -744,6 +805,7 @@ function label_tipo_mov(string $tipo): string
                                                 <td><?= htmlspecialchars(label_tipo_mov((string)$m['tipo'])) ?></td>
                                                 <td><?= number_format((float)$m['cantidad'], 2) ?> <?= htmlspecialchars((string)$m['unidad_medida']) ?></td>
                                                 <td><?= htmlspecialchars((string)($m['lote_codigo'] ?? '-')) ?></td>
+                                                <td><?= htmlspecialchars(trim((string)($m['observacion'] ?? '')) !== '' ? (string)$m['observacion'] : '-') ?></td>
                                                 <td><?= htmlspecialchars(trim((string)($m['usuario'] ?? '')) !== '' ? (string)$m['usuario'] : 'Sin dato') ?></td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -841,6 +903,36 @@ function label_tipo_mov(string $tipo): string
     var form = document.getElementById('formItemInventario');
     if (!form) return;
 
+    var categoriaSelect = form.querySelector('select[name="categoria"]');
+    var controlaStockSwitch = form.querySelector('#controlaStockSwitch');
+    var stockMinimoInput = form.querySelector('#stockMinimoInput');
+    var stockCriticoInput = form.querySelector('#stockCriticoInput');
+
+    var syncControlStockUI = function () {
+        if (!controlaStockSwitch || !stockMinimoInput || !stockCriticoInput) return;
+
+        if (categoriaSelect && categoriaSelect.value === 'activo_fijo') {
+            controlaStockSwitch.checked = false;
+        }
+
+        var controla = controlaStockSwitch.checked;
+        stockMinimoInput.disabled = !controla;
+        stockCriticoInput.disabled = !controla;
+
+        if (!controla) {
+            stockMinimoInput.value = '0';
+            stockCriticoInput.value = '0';
+        }
+    };
+
+    if (categoriaSelect) {
+        categoriaSelect.addEventListener('change', syncControlStockUI);
+    }
+    if (controlaStockSwitch) {
+        controlaStockSwitch.addEventListener('change', syncControlStockUI);
+    }
+    syncControlStockUI();
+
     form.addEventListener('submit', function (e) {
         var estadoSelect = form.querySelector('select[name="activo"]');
         if (!estadoSelect) return;
@@ -855,7 +947,7 @@ function label_tipo_mov(string $tipo): string
 })();
 
 (function () {
-    var movForm = document.querySelector('form[action="dashboard.php?action=inventario_movimiento_guardar"]');
+    var movForm = document.getElementById('formInventarioMovimiento');
     if (!movForm) return;
 
     var selectItem = movForm.querySelector('select[name="item_id"]');
@@ -890,5 +982,13 @@ function label_tipo_mov(string $tipo): string
     if (inputCantPresentacion) {
         inputCantPresentacion.addEventListener('input', renderConversion);
     }
+
+    movForm.addEventListener('submit', function () {
+        var submitBtn = document.getElementById('btnRegistrarMovimiento');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Registrando...';
+        }
+    });
 })();
 </script>

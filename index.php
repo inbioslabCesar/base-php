@@ -36,7 +36,10 @@ $color_footer      = $config_empresa['color_footer'] ?? '#343a40';
 $color_botones     = $config_empresa['color_botones'] ?? '#198754'; // Nuevo campo
 $color_texto       = $config_empresa['color_texto'] ?? '#212529';   // Nuevo campo
 $tamano_letra      = $config_empresa['tamano_letra'] ?? '1rem';     // Nuevo campo
-$logo              = !empty($config_empresa['logo']) ? $config_empresa['logo'] : 'images/empresa/logo_empresa.png';
+$logo              = !empty($config_empresa['logo']) ? $config_empresa['logo'] : '../uploads/empresa/logo_empresa.png';
+if (preg_match('/^data:image\//i', (string)$logo)) {
+    $logo = '../uploads/empresa/logo_empresa.png';
+}
 $frase_promocion   = $config_empresa['frase_promocion'] ?? '';
 $oferta_mes        = $config_empresa['oferta_mes'] ?? '';
 $imagenes_carrusel = [];
@@ -68,6 +71,36 @@ $menu_inicio       = $config_empresa['menu_inicio'] ?? 'Inicio';
 $menu_servicios    = $config_empresa['menu_servicios'] ?? 'Servicios';
 $menu_testimonios  = $config_empresa['menu_testimonios'] ?? 'Testimonios';
 $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
+
+$logoRel = ltrim((string)$logo, '/');
+$logoRel = preg_replace('#^\.\./+#', '', $logoRel);
+// BASE_URL suele terminar en /src/; para recursos publicos usamos la base del sitio.
+$siteBasePath = rtrim((string)dirname(rtrim((string)BASE_URL, '/')), '/\\');
+if ($siteBasePath === '.' || $siteBasePath === '') {
+    $siteBasePath = '';
+}
+$logoPublicPath = ($siteBasePath === '' ? '' : $siteBasePath) . '/' . $logoRel;
+
+$logoAbsPath = __DIR__ . '/' . $logoRel;
+if (!file_exists($logoAbsPath)) {
+    $logoAbsPath = __DIR__ . '/src/' . $logoRel;
+}
+$logoVersion = file_exists($logoAbsPath) ? filemtime($logoAbsPath) : time();
+$logoFaviconHref = $logoPublicPath . '?v=' . $logoVersion;
+
+$faviconIcoHref = ($siteBasePath === '' ? '' : $siteBasePath) . '/favicon.ico';
+$faviconDynamicHref = ($siteBasePath === '' ? '' : $siteBasePath) . '/src/favicon.php?v=' . $logoVersion;
+
+// Detección robusta de esquema/host (útil detrás de proxies/CDN).
+$esHttps = (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+    (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
+    (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+);
+$hostHeader = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$protocolo = (!$isLocalHost) ? 'https' : ($esHttps ? 'https' : 'http');
+$dominio   = $protocolo . '://' . $hostHeader;
+$canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -76,26 +109,18 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     <meta charset="UTF-8">
     <!-- Fuerza upgrade a HTTPS en clientes modernos -->
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-    <!-- Favicon para navegadores -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/src/images/empresa/logo_empresa.png">
-    <link rel="icon" type="image/png" sizes="48x48" href="/src/images/empresa/logo_empresa.png">
+    <!-- Favicon dinámico por empresa (Google suele priorizar este recurso) -->
+    <link rel="icon" href="<?= htmlspecialchars($faviconDynamicHref, ENT_QUOTES, 'UTF-8') ?>" type="image/png" sizes="48x48">
+    <!-- Logo configurado como fallback -->
+    <link rel="icon" href="<?= htmlspecialchars($logoFaviconHref, ENT_QUOTES, 'UTF-8') ?>">
+    <!-- Favicon .ico de respaldo con ruta correcta del proyecto -->
+    <link rel="icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" sizes="any" type="image/x-icon">
     <!-- Favicon .ico para máxima compatibilidad -->
-    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" type="image/x-icon">
     <!-- Apple Touch Icon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/src/images/empresa/logo_empresa.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($logoFaviconHref, ENT_QUOTES, 'UTF-8') ?>">
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <?php
-    // Detección robusta del esquema (útil detrás de proxies/CDN)
-    $esHttps = (
-        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-        (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
-        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-    );
-    $protocolo = $esHttps ? 'https' : 'http';
-    $dominio   = $protocolo . '://' . $_SERVER['HTTP_HOST'];
-    $canonical = $dominio . $_SERVER['REQUEST_URI'];
-    ?>
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -428,7 +453,7 @@ $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
     </style>
     <script type="application/ld+json">
         <?php
-        $logo_url = $dominio . '/' . ltrim($logo, '/');
+        $logo_url = $dominio . $logoPublicPath;
         $json_ld = [
             "@context" => "https://schema.org",
             "@type" => "Organization",

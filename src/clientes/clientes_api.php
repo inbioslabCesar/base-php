@@ -20,6 +20,7 @@ if (!in_array($rol, ['admin', 'recepcionista'])) {
 $draw = intval($_GET['draw'] ?? 1);
 $start = intval($_GET['start'] ?? 0);
 $length = intval($_GET['length'] ?? 10);
+$length = ($length === -1) ? -1 : max(1, $length);
 $search = trim($_GET['search']['value'] ?? '');
 // Ordenamiento (sanitizado)
 $orderCol = isset($_GET['order'][0]['column']) ? intval($_GET['order'][0]['column']) : null;

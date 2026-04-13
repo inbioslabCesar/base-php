@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Favicon por empresa (multi-dominio)
+RewriteRule ^favicon\.ico$ src/favicon.php [L]
+
 # Evitar listado de directorios
 Options -Indexes
 

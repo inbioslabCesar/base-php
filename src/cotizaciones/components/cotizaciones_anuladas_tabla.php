@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../config/currency.php';
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+$currencyCfg = currency_get_config($pdo);
 ?>
 
 <div class="cotizaciones-filters mb-3">
@@ -66,6 +68,29 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
 
 <script>
 $(document).ready(function() {
+    const anuladasCurrencyConfig = <?= json_encode($currencyCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+    function formatMoneySafe(amount) {
+        if (typeof window.formatMoney === 'function') {
+            return window.formatMoney(amount);
+        }
+
+        const numericAmount = Number(amount || 0);
+        const decimals = Number(anuladasCurrencyConfig.decimals ?? 2);
+        const decimalSeparator = anuladasCurrencyConfig.decimal_separator ?? '.';
+        const thousandsSeparator = anuladasCurrencyConfig.thousands_separator ?? ',';
+        const symbol = anuladasCurrencyConfig.symbol ?? '$';
+        const position = anuladasCurrencyConfig.position === 'suffix' ? 'suffix' : 'prefix';
+        const fixed = numericAmount.toFixed(decimals);
+        const parts = fixed.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+        const formattedNumber = decimals > 0 ? parts.join(decimalSeparator) : parts[0];
+
+        return position === 'suffix'
+            ? `${formattedNumber} ${symbol}`
+            : `${symbol} ${formattedNumber}`;
+    }
+
     var tablaAnuladas = $('#tablaCotizacionesAnuladas').DataTable({
         serverSide: true,
         processing: true,
@@ -120,7 +145,7 @@ $(document).ready(function() {
             {
                 data: 'total',
                 render: function(data) {
-                    return 'S/ ' + (parseFloat(data) || 0).toFixed(2);
+                    return formatMoneySafe(data);
                 }
             },
             {

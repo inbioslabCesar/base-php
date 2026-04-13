@@ -18,7 +18,16 @@ $cantidadPresentacion = $cantidadPresentacionRaw === '' ? 0.0 : (float)$cantidad
 $observacion = trim((string)($_POST['observacion'] ?? ''));
 $loteCodigo = trim((string)($_POST['lote_codigo'] ?? ''));
 $fechaVencimiento = trim((string)($_POST['fecha_vencimiento'] ?? ''));
+$formToken = trim((string)($_POST['form_token'] ?? ''));
+$sessionToken = trim((string)($_SESSION['inventario_mov_form_token'] ?? ''));
 $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+
+if ($formToken === '' || $sessionToken === '' || !hash_equals($sessionToken, $formToken)) {
+    $_SESSION['mensaje'] = 'El formulario ya fue enviado o expiró. Recarga la página e intenta nuevamente.';
+    header('Location: dashboard.php?vista=inventario');
+    exit;
+}
+unset($_SESSION['inventario_mov_form_token']);
 
 $tiposEntrada = ['entrada', 'ajuste_pos'];
 $tiposSalida = ['salida', 'ajuste_neg', 'merma', 'vencido'];
@@ -45,17 +54,27 @@ if ($fechaVencimiento !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVenci
 $fechaVencimientoVal = $fechaVencimiento === '' ? null : $fechaVencimiento;
 
 try {
-    $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_lotes','inventario_movimientos')");
-    $stmtTbl->execute();
-    if ((int)$stmtTbl->fetchColumn() < 3) {
+    $requiredTables = ['inventario_items', 'inventario_lotes', 'inventario_movimientos'];
+    $tablesReady = true;
+    $stmtTbl = $pdo->prepare("SHOW TABLES LIKE ?");
+    foreach ($requiredTables as $tblName) {
+        $stmtTbl->execute([$tblName]);
+        if (!$stmtTbl->fetchColumn()) {
+            $tablesReady = false;
+            break;
+        }
+    }
+
+    if (!$tablesReady) {
         $_SESSION['mensaje'] = 'Faltan tablas de inventario. Ejecuta sql/agregar_tablas_inventario.sql.';
         header('Location: dashboard.php?vista=inventario');
         exit;
     }
 
-    $stmtColFactor = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inventario_items' AND COLUMN_NAME = 'factor_presentacion'");
-    $stmtColFactor->execute();
-    $hasFactorPresentacionCol = ((int)$stmtColFactor->fetchColumn() > 0);
+    $stmtColFactor = $pdo->query("SHOW COLUMNS FROM inventario_items LIKE 'factor_presentacion'");
+    $hasFactorPresentacionCol = (bool)($stmtColFactor && $stmtColFactor->fetch(\PDO::FETCH_ASSOC));
+    $stmtColOrigen = $pdo->query("SHOW COLUMNS FROM inventario_movimientos LIKE 'origen'");
+    $hasOrigenMovCol = (bool)($stmtColOrigen && $stmtColOrigen->fetch(\PDO::FETCH_ASSOC));
 
     $stmtItem = $pdo->prepare(
         "SELECT id, nombre, unidad_medida, activo, " .
@@ -115,7 +134,11 @@ try {
             $loteId = (int)$pdo->lastInsertId();
         }
 
-        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        if ($hasOrigenMovCol) {
+            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, origen, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, 'inventario', ?, NOW())");
+        } else {
+            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        }
         $stmtMov->execute([
             $itemId,
             $loteId > 0 ? $loteId : null,
@@ -142,7 +165,11 @@ try {
 
         $restante = $cantidad;
         $stmtUpdLote = $pdo->prepare("UPDATE inventario_lotes SET cantidad_actual = cantidad_actual - ?, updated_at = NOW() WHERE id = ?");
-        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        if ($hasOrigenMovCol) {
+            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, origen, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, 'inventario', ?, NOW())");
+        } else {
+            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        }
 
         foreach ($lotes as $lote) {
             if ($restante <= 0) {

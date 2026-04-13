@@ -69,6 +69,7 @@ if ($id && $ruc && $razon_social && $email) {
         $stmt->execute([$ruc, $id]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El RUC ya está registrado en otra empresa.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_empresa&id=' . $id);
             exit;
         }
@@ -78,6 +79,7 @@ if ($id && $ruc && $razon_social && $email) {
         $stmt->execute([$email, $id]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El email ya está registrado en otra empresa.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_empresa&id=' . $id);
             exit;
         }
@@ -116,11 +118,14 @@ if ($id && $ruc && $razon_social && $email) {
             ]);
         }
         $_SESSION['mensaje'] = "Empresa actualizada exitosamente.";
+        $_SESSION['mensaje_tipo'] = "success";
     } catch (PDOException $e) {
         $_SESSION['mensaje'] = "Error al actualizar la empresa: " . $e->getMessage();
+        $_SESSION['mensaje_tipo'] = "error";
     }
 } else {
     $_SESSION['mensaje'] = "Datos incompletos para actualizar la empresa.";
+    $_SESSION['mensaje_tipo'] = "warning";
 }
 
 header('Location: dashboard.php?vista=empresas');

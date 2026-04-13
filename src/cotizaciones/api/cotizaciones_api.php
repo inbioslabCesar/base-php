@@ -5,17 +5,35 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$rol = $_SESSION['rol'] ?? '';
-if (!in_array($rol, ['admin', 'recepcionista', 'laboratorista'])) {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    echo json_encode(['error' => 'No autorizado', 'debug_rol' => $rol, 'debug_session' => $_SESSION]);
+function sendJsonResponse(array $payload, int $statusCode = 200): void
+{
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($json === false) {
+        echo json_encode([
+            'error' => 'JSON_ENCODE_FAILED',
+            'json_error' => json_last_error_msg()
+        ]);
+        exit;
+    }
+    echo $json;
     exit;
 }
 
-$stmtColsCot = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cotizaciones' AND COLUMN_NAME IN ('anulada_at','anulada_por','anulado_motivo')");
-$stmtColsCot->execute();
-$colsCot = $stmtColsCot->fetchAll(\PDO::FETCH_COLUMN);
+$rol = $_SESSION['rol'] ?? '';
+if (!in_array($rol, ['admin', 'recepcionista', 'laboratorista'])) {
+    sendJsonResponse(['error' => 'No autorizado', 'debug_rol' => $rol, 'debug_session' => $_SESSION], 403);
+}
+
+$stmtColsCot = $pdo->query("SHOW COLUMNS FROM cotizaciones");
+$defsCot = $stmtColsCot ? $stmtColsCot->fetchAll(\PDO::FETCH_ASSOC) : [];
+$colsCot = [];
+foreach ($defsCot as $def) {
+    if (!empty($def['Field'])) {
+        $colsCot[] = (string)$def['Field'];
+    }
+}
 $hasAnuladaAt = in_array('anulada_at', $colsCot, true);
 $hasAnuladaPor = in_array('anulada_por', $colsCot, true);
 $hasAnuladoMotivo = in_array('anulado_motivo', $colsCot, true);
@@ -26,9 +44,14 @@ $selectAnuladaPorNombre = $hasAnuladaPor ? "CONCAT(COALESCE(ua.nombre,''), ' ', 
 $selectAnuladoMotivo = $hasAnuladoMotivo ? "c.anulado_motivo AS anulado_motivo" : "NULL AS anulado_motivo";
 $joinAnuladaUser = $hasAnuladaPor ? " LEFT JOIN usuarios ua ON ua.id = c.anulada_por " : " ";
 
-$stmtColsRes = $pdo->prepare("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resultados_examenes' AND COLUMN_NAME IN ('alarma_activa','alarma_dias','alarma_fecha_objetivo','alarma_estado')");
-$stmtColsRes->execute();
-$colsRes = $stmtColsRes->fetchAll(\PDO::FETCH_COLUMN);
+$stmtColsRes = $pdo->query("SHOW COLUMNS FROM resultados_examenes");
+$defsRes = $stmtColsRes ? $stmtColsRes->fetchAll(\PDO::FETCH_ASSOC) : [];
+$colsRes = [];
+foreach ($defsRes as $def) {
+    if (!empty($def['Field'])) {
+        $colsRes[] = (string)$def['Field'];
+    }
+}
 $hasAlarmColumns = in_array('alarma_activa', $colsRes, true)
     && in_array('alarma_dias', $colsRes, true)
     && in_array('alarma_fecha_objetivo', $colsRes, true);
@@ -96,13 +119,12 @@ if (!empty($_GET['ids'])) {
             $dataFinal[] = $row;
         }
         header('Content-Type: application/json');
-        echo json_encode([
+        sendJsonResponse([
             "draw" => $draw,
             "recordsTotal" => count($dataFinal),
             "recordsFiltered" => count($dataFinal),
             "data" => $dataFinal
         ]);
-        exit;
     }
 }
 
@@ -153,7 +175,7 @@ try {
                 SELECT 1
                 FROM resultados_examenes ra
                 WHERE ra.id_cotizacion = c.id
-                  AND (ra.estado IS NULL OR ra.estado <> 'completado')
+                AND (ra.estado IS NULL OR ra.estado <> 'completado')
                   AND ra.alarma_activa = 1
                   AND ra.alarma_dias IS NOT NULL
                   AND ra.alarma_dias > 0
@@ -167,14 +189,12 @@ try {
 
     if ($resumenAlertas) {
         if (!$hasAlarmColumns) {
-            header('Content-Type: application/json');
-            echo json_encode([
+            sendJsonResponse([
                 'vencido' => 0,
                 'por_vencer' => 0,
                 'en_tiempo' => 0,
                 'total' => 0
             ]);
-            exit;
         }
 
         $sqlResumen = "SELECT
@@ -216,14 +236,12 @@ try {
         $porVencer = (int)($res['por_vencer'] ?? 0);
         $enTiempo = (int)($res['en_tiempo'] ?? 0);
 
-        header('Content-Type: application/json');
-        echo json_encode([
+        sendJsonResponse([
             'vencido' => $vencido,
             'por_vencer' => $porVencer,
             'en_tiempo' => $enTiempo,
             'total' => $vencido + $porVencer + $enTiempo,
         ]);
-        exit;
     }
 
     if ($where) {
@@ -253,7 +271,7 @@ try {
             $row['referencia'] = 'Particular';
         }
         // Calcular porcentaje de resultados llenados
-        $porcentaje = obtenerPorcentajeResultadosCotizacion($pdo, $row['id']);
+        $porcentaje = (int)obtenerPorcentajeResultadosCotizacion($pdo, $row['id']);
         if ($porcentaje === 100) {
             $row['estado_examen'] = 'completado_100';
         } elseif ($porcentaje === 0) {
@@ -331,8 +349,7 @@ try {
 
     // DEBUG: incluir parámetros y SQL en la respuesta si se solicita
     if (isset($_GET['debug']) && $_GET['debug'] == '1') {
-        header('Content-Type: application/json');
-        echo json_encode([
+        sendJsonResponse([
             "draw" => $draw,
             "recordsTotal" => intval($totalRecords),
             "recordsFiltered" => intval($totalFiltered),
@@ -347,21 +364,16 @@ try {
                 "dataCount" => count($dataFinal)
             ]
         ]);
-        exit;
     }
 
-    header('Content-Type: application/json');
-    echo json_encode([
+    sendJsonResponse([
         "draw" => $draw,
         "recordsTotal" => intval($totalRecords),
         "recordsFiltered" => intval($totalFiltered),
         "data" => $dataFinal
     ]);
-    exit;
 } catch (\Exception $e) {
-    header('Content-Type: application/json');
-    echo json_encode([
+    sendJsonResponse([
         "error" => $e->getMessage()
-    ]);
-    exit;
+    ], 500);
 }

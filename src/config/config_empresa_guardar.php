@@ -19,6 +19,31 @@ $email     = trim($_POST['email'] ?? '');
 $telefono  = trim($_POST['telefono'] ?? '');
 $celular   = trim($_POST['celular'] ?? '');
 
+$moneda_codigo = strtoupper(trim((string)($_POST['moneda_codigo'] ?? 'PEN')));
+if ($moneda_codigo === '') {
+    $moneda_codigo = 'PEN';
+}
+$moneda_simbolo = trim((string)($_POST['moneda_simbolo'] ?? 'S/'));
+if ($moneda_simbolo === '') {
+    $moneda_simbolo = 'S/';
+}
+$moneda_posicion = strtolower(trim((string)($_POST['moneda_posicion'] ?? 'prefix')));
+if (!in_array($moneda_posicion, ['prefix', 'suffix'], true)) {
+    $moneda_posicion = 'prefix';
+}
+$moneda_decimales = (int)($_POST['moneda_decimales'] ?? 2);
+if ($moneda_decimales < 0 || $moneda_decimales > 4) {
+    $moneda_decimales = 2;
+}
+$moneda_separador_decimal = (string)($_POST['moneda_separador_decimal'] ?? '.');
+$moneda_separador_decimal = $moneda_separador_decimal !== '' ? mb_substr($moneda_separador_decimal, 0, 1) : '.';
+$moneda_separador_miles = (string)($_POST['moneda_separador_miles'] ?? ',');
+$moneda_separador_miles = $moneda_separador_miles !== '' ? mb_substr($moneda_separador_miles, 0, 1) : ',';
+if ($moneda_separador_decimal === $moneda_separador_miles) {
+    $moneda_separador_decimal = '.';
+    $moneda_separador_miles = ',';
+}
+
 // Mapa (embed/src) opcional
 $maps_embed = trim($_POST['maps_embed'] ?? '');
 if ($maps_embed !== '' && stripos($maps_embed, '<iframe') !== false) {
@@ -33,11 +58,28 @@ if ($maps_embed !== '' && !preg_match('~^https?://www\.google\.com/maps/(embed\?
 }
 
 $has_maps_embed = false;
+$has_currency_columns = false;
 try {
     $chk = $pdo->query("SHOW COLUMNS FROM config_empresa LIKE 'maps_embed'");
     $has_maps_embed = (bool)$chk->fetch(PDO::FETCH_ASSOC);
+
+    $stmtCols = $pdo->query("SHOW COLUMNS FROM config_empresa");
+    $colsRows = $stmtCols ? $stmtCols->fetchAll(PDO::FETCH_ASSOC) : [];
+    $colsMap = [];
+    foreach ($colsRows as $colRow) {
+        if (!empty($colRow['Field'])) {
+            $colsMap[] = (string)$colRow['Field'];
+        }
+    }
+    $has_currency_columns = in_array('moneda_codigo', $colsMap, true)
+        && in_array('moneda_simbolo', $colsMap, true)
+        && in_array('moneda_posicion', $colsMap, true)
+        && in_array('moneda_decimales', $colsMap, true)
+        && in_array('moneda_separador_decimal', $colsMap, true)
+        && in_array('moneda_separador_miles', $colsMap, true);
 } catch (Exception $e) {
     $has_maps_embed = false;
+    $has_currency_columns = false;
 }
 
 // Validación básica
@@ -48,12 +90,65 @@ if (!$nombre || !$ruc || !$direccion || !$email) {
 }
 
 // Procesamiento del logo (solo PNG, sobrescribe archivo)
-$logo = $empresa['logo'] ?? 'images/empresa/logo_empresa.png';
+$logo = $empresa['logo'] ?? '../uploads/empresa/logo_empresa.png';
+$firma = $empresa['firma'] ?? '../uploads/empresa/firma.png';
 
-$baseDir = realpath(__DIR__ . '/..'); // apunta a /src (donde vive images/...)
-if ($baseDir === false) {
-    $baseDir = __DIR__ . '/..';
+$srcDir = realpath(__DIR__ . '/..');
+if ($srcDir === false) {
+    $srcDir = __DIR__ . '/..';
 }
+
+$projectRoot = realpath(__DIR__ . '/../..'); // apunta a raíz del proyecto (fuera de /src)
+if ($projectRoot === false) {
+    $projectRoot = __DIR__ . '/../..';
+}
+
+$baseDir = $projectRoot;
+if ($baseDir === false) {
+    $baseDir = __DIR__ . '/../..';
+}
+
+$resolveStoredAbsolutePath = function (string $storedPath) use ($srcDir, $projectRoot): string {
+    $normalized = str_replace('\\', '/', ltrim($storedPath, '/'));
+    if (strpos($normalized, '../uploads/') === 0) {
+        $normalized = substr($normalized, 3);
+    }
+    if (strpos($normalized, 'uploads/') === 0) {
+        return rtrim($projectRoot, '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+    }
+    return rtrim($srcDir, '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+};
+
+$migrateLegacyAssetToUploads = function (string $storedPath, string $targetRelativeUpload) use ($resolveStoredAbsolutePath, $projectRoot): string {
+    $normalized = str_replace('\\', '/', ltrim($storedPath, '/'));
+    if (strpos($normalized, '../uploads/') === 0 || strpos($normalized, 'uploads/') === 0) {
+        return $storedPath;
+    }
+    if (strpos($normalized, 'images/empresa/') !== 0) {
+        return $storedPath;
+    }
+
+    $src = $resolveStoredAbsolutePath($storedPath);
+    if (!is_file($src)) {
+        return $storedPath;
+    }
+
+    $targetRelativeUpload = ltrim($targetRelativeUpload, '/');
+    $dest = rtrim($projectRoot, '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $targetRelativeUpload);
+    $destDir = dirname($dest);
+    if (!is_dir($destDir)) {
+        @mkdir($destDir, 0775, true);
+    }
+
+    if (@copy($src, $dest)) {
+        return '../' . $targetRelativeUpload;
+    }
+
+    return $storedPath;
+};
+
+$logo = $migrateLegacyAssetToUploads((string)$logo, 'uploads/empresa/logo_empresa.png');
+$firma = $migrateLegacyAssetToUploads((string)$firma, 'uploads/empresa/firma.png');
 
 $describeUploadError = function (int $code): string {
     switch ($code) {
@@ -156,17 +251,16 @@ $saveUpload = function (string $field, string $relativePath, string $label) use 
     return $relativePath;
 };
 
-$nuevoLogo = $saveUpload('logo', 'images/empresa/logo_empresa.png', 'el logo');
+$nuevoLogo = $saveUpload('logo', 'uploads/empresa/logo_empresa.png', 'el logo');
 if ($nuevoLogo) {
-    $logo = $nuevoLogo;
+    $logo = '../' . ltrim($nuevoLogo, '/');
 }
 
 // Procesamiento de la firma (solo PNG, sobrescribe archivo)
-$firma = $empresa['firma'] ?? 'images/empresa/firma.png';
 
-$nuevaFirma = $saveUpload('firma', 'images/empresa/firma.png', 'la firma');
+$nuevaFirma = $saveUpload('firma', 'uploads/empresa/firma.png', 'la firma');
 if ($nuevaFirma) {
-    $firma = $nuevaFirma;
+    $firma = '../' . ltrim($nuevaFirma, '/');
 }
 // Colores y textos
 $color_principal  = trim($_POST['color_principal'] ?? '#0d6efd');
@@ -190,7 +284,7 @@ if (!empty($_POST['eliminar_carrusel']) && is_array($_POST['eliminar_carrusel'])
     foreach ($_POST['eliminar_carrusel'] as $idx) {
         $idx = (int)$idx;
         if (isset($imagenes_carrusel[$idx])) {
-            $ruta = __DIR__ . '/../' . $imagenes_carrusel[$idx];
+            $ruta = $resolveStoredAbsolutePath((string)$imagenes_carrusel[$idx]);
             if (file_exists($ruta)) unlink($ruta);
             unset($imagenes_carrusel[$idx]);
         }
@@ -198,7 +292,7 @@ if (!empty($_POST['eliminar_carrusel']) && is_array($_POST['eliminar_carrusel'])
     $imagenes_carrusel = array_values($imagenes_carrusel);
 }
 if (!empty($_FILES['imagenes_carrusel']['name'][0])) {
-    $uploadDir = __DIR__ . '/../images/empresa/carrusel/';
+    $uploadDir = rtrim($projectRoot, '\\/') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'empresa' . DIRECTORY_SEPARATOR . 'carrusel' . DIRECTORY_SEPARATOR;
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -208,7 +302,7 @@ if (!empty($_FILES['imagenes_carrusel']['name'][0])) {
             $ext = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
                 $nuevoNombre = uniqid('carrusel_') . '.' . $ext;
-                $rutaRelativa = 'images/empresa/carrusel/' . $nuevoNombre;
+                $rutaRelativa = '../uploads/empresa/carrusel/' . $nuevoNombre;
                 if (move_uploaded_file($tmp_name, $uploadDir . $nuevoNombre)) {
                     $imagenes_carrusel[] = $rutaRelativa;
                 }
@@ -229,7 +323,7 @@ if (!empty($_POST['eliminar_institucional']) && is_array($_POST['eliminar_instit
     foreach ($_POST['eliminar_institucional'] as $idx) {
         $idx = (int)$idx;
         if (isset($imagenes_institucionales[$idx])) {
-            $ruta = __DIR__ . '/../' . $imagenes_institucionales[$idx];
+            $ruta = $resolveStoredAbsolutePath((string)$imagenes_institucionales[$idx]);
             if (file_exists($ruta)) unlink($ruta);
             unset($imagenes_institucionales[$idx]);
         }
@@ -237,7 +331,7 @@ if (!empty($_POST['eliminar_institucional']) && is_array($_POST['eliminar_instit
     $imagenes_institucionales = array_values($imagenes_institucionales);
 }
 if (!empty($_FILES['imagenes_institucionales']['name'][0])) {
-    $uploadDir = __DIR__ . '/../images/empresa/institucional/';
+    $uploadDir = rtrim($projectRoot, '\\/') . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'empresa' . DIRECTORY_SEPARATOR . 'institucional' . DIRECTORY_SEPARATOR;
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -247,7 +341,7 @@ if (!empty($_FILES['imagenes_institucionales']['name'][0])) {
             $ext = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
                 $nuevoNombre = uniqid('institucional_') . '.' . $ext;
-                $rutaRelativa = 'images/empresa/institucional/' . $nuevoNombre;
+                $rutaRelativa = '../uploads/empresa/institucional/' . $nuevoNombre;
                 if (move_uploaded_file($tmp_name, $uploadDir . $nuevoNombre)) {
                     $imagenes_institucionales[] = $rutaRelativa;
                 }
@@ -278,6 +372,16 @@ try {
         if ($has_maps_embed) {
             $sql .= ", maps_embed=?";
             $params[] = $maps_embed;
+        }
+
+        if ($has_currency_columns) {
+            $sql .= ", moneda_codigo=?, moneda_simbolo=?, moneda_posicion=?, moneda_decimales=?, moneda_separador_decimal=?, moneda_separador_miles=?";
+            $params[] = $moneda_codigo;
+            $params[] = $moneda_simbolo;
+            $params[] = $moneda_posicion;
+            $params[] = $moneda_decimales;
+            $params[] = $moneda_separador_decimal;
+            $params[] = $moneda_separador_miles;
         }
 
         $sql .= ",
@@ -312,6 +416,20 @@ try {
         if ($has_maps_embed) {
             $cols[] = 'maps_embed';
             $vals[] = $maps_embed;
+        }
+        if ($has_currency_columns) {
+            $cols[] = 'moneda_codigo';
+            $cols[] = 'moneda_simbolo';
+            $cols[] = 'moneda_posicion';
+            $cols[] = 'moneda_decimales';
+            $cols[] = 'moneda_separador_decimal';
+            $cols[] = 'moneda_separador_miles';
+            $vals[] = $moneda_codigo;
+            $vals[] = $moneda_simbolo;
+            $vals[] = $moneda_posicion;
+            $vals[] = $moneda_decimales;
+            $vals[] = $moneda_separador_decimal;
+            $vals[] = $moneda_separador_miles;
         }
         $cols = array_merge($cols, [
             'color_principal', 'color_secundario', 'color_footer', 'color_botones', 'color_texto', 'tamano_letra',

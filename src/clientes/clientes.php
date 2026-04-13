@@ -488,6 +488,14 @@ function capitalize($string) {
             <button class="btn btn-primary" type="button" onclick="document.getElementById('buscadorClienteMovil').value = ''; filtrarCardsClientes('');"><i class="bi bi-x"></i></button>
         </div>
     </div>
+    <div class="d-flex gap-2 mb-3 d-block d-md-none">
+        <button type="button" id="btnExportExcelMovil" class="btn btn-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Exportar Excel
+        </button>
+        <button type="button" id="btnExportPdfMovil" class="btn btn-danger btn-sm">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Exportar PDF
+        </button>
+    </div>
     <div class="cards-container" id="cardsClientesAjax">
         <!-- Cards de clientes se llenarán por AJAX aquí -->
     </div>
@@ -584,17 +592,56 @@ document.getElementById('buscadorClienteMovil').addEventListener('input', functi
 });
 </script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script>
 $(document).ready(function() {
+    function exportarTodo(e, dt, button, config) {
+        const self = this;
+        const oldStart = dt.settings()[0]._iDisplayStart;
+
+        dt.one('preXhr', function(e, s, data) {
+            data.start = 0;
+            data.length = -1;
+
+            dt.one('preDraw', function(e, settings) {
+                if (button[0].className.indexOf('buttons-excel') >= 0) {
+                    $.fn.dataTable.ext.buttons.excelHtml5.action.call(self, e, dt, button, config);
+                } else if (button[0].className.indexOf('buttons-pdf') >= 0) {
+                    $.fn.dataTable.ext.buttons.pdfHtml5.action.call(self, e, dt, button, config);
+                }
+
+                dt.one('preXhr', function(e, s, data) {
+                    settings._iDisplayStart = oldStart;
+                    data.start = oldStart;
+                    data.length = dt.page.len();
+                });
+
+                setTimeout(function() {
+                    dt.ajax.reload(null, false);
+                }, 0);
+
+                return false;
+            });
+        });
+
+        dt.ajax.reload();
+    }
+
     // Mejor manejo de errores de DataTables para depurar
     if ($.fn.dataTable) { $.fn.dataTable.ext.errMode = 'none'; }
     $('#tablaClientes').on('error.dt', function(e, settings, techNote, message) {
         console.error('DataTables error:', message);
     });
-    $('#tablaClientes').DataTable({
+    var tablaClientes = $('#tablaClientes').DataTable({
         "serverSide": true,
         "processing": true,
         "ajax": {
@@ -603,6 +650,7 @@ $(document).ready(function() {
         },
         "pageLength": 3,
         "lengthMenu": [[3, 5, 10, 25, 50], [3, 5, 10, 25, 50]],
+        "dom": "lBfrtip",
         "order": [],
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
@@ -639,7 +687,29 @@ $(document).ready(function() {
                     return btns;
                 }
             }
+        ],
+        "buttons": [
+            {
+                "extend": "excelHtml5",
+                "text": "Exportar Excel",
+                "className": "btn btn-success",
+                "action": exportarTodo
+            },
+            {
+                "extend": "pdfHtml5",
+                "text": "Exportar PDF",
+                "className": "btn btn-danger",
+                "action": exportarTodo
+            }
         ]
+    });
+
+    $('#btnExportExcelMovil').on('click', function() {
+        tablaClientes.button('.buttons-excel').trigger();
+    });
+
+    $('#btnExportPdfMovil').on('click', function() {
+        tablaClientes.button('.buttons-pdf').trigger();
     });
 });
 </script>

@@ -13,7 +13,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $itemId = (int)($_POST['item_id'] ?? 0);
 $cantidad = round((float)($_POST['cantidad'] ?? 0), 2);
 $observacion = trim((string)($_POST['observacion'] ?? ''));
+$formToken = trim((string)($_POST['form_token'] ?? ''));
+$sessionToken = trim((string)($_SESSION['inventario_transfer_form_token'] ?? ''));
 $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+
+if ($formToken === '' || $sessionToken === '' || !hash_equals($sessionToken, $formToken)) {
+    $_SESSION['mensaje'] = 'El formulario de transferencia ya fue enviado o expiró. Recarga la página e intenta nuevamente.';
+    header('Location: dashboard.php?vista=inventario_interno');
+    exit;
+}
+unset($_SESSION['inventario_transfer_form_token']);
 
 if ($itemId <= 0 || $cantidad <= 0) {
     $_SESSION['mensaje'] = 'Datos inválidos para transferencia.';
@@ -35,6 +44,9 @@ try {
     $stmtSuma = $pdo->prepare("SELECT IFNULL(SUM(cantidad_actual),0) FROM inventario_lotes WHERE item_id = ? AND cantidad_actual > 0");
     $stmtSuma->execute([$itemId]);
     $stockTotal = round((float)$stmtSuma->fetchColumn(), 2);
+
+    $stmtColOrigen = $pdo->query("SHOW COLUMNS FROM inventario_movimientos LIKE 'origen'");
+    $hasOrigenMovCol = (bool)($stmtColOrigen && $stmtColOrigen->fetch(\PDO::FETCH_ASSOC));
 
     if ($stockTotal < $cantidad) {
         $_SESSION['mensaje'] = 'Stock insuficiente en almacén principal. Disponible: ' . number_format($stockTotal, 2) . ' ' . ($item['unidad_medida'] ?? '');
@@ -60,7 +72,11 @@ try {
 
     $restante = $cantidad;
     $stmtUpdLote = $pdo->prepare("UPDATE inventario_lotes SET cantidad_actual = cantidad_actual - ?, updated_at = NOW() WHERE id = ?");
-    $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, 'salida', ?, ?, ?, NOW())");
+    if ($hasOrigenMovCol) {
+        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, origen, usuario_id, fecha_hora) VALUES (?, ?, 'salida', ?, ?, 'transferencia_interna', ?, NOW())");
+    } else {
+        $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, 'salida', ?, ?, ?, NOW())");
+    }
 
     foreach ($lotes as $lote) {
         if ($restante <= 0) {

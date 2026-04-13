@@ -1,4 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . '/../conexion/conexion.php';
 
 $tablesReady = false;
@@ -14,6 +18,19 @@ $resumen = [
     'transferencias_hoy' => 0,
     'items_stock_interno' => 0,
 ];
+
+$flashMensaje = trim((string)($_SESSION['mensaje'] ?? ''));
+$flashTipo = (stripos($flashMensaje, 'no se pudo') !== false
+    || stripos($flashMensaje, 'inválido') !== false
+    || stripos($flashMensaje, 'insuficiente') !== false
+    || stripos($flashMensaje, 'faltan') !== false
+    || stripos($flashMensaje, 'error') !== false)
+    ? 'danger'
+    : 'success';
+unset($_SESSION['mensaje']);
+
+$_SESSION['inventario_transfer_form_token'] = bin2hex(random_bytes(16));
+$transferFormToken = (string)$_SESSION['inventario_transfer_form_token'];
 
 try {
     $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_items','inventario_examen_recetas','inventario_transferencias','inventario_transferencias_detalle')");
@@ -147,6 +164,13 @@ try {
         </div>
     </div>
 
+    <?php if ($flashMensaje !== ''): ?>
+        <div class="alert alert-<?= $flashTipo ?> alert-dismissible fade show" role="alert">
+            <?= htmlspecialchars($flashMensaje) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
     <?php if (!$tablesReady): ?>
         <div class="alert alert-warning">
             Faltan tablas para inventario interno. Ejecuta <strong>sql/agregar_tablas_inventario_interno.sql</strong> y recarga la página.
@@ -223,7 +247,8 @@ try {
                 <div class="card shadow-sm h-100">
                     <div class="card-header bg-light"><strong>Transferir a laboratorio</strong></div>
                     <div class="card-body">
-                        <form method="post" action="dashboard.php?action=inventario_transferencia_guardar" class="row g-2">
+                        <form method="post" action="dashboard.php?action=inventario_transferencia_guardar" class="row g-2" id="formInventarioTransferencia">
+                            <input type="hidden" name="form_token" value="<?= htmlspecialchars($transferFormToken) ?>">
                             <div class="col-md-6">
                                 <label class="form-label">Ítem desde almacén principal</label>
                                 <select name="item_id" class="form-select" required>
@@ -248,7 +273,7 @@ try {
                                 <input type="text" name="observacion" class="form-control" placeholder="Ej: Retiro para turno mañana">
                             </div>
                             <div class="col-12 d-grid">
-                                <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-left-right"></i> Registrar transferencia interna</button>
+                                <button type="submit" class="btn btn-primary" id="btnInventarioTransferencia"><i class="bi bi-arrow-left-right"></i> Registrar transferencia interna</button>
                             </div>
                         </form>
                     </div>
@@ -318,12 +343,13 @@ try {
                                         <th>Origen/Destino</th>
                                         <th>Ítems transferidos</th>
                                         <th>Cantidad total</th>
+                                        <th>Observación</th>
                                         <th>Usuario</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($transferencias)): ?>
-                                        <tr class="js-empty-row"><td colspan="5" class="text-center text-muted py-3">Sin transferencias registradas.</td></tr>
+                                        <tr class="js-empty-row"><td colspan="6" class="text-center text-muted py-3">Sin transferencias registradas.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($transferencias as $t): ?>
                                             <tr>
@@ -341,6 +367,7 @@ try {
                                                     <?php endif; ?>
                                                 </td>
                                                 <td><?= number_format((float)$t['cantidad_total'], 4) ?></td>
+                                                <td><?= htmlspecialchars(trim((string)($t['observacion'] ?? '')) !== '' ? (string)$t['observacion'] : '-') ?></td>
                                                 <td><?= htmlspecialchars(trim((string)($t['usuario'] ?? '')) !== '' ? (string)$t['usuario'] : 'Sin dato') ?></td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -588,5 +615,18 @@ document.addEventListener('DOMContentLoaded', function () {
         render();
     });
 });
+
+(function () {
+    var transferForm = document.getElementById('formInventarioTransferencia');
+    if (!transferForm) return;
+
+    transferForm.addEventListener('submit', function () {
+        var submitBtn = document.getElementById('btnInventarioTransferencia');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Registrando...';
+        }
+    });
+})();
 </script>
 <?php endif; ?>

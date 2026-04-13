@@ -231,10 +231,6 @@ function obtenerItemsResultados($pdo, $rows) {
             foreach ($formulaItems as $fi) {
                 $nombre = $fi['nombre'];
                 $item = $fi['item'];
-                $actualGuardado = $getResultado($nombre, $item, '');
-                if ($actualGuardado !== '' && $actualGuardado !== null) {
-                    continue;
-                }
                 $res = $evalFormula($item['formula'], $valoresNorm);
                 if ($res === null) {
                     continue;

@@ -118,6 +118,14 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
 ?>
 <div class="examenes-cards-container d-block d-md-none">
     <h4 class="mb-3">Exámenes</h4>
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <button type="button" id="btnExportExcelMovil" class="btn btn-success btn-sm">
+            <i class="fa fa-file-excel me-1"></i> Exportar Excel
+        </button>
+        <button type="button" id="btnExportPdfMovil" class="btn btn-danger btn-sm">
+            <i class="fa fa-file-pdf me-1"></i> Exportar PDF
+        </button>
+    </div>
     <div class="mb-3">
         <div class="input-group">
             <input type="text" id="buscadorExamenMovil" class="form-control" placeholder="Buscar examen por nombre...">
@@ -328,7 +336,39 @@ document.addEventListener('click', async function (e) {
 
 <script>
     $(document).ready(function() {
-        $('#tabla-examenes').DataTable({
+        function exportarTodo(e, dt, button, config) {
+            const self = this;
+            const oldStart = dt.settings()[0]._iDisplayStart;
+
+            dt.one('preXhr', function(e, s, data) {
+                data.start = 0;
+                data.length = -1;
+
+                dt.one('preDraw', function(e, settings) {
+                    if (button[0].className.indexOf('buttons-excel') >= 0) {
+                        $.fn.dataTable.ext.buttons.excelHtml5.action.call(self, e, dt, button, config);
+                    } else if (button[0].className.indexOf('buttons-pdf') >= 0) {
+                        $.fn.dataTable.ext.buttons.pdfHtml5.action.call(self, e, dt, button, config);
+                    }
+
+                    dt.one('preXhr', function(e, s, data) {
+                        settings._iDisplayStart = oldStart;
+                        data.start = oldStart;
+                        data.length = dt.page.len();
+                    });
+
+                    setTimeout(function() {
+                        dt.ajax.reload(null, false);
+                    }, 0);
+
+                    return false;
+                });
+            });
+
+            dt.ajax.reload();
+        }
+
+        var tablaExamenes = $('#tabla-examenes').DataTable({
             serverSide: true,
             processing: true,
             ajax: {
@@ -374,12 +414,14 @@ document.addEventListener('click', async function (e) {
                 {
                     extend: 'excelHtml5',
                     text: 'Exportar Excel',
-                    className: 'btn btn-success'
+                    className: 'btn btn-success',
+                    action: exportarTodo
                 },
                 {
                     extend: 'pdfHtml5',
                     text: 'Exportar PDF',
-                    className: 'btn btn-danger'
+                    className: 'btn btn-danger',
+                    action: exportarTodo
                 },
                 {
                     extend: 'print',
@@ -387,6 +429,14 @@ document.addEventListener('click', async function (e) {
                     className: 'btn btn-info'
                 }
             ]
+        });
+
+        $('#btnExportExcelMovil').on('click', function() {
+            tablaExamenes.button('.buttons-excel').trigger();
+        });
+
+        $('#btnExportPdfMovil').on('click', function() {
+            tablaExamenes.button('.buttons-pdf').trigger();
         });
                 // Handler para abrir modal de detalle
                 $('#tabla-examenes').on('click', '.btn-detalle-examen', async function() {

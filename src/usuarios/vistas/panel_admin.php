@@ -4,16 +4,19 @@
     border-radius: 20px;
     box-shadow: 0 4px 24px #764ba233;
 }
-.btn-gradient {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.btn.btn-gradient {
+    background: #0d6efd;
     color: #fff;
     border: none;
     border-radius: 12px;
     font-weight: 600;
     transition: box-shadow 0.2s, transform 0.2s;
 }
-.btn-gradient:hover {
-    box-shadow: 0 4px 16px #764ba2aa;
+.btn.btn-gradient:hover,
+.btn.btn-gradient:focus {
+    background: #0b5ed7;
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(13, 110, 253, 0.45);
     transform: translateY(-2px) scale(1.04);
 }
 .panel-card {

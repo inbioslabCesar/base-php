@@ -70,6 +70,7 @@ if ($id && $nombre && $apellido && $dni && $email && $rol) {
         $stmt->execute([$dni, $id]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El DNI ya está registrado por otro usuario.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_usuario&id=' . $id);
             exit;
         }
@@ -79,6 +80,7 @@ if ($id && $nombre && $apellido && $dni && $email && $rol) {
         $stmt->execute([$email, $id]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El email ya está registrado por otro usuario.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_usuario&id=' . $id);
             exit;
         }
@@ -121,11 +123,14 @@ if ($id && $nombre && $apellido && $dni && $email && $rol) {
             ]);
         }
         $_SESSION['mensaje'] = "Usuario actualizado exitosamente.";
+        $_SESSION['mensaje_tipo'] = "success";
     } catch (PDOException $e) {
         $_SESSION['mensaje'] = "Error al actualizar el usuario: " . $e->getMessage();
+        $_SESSION['mensaje_tipo'] = "error";
     }
 } else {
     $_SESSION['mensaje'] = "Datos incompletos para actualizar el usuario.";
+    $_SESSION['mensaje_tipo'] = "warning";
 }
 
 header('Location: dashboard.php?vista=usuarios');

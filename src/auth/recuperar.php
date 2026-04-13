@@ -38,12 +38,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+$logoAuth = !empty($config['logo']) ? (string)$config['logo'] : '../uploads/empresa/logo_empresa.png';
+if (preg_match('/^data:image\//i', $logoAuth)) {
+    $logoAuth = '../uploads/empresa/logo_empresa.png';
+}
+$logoAuthVersion = time();
+$logoAuthAbs1 = __DIR__ . '/../' . ltrim($logoAuth, '/');
+$logoAuthAbs2 = __DIR__ . '/../../' . ltrim($logoAuth, '/');
+if (is_file($logoAuthAbs1)) {
+    $logoAuthVersion = (int)filemtime($logoAuthAbs1);
+} elseif (is_file($logoAuthAbs2)) {
+    $logoAuthVersion = (int)filemtime($logoAuthAbs2);
+}
+
+$faviconDynamicHref = '../favicon.php?v=' . $logoAuthVersion;
+$faviconIcoHref = '../../favicon.ico';
 ?>
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="<?= htmlspecialchars($faviconDynamicHref, ENT_QUOTES, 'UTF-8') ?>" type="image/png" sizes="48x48">
+    <link rel="icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" sizes="any" type="image/x-icon">
+    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="../<?= htmlspecialchars($logoAuth, ENT_QUOTES, 'UTF-8') ?>?v=<?= $logoAuthVersion ?>">
     <title>Recuperar Contraseña - <?= htmlspecialchars($config['nombre']) ?> LABORATORIO CLÍNICO</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap 5 CDN -->

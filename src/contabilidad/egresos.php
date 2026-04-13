@@ -5,6 +5,15 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../conexion/conexion.php';
 
+$hasEgresoCategoria = false;
+try {
+    $stmtColCat = $pdo->prepare("SHOW COLUMNS FROM egresos LIKE 'categoria'");
+    $stmtColCat->execute();
+    $hasEgresoCategoria = (bool)$stmtColCat->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $hasEgresoCategoria = false;
+}
+
 // Filtros por fecha (por defecto mes actual)
 $desde = $_GET['desde'] ?? date('Y-m-01');
 $hasta = $_GET['hasta'] ?? date('Y-m-d');
@@ -65,8 +74,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Consultar egresos filtrados
-$stmt = $pdo->prepare("SELECT id, monto, descripcion, fecha FROM egresos WHERE DATE(fecha) BETWEEN ? AND ? ORDER BY fecha DESC");
+// Consultar egresos filtrados (más recientes primero)
+$sqlList = $hasEgresoCategoria
+    ? "SELECT id, monto, descripcion, categoria, subcategoria, fecha FROM egresos WHERE DATE(fecha) BETWEEN ? AND ? ORDER BY fecha DESC, id DESC"
+    : "SELECT id, monto, descripcion, fecha FROM egresos WHERE DATE(fecha) BETWEEN ? AND ? ORDER BY fecha DESC, id DESC";
+$stmt = $pdo->prepare($sqlList);
 $stmt->execute([$desde, $hasta]);
 $egresos = $stmt->fetchAll();
 ?>
@@ -123,6 +135,7 @@ $egresos = $stmt->fetchAll();
             <thead class="table-dark">
                 <th>Monto</th>
                 <th>Descripción</th>
+                <?php if ($hasEgresoCategoria): ?><th>Categoría</th><?php endif; ?>
                 <th>Fecha</th>
                 <th>Acciones</th>
             </thead>
@@ -132,7 +145,32 @@ $egresos = $stmt->fetchAll();
                         <tr>
                             <td>S/ <?= number_format($egreso['monto'], 2) ?></td>
                             <td><?= htmlspecialchars($egreso['descripcion']) ?></td>
-                            <td><?= date('d/m/Y', strtotime($egreso['fecha'])) ?></td>
+                            <?php if ($hasEgresoCategoria): ?>
+                                <td>
+                                    <?php
+                                        $cat = trim((string)($egreso['categoria'] ?? ''));
+                                        $sub = trim((string)($egreso['subcategoria'] ?? ''));
+                                        $catLabel = $cat;
+                                        $badgeClass = 'bg-secondary';
+                                        if ($cat === 'referenciado_laboratorio') {
+                                            $catLabel = 'Tercerizado - Laboratorio';
+                                            $badgeClass = 'bg-danger';
+                                        } elseif ($cat === 'referenciado_logistica') {
+                                            $catLabel = 'Tercerizado - Logística';
+                                            $badgeClass = 'bg-warning text-dark';
+                                        }
+                                    ?>
+                                    <?php if ($cat !== ''): ?>
+                                        <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($catLabel) ?></span>
+                                    <?php else: ?>
+                                        <span class="text-muted">—</span>
+                                    <?php endif; ?>
+                                    <?php if ($sub !== ''): ?>
+                                        <div><small class="text-muted"><?= htmlspecialchars($sub) ?></small></div>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endif; ?>
+                            <td data-order="<?= htmlspecialchars($egreso['fecha']) ?>"><?= date('d/m/Y', strtotime($egreso['fecha'])) ?></td>
                             <td>
                                 <a href="dashboard.php?vista=egresos_editar&id=<?= $egreso['id'] ?>" class="btn btn-primary btn-sm mb-1" title="Editar">
                                     <i class="bi bi-pencil-square"></i>
@@ -149,7 +187,7 @@ $egresos = $stmt->fetchAll();
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="3" class="text-center">No hay egresos registrados en el periodo.</td>
+                        <td colspan="<?= $hasEgresoCategoria ? '5' : '4' ?>" class="text-center">No hay egresos registrados en el periodo.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
@@ -176,6 +214,7 @@ $egresos = $stmt->fetchAll();
 <script>
     $(document).ready(function() {
         $('#tablaEgresos').DataTable({
+            "order": [],
             "pageLength": 10,
             "lengthMenu": [5, 10, 25, 50, 100],
                 "pageLength": 5,

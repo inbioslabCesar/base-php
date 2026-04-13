@@ -93,7 +93,7 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     <div class="card-footer d-flex justify-content-end gap-2">
                         <a href="dashboard.php?vista=form_convenio&id=<?= $convenio['id'] ?>" class="btn btn-warning btn-sm">Editar</a>
-                        <a href="dashboard.php?action=eliminar_convenio&id=<?= $convenio['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('¿Estás seguro de eliminar este convenio?');">Eliminar</a>
+                        <a href="dashboard.php?action=eliminar_convenio&id=<?= $convenio['id'] ?>" class="btn btn-danger btn-sm js-eliminar-convenio">Eliminar</a>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -134,6 +134,7 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
@@ -180,7 +181,7 @@ $(document).ready(function() {
                 orderable: false,
                 render: function(data, type, row) {
                     return `<a href='dashboard.php?vista=form_convenio&id=${row.id}' class='btn btn-primary btn-sm'>Editar</a>
-                            <a href='dashboard.php?action=eliminar_convenio&id=${row.id}' class='btn btn-danger btn-sm' onclick='return confirm(\"¿Estás seguro de eliminar este convenio?\");'>Eliminar</a>`;
+                            <a href='dashboard.php?action=eliminar_convenio&id=${row.id}' class='btn btn-danger btn-sm js-eliminar-convenio'>Eliminar</a>`;
                 }
             }
         ],
@@ -306,6 +307,26 @@ $(document).ready(function() {
     });
     document.getElementById('buscadorConvenioMovil').addEventListener('input', function(e) {
         filtrarCardsConvenios(e.target.value);
+    });
+
+    $(document).on('click', 'a.js-eliminar-convenio', async function(e) {
+        e.preventDefault();
+        const href = $(this).attr('href');
+
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: 'Eliminar convenio',
+            text: 'Esta acción intentará eliminar el convenio seleccionado.',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d'
+        });
+
+        if (r.isConfirmed) {
+            window.location.href = href;
+        }
     });
 });
 </script>

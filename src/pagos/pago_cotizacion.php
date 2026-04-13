@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/currency.php';
 
 
 $idCotizacion = $_GET['id'] ?? null;
@@ -10,6 +11,8 @@ $saldo = 0;
 $isPagada = false;
 $isAnulada = false;
 $hayCajaAbierta = false;
+$currencyCfg = currency_get_config($pdo);
+$currencySymbol = (string)($currencyCfg['symbol'] ?? 'S/');
 
 try {
     $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cajas'");
@@ -200,7 +203,7 @@ if ($idCotizacion) {
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         El monto debe ser positivo y no mayor al saldo pendiente.
                         <?php if ($intento !== null && $saldoParam !== null): ?>
-                            <div class="mt-1"><small>Intento: S/ <?= number_format($intento, 2) ?> | Saldo disponible: S/ <?= number_format($saldoParam, 2) ?></small></div>
+                            <div class="mt-1"><small>Intento: <?= money_format_local($intento, $currencyCfg) ?> | Saldo disponible: <?= money_format_local($saldoParam, $currencyCfg) ?></small></div>
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
@@ -256,7 +259,7 @@ if ($idCotizacion) {
                         <div class="row align-items-end">
                             <div class="col-md-6">
                                 <label class="form-label text-white">
-                                    <strong>Nuevo Monto Total (S/)</strong>
+                                    <strong>Nuevo Monto Total (<?= htmlspecialchars($currencySymbol) ?>)</strong>
                                 </label>
                        <input type="number" 
                            step="0.01" 
@@ -297,16 +300,16 @@ if ($idCotizacion) {
                     <div class="row">
                         <div class="col-md-4">
                             <h6><i class="bi bi-calculator me-2"></i>Monto Total Acordado</h6>
-                            <h4 class="text-primary fw-bold">S/ <?= number_format($cotizacion['total'], 2) ?></h4>
+                            <h4 class="text-primary fw-bold"><?= money_format_local((float)$cotizacion['total'], $currencyCfg) ?></h4>
                         </div>
                         <div class="col-md-4">
                             <h6><i class="bi bi-cash-stack me-2"></i>Monto Abonado</h6>
-                            <h4 class="text-success fw-bold">S/ <?= number_format($totalPagado, 2) ?></h4>
+                            <h4 class="text-success fw-bold"><?= money_format_local($totalPagado, $currencyCfg) ?></h4>
                         </div>
                         <div class="col-md-4">
                             <h6><i class="bi bi-hourglass-split me-2"></i>Saldo Pendiente</h6>
                             <h4 class="<?= $saldo > 0 ? 'text-danger' : 'text-success' ?> fw-bold">
-                                S/ <?= number_format($saldo, 2) ?>
+                                <?= money_format_local($saldo, $currencyCfg) ?>
                             </h4>
                         </div>
                     </div>
@@ -326,7 +329,7 @@ if ($idCotizacion) {
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">
                                     <i class="bi bi-cash me-2"></i>
-                                    <strong>Monto a Abonar (S/)</strong>
+                                    <strong>Monto a Abonar (<?= htmlspecialchars($currencySymbol) ?>)</strong>
                                 </label>
                                 <input type="number" 
                                        step="0.01" 
@@ -338,7 +341,7 @@ if ($idCotizacion) {
                                        placeholder="0.00">
                                 <div class="form-text" id="montoAbonarInfo">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    Máximo disponible: S/ <?= number_format($saldo, 2) ?>
+                                    Máximo disponible: <?= money_format_local($saldo, $currencyCfg) ?>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -449,7 +452,7 @@ if ($idCotizacion) {
                                                     Cambio de Total
                                                 </span>
                                             <?php else: ?>
-                                                <span class="text-success">S/ <?= number_format($pago['monto'], 2) ?></span>
+                                                <span class="text-success"><?= money_format_local((float)$pago['monto'], $currencyCfg) ?></span>
                                             <?php endif; ?>
                                         </td>
                                         <td>
@@ -534,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 montoAbonado.min = 0.01;
                 montoAbonado.placeholder = 'Monto mayor a 0';
                 montoAbonado.setAttribute('required', 'required');
-                document.getElementById('montoAbonarInfo').innerHTML = '<i class="bi bi-info-circle me-1"></i> Máximo disponible: S/ <?= number_format($saldo, 2) ?>';
+                document.getElementById('montoAbonarInfo').innerHTML = '<i class="bi bi-info-circle me-1"></i> Máximo disponible: <?= addslashes(money_format_local($saldo, $currencyCfg)) ?>';
             }
         });
 

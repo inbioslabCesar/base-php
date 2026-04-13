@@ -30,11 +30,24 @@ require_once __DIR__ . '/../auth/empresa_config.php';
             <?php endif; ?>
             <a class="nav-link sidebar-link mt-3" href="<?= BASE_URL ?>auth/logout.php"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a>
         </nav>
-        <div class="text-center text-white-50 small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
+        <div class="text-center text-white small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
     </div>
     <style>
         .sidebar-gradient {
-            background: linear-gradient(135deg, #143a51 0%, #667eea 100%);
+            background: #0d6efd;
+        }
+        .sidebar-gradient .nav-link,
+        .sidebar-gradient .nav-link i,
+        .offcanvas.sidebar-gradient .nav-link,
+        .offcanvas.sidebar-gradient .nav-link i {
+            color: #fff !important;
+        }
+        .offcanvas.sidebar-gradient {
+            --bs-offcanvas-bg: #0d6efd;
+            background-color: #0d6efd;
+        }
+        .offcanvas.sidebar-gradient .offcanvas-body {
+            background-color: #0d6efd;
         }
         .sidebar-link {
             color: #fff !important;
@@ -51,14 +64,13 @@ require_once __DIR__ . '/../auth/empresa_config.php';
         }
         .sidebar-link.active,
         .sidebar-link:hover {
-            background: #764ba2;
+            background: #0b5ed7;
             color: #fff !important;
         }
     </style>
-    </div>
     <!-- Offcanvas para móvil -->
     <div class="offcanvas offcanvas-start d-md-none sidebar-gradient" tabindex="-1" id="sidebarToggle" aria-labelledby="sidebarToggleLabel">
-        <div class="offcanvas-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;">
+        <div class="offcanvas-header" style="background: #0d6efd; color: #fff;">
             <h5 class="offcanvas-title fw-bold" id="sidebarToggleLabel"><i class="bi bi-list me-2"></i>Menú</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
         </div>
@@ -89,7 +101,7 @@ require_once __DIR__ . '/../auth/empresa_config.php';
                 <?php endif; ?>
                 <a class="nav-link sidebar-link mt-3" href="<?= BASE_URL ?>auth/logout.php"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</a>
             </nav>
-            <div class="text-center text-white-50 small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
+            <div class="text-center text-white small py-2">© <?= date('Y') ?> <?= htmlspecialchars(ucwords(strtolower($config['nombre']))) ?></div>
         </div>
         <style>
             .sidebar-link {
@@ -107,11 +119,10 @@ require_once __DIR__ . '/../auth/empresa_config.php';
             }
             .sidebar-link.active,
             .sidebar-link:hover {
-                background: #764ba2;
+                background: #0b5ed7;
                 color: #fff !important;
             }
         </style>
-        </div>
     </div>
 
 </aside>

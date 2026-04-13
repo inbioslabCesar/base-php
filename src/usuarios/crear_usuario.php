@@ -76,6 +76,7 @@ if ($nombre && $apellido && $dni && $email && $rol && $password) {
         $stmt->execute([$dni]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El DNI ya está registrado.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_usuario');
             exit;
         }
@@ -85,6 +86,7 @@ if ($nombre && $apellido && $dni && $email && $rol && $password) {
         $stmt->execute([$email]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El email ya está registrado.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_usuario');
             exit;
         }
@@ -109,11 +111,14 @@ if ($nombre && $apellido && $dni && $email && $rol && $password) {
         ]);
 
         $_SESSION['mensaje'] = "Usuario creado exitosamente.";
+        $_SESSION['mensaje_tipo'] = "success";
     } catch (PDOException $e) {
         $_SESSION['mensaje'] = "Error al crear el usuario: " . $e->getMessage();
+        $_SESSION['mensaje_tipo'] = "error";
     }
 } else {
     $_SESSION['mensaje'] = "Faltan datos obligatorios.";
+    $_SESSION['mensaje_tipo'] = "warning";
 }
 
 header('Location: dashboard.php?vista=usuarios');

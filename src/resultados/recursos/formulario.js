@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Lógica de cálculos automáticos para campos con fórmula
+    const calculatedFields = [];
     document.querySelectorAll('.campo-calculado[data-formula]').forEach(function(calculado) {
         let formula = calculado.getAttribute('data-formula');
         let variables = formula.match(/\[([^\]]+)\]/g) || [];
@@ -99,6 +100,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         calculado.value = String(resultado);
                     }
                 }
+                if (prevValue !== calculado.value) {
+                    // Propaga cambios a campos calculados dependientes y a validación en tiempo real.
+                    calculado.dispatchEvent(new Event('input', { bubbles: true }));
+                }
                 // Efecto visual cuando se calcula
                 calculado.style.background = 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
                 setTimeout(() => {
@@ -121,8 +126,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             }
         });
-        calcular(false);
+        calculatedFields.push({ el: calculado, calcular });
     });
+
+    // Recalcula en cadena al cargar para evitar valores guardados obsoletos
+    // cuando hay fórmulas dependientes (A usa B y B también es calculado).
+    const maxFormulaPasses = Math.max(1, calculatedFields.length + 1);
+    for (let pass = 0; pass < maxFormulaPasses; pass++) {
+        let changedAny = false;
+        calculatedFields.forEach(({ el, calcular }) => {
+            const before = String(el.value ?? '');
+            calcular(true);
+            if (String(el.value ?? '') !== before) {
+                changedAny = true;
+            }
+        });
+        if (!changedAny) {
+            break;
+        }
+    }
 
     // Cabeceras por paciente (se insertan en el snapshot al guardar)
     document.querySelectorAll('.header-builder').forEach((builder) => {

@@ -16,6 +16,10 @@ $id_cliente = $_POST['id_cliente'] ?? null;
 $examenes = $_POST['examenes'] ?? [];
 $cantidades = $_POST['cantidades'] ?? [];
 $precios = $_POST['precios'] ?? [];
+$referenciado_flags = $_POST['referenciado_flags'] ?? [];
+$laboratorio_referenciado_nombre = $_POST['laboratorio_referenciado_nombre'] ?? [];
+$costo_laboratorio_referenciado = $_POST['costo_laboratorio_referenciado'] ?? [];
+$costo_logistica_extra = $_POST['costo_logistica_extra'] ?? [];
 $tipo_usuario = $_POST['tipo_usuario'] ?? 'cliente';
 $id_empresa = $_POST['id_empresa'] ?? null;
 $id_convenio = $_POST['id_convenio'] ?? null;
@@ -70,6 +74,16 @@ if (!$id_cliente || !$creado_por) {
 function cotizacionesHasColumn(PDO $pdo, string $column): bool {
     try {
         $stmt = $pdo->prepare("SHOW COLUMNS FROM cotizaciones LIKE ?");
+        $stmt->execute([$column]);
+        return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function cotizacionesDetalleHasColumn(PDO $pdo, string $column): bool {
+    try {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM cotizaciones_detalle LIKE ?");
         $stmt->execute([$column]);
         return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
@@ -164,6 +178,16 @@ for ($i = 0; $i < count($examenes); $i++) {
 
     $subtotal = $precio_unitario_desc * $cantidad;
 
+    $es_referenciado = (int)($referenciado_flags[$i] ?? 0) === 1 ? 1 : 0;
+    $laboratorio_ref = trim((string)($laboratorio_referenciado_nombre[$i] ?? ''));
+    $costo_lab = max(0, (float)($costo_laboratorio_referenciado[$i] ?? 0));
+    $costo_log = max(0, (float)($costo_logistica_extra[$i] ?? 0));
+    if ($es_referenciado !== 1) {
+        $laboratorio_ref = '';
+        $costo_lab = 0.0;
+        $costo_log = 0.0;
+    }
+
     $total_bruto += $subtotal_bruto;
     $total += $subtotal;
 
@@ -172,7 +196,11 @@ for ($i = 0; $i < count($examenes); $i++) {
         'nombre_examen' => $examen['nombre'],
         'precio_unitario' => $precio_unitario_desc,
         'cantidad' => $cantidad,
-        'subtotal' => $subtotal
+        'subtotal' => $subtotal,
+        'es_referenciado' => $es_referenciado,
+        'laboratorio_referenciado_nombre' => $laboratorio_ref,
+        'costo_laboratorio_referenciado' => $costo_lab,
+        'costo_logistica_extra' => $costo_log,
     ];
 }
 
@@ -256,16 +284,43 @@ $sql = 'INSERT INTO cotizaciones (' . implode(',', $cols) . ') VALUES (' . $plac
 $stmt = $pdo->prepare($sql);
 $stmt->execute($vals);
 $id_cotizacion = $pdo->lastInsertId();
-$stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
+$hasRefCols = cotizacionesDetalleHasColumn($pdo, 'es_referenciado')
+    && cotizacionesDetalleHasColumn($pdo, 'laboratorio_referenciado_nombre')
+    && cotizacionesDetalleHasColumn($pdo, 'costo_laboratorio_referenciado')
+    && cotizacionesDetalleHasColumn($pdo, 'costo_logistica_extra')
+    && cotizacionesDetalleHasColumn($pdo, 'estado_liquidacion');
+
+if ($hasRefCols) {
+    $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal, es_referenciado, laboratorio_referenciado_nombre, costo_laboratorio_referenciado, costo_logistica_extra, estado_liquidacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+} else {
+    $stmt = $pdo->prepare("INSERT INTO cotizaciones_detalle (id_cotizacion, id_examen, nombre_examen, precio_unitario, cantidad, subtotal) VALUES (?, ?, ?, ?, ?, ?)");
+}
+
 foreach ($detalles as $detalle) {
-    $stmt->execute([
-        $id_cotizacion,
-        $detalle['id_examen'],
-        $detalle['nombre_examen'],
-        $detalle['precio_unitario'],
-        $detalle['cantidad'],
-        $detalle['subtotal']
-    ]);
+    if ($hasRefCols) {
+        $stmt->execute([
+            $id_cotizacion,
+            $detalle['id_examen'],
+            $detalle['nombre_examen'],
+            $detalle['precio_unitario'],
+            $detalle['cantidad'],
+            $detalle['subtotal'],
+            $detalle['es_referenciado'],
+            $detalle['laboratorio_referenciado_nombre'] !== '' ? $detalle['laboratorio_referenciado_nombre'] : null,
+            $detalle['costo_laboratorio_referenciado'],
+            $detalle['costo_logistica_extra'],
+            $detalle['es_referenciado'] === 1 ? 'pendiente' : 'liquidado',
+        ]);
+    } else {
+        $stmt->execute([
+            $id_cotizacion,
+            $detalle['id_examen'],
+            $detalle['nombre_examen'],
+            $detalle['precio_unitario'],
+            $detalle['cantidad'],
+            $detalle['subtotal']
+        ]);
+    }
 }
 foreach ($detalles as $detalle) {
     $id_examen = $detalle['id_examen'];

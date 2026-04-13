@@ -1,11 +1,13 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../config/currency.php';
 $modoCotizaciones = strtolower(trim((string)($modoCotizaciones ?? 'activas')));
 $soloAnuladas = ($modoCotizaciones === 'anuladas');
 $rolActualCot = strtolower(trim((string)($_SESSION['rol'] ?? '')));
 $puedeAnularCot = ($rolActualCot === 'admin');
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(\PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(\PDO::FETCH_ASSOC);
+$currencyCfg = currency_get_config($pdo);
 ?>
 <style>
 .btn-cotizacion-accion {
@@ -171,6 +173,26 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
         border: none;
         display: inline-block;
     }
+    .cotizacion-selector-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .cotizacion-acciones-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+    .cotizacion-acciones-row .btn-cotizacion-accion {
+        margin-right: 0;
+        margin-bottom: 0;
+    }
+    .cotizacion-acciones-row .badge {
+        margin: 0;
+    }
 }
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -252,7 +274,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                 </tbody>
             </table>
                         <div class="mt-3">
-                                <button id="btnPagoMasivo" class="btn btn-success" disabled data-bs-toggle="modal" data-bs-target="#modalPagoMasivo">Pago masivo (<span id="totalPagoMasivo">S/ 0.00</span>)</button>
+                                <button id="btnPagoMasivo" class="btn btn-success" disabled data-bs-toggle="modal" data-bs-target="#modalPagoMasivo">Pago masivo (<span id="totalPagoMasivo"><?= htmlspecialchars(money_format_local(0, $currencyCfg)) ?></span>)</button>
                         </div>
 
                         <!-- Modal de confirmación pago masivo -->
@@ -265,7 +287,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
                                     </div>
                                     <div class="modal-body">
                                         <p>¿Desea registrar el pago masivo para <span id="cantidadSeleccionadas">0</span> cotizaciones seleccionadas?</p>
-                                        <p>Totales a pagar: <strong id="modalTotalPago">S/ 0.00</strong></p>
+                                        <p>Totales a pagar: <strong id="modalTotalPago"><?= htmlspecialchars(money_format_local(0, $currencyCfg)) ?></strong></p>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -290,7 +312,7 @@ $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fe
 <div class="d-block d-md-none mb-3" id="totalesCotizacionesMovil">
     <div class="card p-3 bg-info bg-opacity-10 border-0">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
-                <span class="fw-bold">Total a pagar: <span class="text-success" id="totalPagoMasivoMovil">S/ 0.00</span></span>
+                <span class="fw-bold">Total a pagar: <span class="text-success" id="totalPagoMasivoMovil"><?= htmlspecialchars(money_format_local(0, $currencyCfg)) ?></span></span>
             <button id="btnPagoMasivoMovil" class="btn btn-success mt-2 mt-md-0" disabled data-bs-toggle="modal" data-bs-target="#modalPagoMasivoMovil">Pago masivo (<span id="cantidadSeleccionadasMovil">0</span>)</button>
         </div>
     </div>
@@ -312,6 +334,9 @@ const puedeAnularCotizacion = <?= $puedeAnularCot ? 'true' : 'false' ?>;
 const modoCotizaciones = '<?= $soloAnuladas ? 'anuladas' : 'activas' ?>';
 const soloAnuladas = <?= $soloAnuladas ? 'true' : 'false' ?>;
 let filtroAlertaEstado = '';
+const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
+    ? window.formatMoney(value)
+    : `S/ ${Number(value || 0).toFixed(2)}`;
 
 function renderEstadoExamenBadge(row) {
     const estado = row.estado_examen;
@@ -439,11 +464,17 @@ function getSeleccionGlobal() {
         }
         lastIsMobile = isMobile;
     });
+        const cotizacionesRestorePending = localStorage.getItem('cotizaciones_restore_pending') === '1';
+        const cotizacionesRestoreStartRaw = parseInt(localStorage.getItem('cotizaciones_restore_start') || '0', 10);
+        const cotizacionesRestoreStart = Number.isFinite(cotizacionesRestoreStartRaw) && cotizacionesRestoreStartRaw >= 0
+            ? cotizacionesRestoreStartRaw
+            : 0;
+
         var tabla = $('#tablaCotizaciones').DataTable({
             "serverSide": true,
             "processing": true,
             "ajax": {
-                "url": "dashboard.php?action=cotizaciones_api&debug=1",
+                "url": "dashboard.php?action=cotizaciones_api",
                 "type": "GET",
                 "data": function(d) {
                     d.filtro_dni = $('#filtroDni').val();
@@ -456,6 +487,7 @@ function getSeleccionGlobal() {
                 }
             },
             "pageLength": 3,
+            "displayStart": cotizacionesRestorePending ? cotizacionesRestoreStart : 0,
             "lengthMenu": [[3, 5, 10], [3, 5, 10]],
             "order": [],
             "language": {
@@ -482,7 +514,7 @@ function getSeleccionGlobal() {
                 {
                     "data": "total",
                     "render": function(data) {
-                        return 'S/ ' + parseFloat(data).toFixed(2);
+                        return formatMoneySafe(data);
                     }
                 },
                 {
@@ -565,6 +597,30 @@ function getSeleccionGlobal() {
             ]
         });
 
+        if (cotizacionesRestorePending) {
+            $('#tablaCotizaciones').one('draw.dt', function() {
+                localStorage.removeItem('cotizaciones_restore_pending');
+            });
+        }
+
+        $(document).on('click', 'a.btn-cotizacion-accion', function() {
+            const href = ($(this).attr('href') || '').trim();
+            const target = (($(this).attr('target') || '').trim()).toLowerCase();
+            if (!href || target === '_blank') {
+                return;
+            }
+            if (href.indexOf('dashboard.php?vista=') !== 0) {
+                return;
+            }
+
+            const pageInfo = tabla.page.info();
+            if (!pageInfo || typeof pageInfo.start === 'undefined') {
+                return;
+            }
+            localStorage.setItem('cotizaciones_restore_start', String(pageInfo.start));
+            localStorage.setItem('cotizaciones_restore_pending', '1');
+        });
+
         // Recargar tabla al cambiar cualquier filtro
         $('#filtroDni, #filtroEmpresa, #filtroConvenio, #filtroFechaDesde, #filtroFechaHasta').on('change keyup', function() {
             tabla.ajax.reload();
@@ -627,16 +683,16 @@ function getSeleccionGlobal() {
                         algunoSeleccionado = true;
                     }
                 });
-                totalPagoMasivo.textContent = 'S/ ' + total.toFixed(2);
+                totalPagoMasivo.textContent = formatMoneySafe(total);
                 btnPagoMasivo.disabled = !algunoSeleccionado;
-                modalTotalPago.textContent = 'S/ ' + total.toFixed(2);
+                modalTotalPago.textContent = formatMoneySafe(total);
                 cantidadSeleccionadas.textContent = count;
             }
         });
     } else {
-        totalPagoMasivo.textContent = 'S/ 0.00';
+        totalPagoMasivo.textContent = formatMoneySafe(0);
         btnPagoMasivo.disabled = true;
-        modalTotalPago.textContent = 'S/ 0.00';
+        modalTotalPago.textContent = formatMoneySafe(0);
         cantidadSeleccionadas.textContent = 0;
     }
         }
@@ -782,7 +838,7 @@ function getSeleccionGlobal() {
             </div>
             <div class="modal-body">
                 <p>¿Desea registrar el pago masivo para <span id="cantidadSeleccionadasMovilModal">0</span> cotizaciones seleccionadas?</p>
-                <p>Total a pagar: <strong id="modalTotalPagoMovil">S/ 0.00</strong></p>
+                <p>Total a pagar: <strong id="modalTotalPagoMovil"><?= htmlspecialchars(money_format_local(0, $currencyCfg)) ?></strong></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -829,17 +885,17 @@ function actualizarTotalMovil() {
                         algunoSeleccionado = true;
                     }
                 });
-                document.getElementById('totalPagoMasivoMovil').textContent = 'S/ ' + total.toFixed(2);
+                document.getElementById('totalPagoMasivoMovil').textContent = formatMoneySafe(total);
                 document.getElementById('btnPagoMasivoMovil').disabled = !algunoSeleccionado;
-                document.getElementById('modalTotalPagoMovil').textContent = 'S/ ' + total.toFixed(2);
+                document.getElementById('modalTotalPagoMovil').textContent = formatMoneySafe(total);
                 document.getElementById('cantidadSeleccionadasMovil').textContent = count;
                 document.getElementById('cantidadSeleccionadasMovilModal').textContent = count;
             }
         });
     } else {
-        document.getElementById('totalPagoMasivoMovil').textContent = 'S/ 0.00';
+        document.getElementById('totalPagoMasivoMovil').textContent = formatMoneySafe(0);
         document.getElementById('btnPagoMasivoMovil').disabled = true;
-        document.getElementById('modalTotalPagoMovil').textContent = 'S/ 0.00';
+        document.getElementById('modalTotalPagoMovil').textContent = formatMoneySafe(0);
         document.getElementById('cantidadSeleccionadasMovil').textContent = 0;
         document.getElementById('cantidadSeleccionadasMovilModal').textContent = 0;
     }
@@ -913,14 +969,16 @@ function renderCotizacionCard(row) {
         </div>
         <div class='info-item'><span class='info-label'>DNI</span><span class='info-value'>${row.dni || ''}</span></div>
         <div class='info-item'><span class='info-label'>Fecha</span><span class='info-value'>${row.fecha || ''}</span></div>
-        <div class='info-item'><span class='info-label'>Total</span><span class='info-value'>S/ ${(parseFloat(row.total) || 0).toFixed(2)}</span></div>
+        <div class='info-item'><span class='info-label'>Total</span><span class='info-value'>${formatMoneySafe(parseFloat(row.total) || 0)}</span></div>
         <div class='info-item'><span class='info-label'>Referencia</span><span class='info-value'>${referenciaBadge}</span></div>
         <div class='info-item'><span class='info-label'>Estado Pago</span><span class='info-value'>${estadoPago}</span></div>
         <div class='info-item'><span class='info-label'>Estado Examen</span><span class='info-value'>${estadoExamen}</span></div>
         <div class='info-item'><span class='info-label'>Rol Creador</span><span class='info-value'>${row.rol_creador || ''}</span></div>
-        <div class='d-flex align-items-center gap-2 mt-2'>
+        <div class='cotizacion-selector-row'>
             <input type='checkbox' class='cotizacion-checkbox-movil' data-id='${row.id}' data-saldo='${parseFloat(row.saldo) || 0}' ${checked}>
             <label class='mb-0'>Seleccionar</label>
+        </div>
+        <div class='cotizacion-acciones-row'>
             ${acciones}
         </div>
     </div>`;

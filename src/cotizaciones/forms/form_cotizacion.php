@@ -3,6 +3,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../config/currency.php';
+
+$currencyCfg = currency_get_config($pdo);
+$currencySymbol = $currencyCfg['symbol'];
 
 $rol = $_SESSION['rol'] ?? null;
 $isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
@@ -13,6 +17,7 @@ $tipoComprobanteCliente = 'boleta';
 $receptorRuc = '';
 $receptorRazonSocial = '';
 $receptorDireccion = '';
+$hasDetalleReferenciadoCols = false;
 
 // Exámenes catálogo
 $stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico FROM examenes WHERE vigente = 1 ORDER BY nombre");
@@ -65,6 +70,23 @@ if ($isEdit) {
     } else {
         $id_cliente = isset($_GET['id']) ? intval($_GET['id']) : '';
     }
+}
+
+try {
+    $stmtColsDet = $pdo->query("SHOW COLUMNS FROM cotizaciones_detalle");
+    $colsDet = $stmtColsDet ? $stmtColsDet->fetchAll(PDO::FETCH_ASSOC) : [];
+    $mapDet = [];
+    foreach ($colsDet as $colDet) {
+        if (!empty($colDet['Field'])) {
+            $mapDet[] = (string)$colDet['Field'];
+        }
+    }
+    $hasDetalleReferenciadoCols = in_array('es_referenciado', $mapDet, true)
+        && in_array('laboratorio_referenciado_nombre', $mapDet, true)
+        && in_array('costo_laboratorio_referenciado', $mapDet, true)
+        && in_array('costo_logistica_extra', $mapDet, true);
+} catch (Throwable $e) {
+    $hasDetalleReferenciadoCols = false;
 }
 
 // Validar cliente
@@ -232,7 +254,8 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
     background: white;
     border-radius: 15px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
     border: 1px solid #e3e6f0;
 }
 
@@ -553,6 +576,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
     }
     .examenes-table .table {
         font-size: 0.92rem;
+        min-width: 980px;
     }
     .examenes-table thead th, .examenes-table tbody td {
         padding: 0.5rem 0.3rem;
@@ -576,6 +600,23 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+    }
+    .tercerizado-costos .col-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .tercerizado-costos .form-label {
+        font-size: 0.78rem;
+        line-height: 1.2;
+    }
+    .acciones-cell {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.35rem;
+    }
+    .acciones-cell .btn {
+        min-width: 34px;
+        min-height: 34px;
     }
 }
 </style>
@@ -814,6 +855,9 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     if (Array.isArray(examenesCotizacion) && examenesCotizacion.length > 0) {
                         examenesSeleccionados = examenesCotizacion.map(function(ex) {
                             let info = examenesData.find(e => e.id == ex.id_examen);
+                            let esReferenciado = parseInt(ex.es_referenciado || 0) === 1;
+                            let costoLab = parseFloat(ex.costo_laboratorio_referenciado || 0);
+                            let costoLogistica = parseFloat(ex.costo_logistica_extra || 0);
                             return {
                                 id: ex.id_examen,
                                 codigo: info ? info.codigo : '',
@@ -824,7 +868,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                 descripcion: info ? info.descripcion : '',
                                 tiempo_respuesta: info ? info.tiempo_respuesta : '',
                                 preanalitica_cliente: info ? info.preanalitica_cliente : '',
-                                observaciones: info ? info.observaciones : ''
+                                observaciones: info ? info.observaciones : '',
+                                es_referenciado: esReferenciado ? 1 : 0,
+                                laboratorio_referenciado_nombre: (ex.laboratorio_referenciado_nombre || '').toString(),
+                                costo_laboratorio_referenciado: isNaN(costoLab) ? 0 : costoLab,
+                                costo_logistica_extra: isNaN(costoLogistica) ? 0 : costoLogistica
                             };
                         });
                     } else {
@@ -844,11 +892,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                 });
                 </script>
                 <?php endif; ?>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 <!-- Footer fijo mejorado -->
 <div class="fixed-bottom footer-cotizacion p-3" id="footerCotizacion">
@@ -858,7 +902,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                 <i class="bi bi-calculator text-success"></i>
                 <div>
                     <small class="text-muted">Total a pagar:</small>
-                    <div class="total-amount" id="totalCotizacion">S/. 0.00</div>
+                    <div class="total-amount" id="totalCotizacion"><?= htmlspecialchars(money_format_local(0, $currencyCfg)) ?></div>
                 </div>
                 <div id="descuentoInfo" class="d-none">
                     <span class="descuento-badge">
@@ -908,6 +952,29 @@ let examenesSeleccionados = [];
 let descuentoCliente = <?= $descuento_cliente ?>;
 let descuentoActual = <?= $descuento_empresa_convenio ?: $descuento_cliente ?>;
 let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
+let hasDetalleReferenciadoCols = <?= $hasDetalleReferenciadoCols ? 'true' : 'false' ?>;
+const formCurrencyConfig = <?= json_encode($currencyCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+function formatMoneySafe(amount) {
+    if (typeof window.formatMoney === 'function') {
+        return window.formatMoney(amount);
+    }
+
+    const numericAmount = Number(amount || 0);
+    const decimals = Number(formCurrencyConfig.decimals ?? 2);
+    const decimalSeparator = formCurrencyConfig.decimal_separator ?? '.';
+    const thousandsSeparator = formCurrencyConfig.thousands_separator ?? ',';
+    const symbol = formCurrencyConfig.symbol ?? '$';
+    const position = formCurrencyConfig.position === 'suffix' ? 'suffix' : 'prefix';
+    const fixed = numericAmount.toFixed(decimals);
+    const parts = fixed.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+    const formattedNumber = decimals > 0 ? parts.join(decimalSeparator) : parts[0];
+
+    return position === 'suffix'
+        ? `${formattedNumber} ${symbol}`
+        : `${symbol} ${formattedNumber}`;
+}
 
 function showCotizacionFormError(message) {
     const $alert = $('#cotizacionFormAlert');
@@ -1034,7 +1101,7 @@ function formatExamenOption(examen) {
                 '<small class="text-muted">Código: ' + (examenData.codigo || 'N/A') + '</small>' +
             '</div>' +
             '<div class="text-end">' +
-                '<span class="badge bg-success">S/. ' + parseFloat(examenData.precio_publico).toFixed(2) + '</span>' +
+                '<span class="badge bg-success">' + formatMoneySafe(examenData.precio_publico) + '</span>' +
             '</div>' +
         '</div>'
     );
@@ -1156,7 +1223,11 @@ $('#buscadorExamen').on('select2:select', function(e) {
         examenesSeleccionados.push({
             ...examen,
             precio_unitario: precioConDescuento,
-            cantidad: 1
+            cantidad: 1,
+            es_referenciado: 0,
+            laboratorio_referenciado_nombre: '',
+            costo_laboratorio_referenciado: 0,
+            costo_logistica_extra: 0
         });
     } else {
         existente.cantidad += 1;
@@ -1283,6 +1354,51 @@ $(document).on('click', '.btn-remove', function() {
     renderizarLista();
 });
 
+$(document).on('change', '.referenciadoCheck', function() {
+    let idx = parseInt($(this).data('idx'), 10);
+    let checked = $(this).is(':checked');
+    if (!Number.isInteger(idx) || !examenesSeleccionados[idx]) return;
+    examenesSeleccionados[idx].es_referenciado = checked ? 1 : 0;
+    if (!checked) {
+        examenesSeleccionados[idx].laboratorio_referenciado_nombre = '';
+        examenesSeleccionados[idx].costo_laboratorio_referenciado = 0;
+        examenesSeleccionados[idx].costo_logistica_extra = 0;
+    }
+    renderizarLista();
+});
+
+function syncReferenciadoHidden(idx) {
+    if (!Number.isInteger(idx) || !examenesSeleccionados[idx]) return;
+    const ex = examenesSeleccionados[idx];
+    $(`input[name="referenciado_flags[]"]:eq(${idx})`).val(parseInt(ex.es_referenciado || 0) === 1 ? 1 : 0);
+    $(`input[name="laboratorio_referenciado_nombre[]"]:eq(${idx})`).val((ex.laboratorio_referenciado_nombre || '').toString().trim());
+    $(`input[name="costo_laboratorio_referenciado[]"]:eq(${idx})`).val(parseFloat(ex.costo_laboratorio_referenciado || 0).toFixed(2));
+    $(`input[name="costo_logistica_extra[]"]:eq(${idx})`).val(parseFloat(ex.costo_logistica_extra || 0).toFixed(2));
+}
+
+$(document).on('input', '.laboratorioReferenciadoInput', function() {
+    let idx = parseInt($(this).data('idx'), 10);
+    if (!Number.isInteger(idx) || !examenesSeleccionados[idx]) return;
+    examenesSeleccionados[idx].laboratorio_referenciado_nombre = ($(this).val() || '').toString().trim();
+    syncReferenciadoHidden(idx);
+});
+
+$(document).on('input', '.costoLabInput', function() {
+    let idx = parseInt($(this).data('idx'), 10);
+    if (!Number.isInteger(idx) || !examenesSeleccionados[idx]) return;
+    let monto = parseFloat($(this).val());
+    examenesSeleccionados[idx].costo_laboratorio_referenciado = (isNaN(monto) || monto < 0) ? 0 : monto;
+    syncReferenciadoHidden(idx);
+});
+
+$(document).on('input', '.costoLogisticaInput', function() {
+    let idx = parseInt($(this).data('idx'), 10);
+    if (!Number.isInteger(idx) || !examenesSeleccionados[idx]) return;
+    let monto = parseFloat($(this).val());
+    examenesSeleccionados[idx].costo_logistica_extra = (isNaN(monto) || monto < 0) ? 0 : monto;
+    syncReferenciadoHidden(idx);
+});
+
 // Ver detalles
 $(document).on('click', '.btn-detalle', function() {
     let idx = $(this).data('idx');
@@ -1306,7 +1422,7 @@ $(document).on('click', '.btn-detalle', function() {
                         </tr>
                         <tr>
                             <td class="fw-bold">Precio:</td>
-                            <td class="text-success fw-bold">S/. ${parseFloat(ex.precio_unitario).toFixed(2)}</td>
+                            <td class="text-success fw-bold">${formatMoneySafe(ex.precio_unitario)}</td>
                         </tr>
                     </table>
                 </div>
@@ -1373,7 +1489,8 @@ function renderizarLista() {
                     <tr>
                         <th><i class="bi bi-flask me-2"></i>Examen</th>
                         <th style="width:120px;"><i class="bi bi-123 me-2"></i>Cantidad</th>
-                        <th style="width:140px;"><i class="bi bi-currency-dollar me-2"></i>Precio (S/.)</th>
+                        <th style="width:140px;"><i class="bi bi-currency-dollar me-2"></i>Precio (<?= htmlspecialchars($currencySymbol) ?>)</th>
+                        <th style="width:280px;"><i class="bi bi-truck me-2"></i>Tercerizado</th>
                         <th style="width:120px;"><i class="bi bi-calculator me-2"></i>Subtotal</th>
                         <th style="width:160px;"><i class="bi bi-gear me-2"></i>Acciones</th>
                     </tr>
@@ -1384,6 +1501,10 @@ function renderizarLista() {
             let precio = parseFloat(ex.precio_unitario);
             let subtotal = precio * ex.cantidad;
             total += subtotal;
+            let esRef = parseInt(ex.es_referenciado || 0) === 1;
+            let laboratorioRef = (ex.laboratorio_referenciado_nombre || '').toString();
+            let costoLab = parseFloat(ex.costo_laboratorio_referenciado || 0);
+            let costoLog = parseFloat(ex.costo_logistica_extra || 0);
             html += `
             <tr class="fade-in-up">
                 <td>
@@ -1404,24 +1525,54 @@ function renderizarLista() {
                     ${
                         (rolUsuario === 'admin' || rolUsuario === 'recepcionista')
                             ? `<div class="input-group">
-                                <span class="input-group-text bg-success text-white">S/.</span>
+                                <span class="input-group-text bg-success text-white"><?= htmlspecialchars($currencySymbol) ?></span>
                                 <input type="text" class="form-control form-control-modern precioExamen" 
                                       data-idx="${idx}" value="${precio.toFixed(2)}" 
                                       placeholder="0.00" 
                                       pattern="[0-9]+(\.[0-9]{1,2})?" 
                                       title="Ingresa el precio (ej: 25.50)">
                                </div>`
-                            : `<div class="form-control-plaintext fw-bold text-success">S/. ${precio.toFixed(2)}</div>`
+                            : `<div class="form-control-plaintext fw-bold text-success">${formatMoneySafe(precio)}</div>`
                     }
                     <input type="hidden" name="examenes[]" value="${ex.id}">
                     <input type="hidden" name="cantidades[]" value="${ex.cantidad}">
                     <input type="hidden" name="precios[]" value="${precio.toFixed(2)}">
                 </td>
                 <td>
-                    <div class="fw-bold text-success fs-6">S/. ${subtotal.toFixed(2)}</div>
+                    ${hasDetalleReferenciadoCols ? `
+                        <div class="form-check mb-2">
+                            <input class="form-check-input referenciadoCheck" type="checkbox" data-idx="${idx}" id="ref_${idx}" ${esRef ? 'checked' : ''}>
+                            <label class="form-check-label" for="ref_${idx}">Referenciado</label>
+                        </div>
+                        <label class="form-label form-label-sm mb-1">Laboratorio externo</label>
+                        <input type="text" class="form-control form-control-sm mb-2 laboratorioReferenciadoInput" data-idx="${idx}" placeholder="Laboratorio externo" value="${laboratorioRef.replace(/"/g, '&quot;')}" ${esRef ? '' : 'disabled'}>
+                        <div class="row g-1 tercerizado-costos">
+                            <div class="col-6">
+                                <label class="form-label form-label-sm mb-1">Costo laboratorio</label>
+                                <input type="number" step="0.01" min="0" class="form-control form-control-sm costoLabInput" data-idx="${idx}" placeholder="Costo lab" value="${(isNaN(costoLab) ? 0 : costoLab).toFixed(2)}" ${esRef ? '' : 'disabled'}>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label form-label-sm mb-1">Costo logística</label>
+                                <input type="number" step="0.01" min="0" class="form-control form-control-sm costoLogisticaInput" data-idx="${idx}" placeholder="Costo logística" value="${(isNaN(costoLog) ? 0 : costoLog).toFixed(2)}" ${esRef ? '' : 'disabled'}>
+                            </div>
+                        </div>
+                        <input type="hidden" name="referenciado_flags[]" value="${esRef ? 1 : 0}">
+                        <input type="hidden" name="laboratorio_referenciado_nombre[]" value="${laboratorioRef.replace(/"/g, '&quot;')}">
+                        <input type="hidden" name="costo_laboratorio_referenciado[]" value="${(isNaN(costoLab) ? 0 : costoLab).toFixed(2)}">
+                        <input type="hidden" name="costo_logistica_extra[]" value="${(isNaN(costoLog) ? 0 : costoLog).toFixed(2)}">
+                    ` : `
+                        <span class="badge bg-secondary">No habilitado</span>
+                        <input type="hidden" name="referenciado_flags[]" value="0">
+                        <input type="hidden" name="laboratorio_referenciado_nombre[]" value="">
+                        <input type="hidden" name="costo_laboratorio_referenciado[]" value="0.00">
+                        <input type="hidden" name="costo_logistica_extra[]" value="0.00">
+                    `}
                 </td>
                 <td>
-                    <div class="d-flex gap-1">
+                    <div class="fw-bold text-success fs-6">${formatMoneySafe(subtotal)}</div>
+                </td>
+                <td>
+                    <div class="d-flex gap-1 acciones-cell">
                         <button type="button" class="btn btn-info-modern btn-modern btn-sm btn-detalle" 
                                 data-idx="${idx}" title="Ver detalles">
                             <i class="bi bi-info-circle"></i>
@@ -1438,7 +1589,7 @@ function renderizarLista() {
     }
     
     $('#examenes-seleccionados').html(html);
-    $('#totalCotizacion').text('S/. ' + total.toFixed(2));
+    $('#totalCotizacion').text(formatMoneySafe(total));
     
     // Actualizar información de descuento
     if (descuentoActual > 0) {
@@ -1452,6 +1603,10 @@ function renderizarLista() {
     examenesSeleccionados.forEach((ex, idx) => {
         $(`input[name="cantidades[]"]:eq(${idx})`).val(ex.cantidad);
         $(`input[name="precios[]"]:eq(${idx})`).val(parseFloat(ex.precio_unitario).toFixed(2));
+        $(`input[name="referenciado_flags[]"]:eq(${idx})`).val(parseInt(ex.es_referenciado || 0) === 1 ? 1 : 0);
+        $(`input[name="laboratorio_referenciado_nombre[]"]:eq(${idx})`).val((ex.laboratorio_referenciado_nombre || '').toString().trim());
+        $(`input[name="costo_laboratorio_referenciado[]"]:eq(${idx})`).val(parseFloat(ex.costo_laboratorio_referenciado || 0).toFixed(2));
+        $(`input[name="costo_logistica_extra[]"]:eq(${idx})`).val(parseFloat(ex.costo_logistica_extra || 0).toFixed(2));
     });
 }
 </script>

@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $auth = new Auth($pdo, 'usuarios');
     $usuario = $auth->login($email, $password);
     if ($usuario) {
+        session_regenerate_id(true);
         $_SESSION['usuario'] = $usuario['nombre'];
         $_SESSION['email'] = $usuario['email'];
         $_SESSION['usuario_id'] = $usuario['id'];
@@ -47,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $auth = new Auth($pdo, 'empresas');
     $empresa = $auth->login($email, $password);
     if ($empresa) {
+        session_regenerate_id(true);
         $_SESSION['usuario'] = $empresa['nombre_comercial'];
         $_SESSION['email'] = $empresa['email'];
         $_SESSION['empresa_id'] = $empresa['id'];
@@ -60,6 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $auth = new Auth($pdo, 'clientes');
     $cliente = $auth->login($email, $password);
     if ($cliente) {
+        session_regenerate_id(true);
         $_SESSION['usuario'] = $cliente['nombre'];
         $_SESSION['email'] = $cliente['email'];
         $_SESSION['cliente_id'] = $cliente['id'];
@@ -73,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $auth = new Auth($pdo, 'convenios');
     $convenio = $auth->login($email, $password);
     if ($convenio) {
+        session_regenerate_id(true);
         $_SESSION['usuario'] = $convenio['nombre'];
         $_SESSION['email'] = $convenio['email'];
         $_SESSION['convenio_id'] = $convenio['id'];
@@ -87,15 +91,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: login.php');
     exit;
 }
+
+$logoAuth = !empty($config['logo']) ? (string)$config['logo'] : '../uploads/empresa/logo_empresa.png';
+if (preg_match('/^data:image\//i', $logoAuth)) {
+    $logoAuth = '../uploads/empresa/logo_empresa.png';
+}
+$logoAuthVersion = time();
+$logoAuthAbs1 = __DIR__ . '/../' . ltrim($logoAuth, '/');
+$logoAuthAbs2 = __DIR__ . '/../../' . ltrim($logoAuth, '/');
+if (is_file($logoAuthAbs1)) {
+    $logoAuthVersion = (int)filemtime($logoAuthAbs1);
+} elseif (is_file($logoAuthAbs2)) {
+    $logoAuthVersion = (int)filemtime($logoAuthAbs2);
+}
+
+$faviconDynamicHref = '../favicon.php?v=' . $logoAuthVersion;
+$faviconIcoHref = '../../favicon.ico';
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="<?= htmlspecialchars($faviconDynamicHref, ENT_QUOTES, 'UTF-8') ?>" type="image/png" sizes="48x48">
+    <link rel="icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" sizes="any" type="image/x-icon">
+    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="../<?= htmlspecialchars($logoAuth, ENT_QUOTES, 'UTF-8') ?>?v=<?= $logoAuthVersion ?>">
     <title>Iniciar Sesión | <?= htmlspecialchars($config['nombre']) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <!-- CSS general de autenticación -->
     <link rel="stylesheet" href="../styles/auth.css">
     <style>
@@ -113,6 +139,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 120px;
             display: block;
             margin: 0 auto 12px auto;
+        }
+        .password-toggle-btn {
+            min-width: 46px;
+            border-left: 0;
+            background: rgba(13, 110, 253, 0.08);
+            color: #0d6efd;
+            transition: all 0.2s ease;
+        }
+        .password-toggle-btn:hover {
+            background: rgba(13, 110, 253, 0.16);
+            color: #0a58ca;
+        }
+        .password-toggle-btn:focus {
+            box-shadow: none;
+        }
+        .input-group:focus-within .password-toggle-btn {
+            border-color: #86b7fe;
+            background: rgba(13, 110, 253, 0.14);
+        }
+        #togglePasswordIcon {
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -147,7 +194,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="mb-3">
                 <label for="password" class="form-label">Contraseña</label>
-                <input type="password" class="form-control" id="password" name="password" required>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="password" name="password" required>
+                    <button class="btn password-toggle-btn" type="button" id="togglePassword" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
+                        <i class="bi bi-eye" id="togglePasswordIcon" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
             <button type="submit" class="btn btn-primary w-100 mb-2">Ingresar</button>
             <div class="d-flex justify-content-between">
@@ -156,6 +208,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </form>
     </div>
+    <script>
+        (function () {
+            var passwordInput = document.getElementById('password');
+            var toggleButton = document.getElementById('togglePassword');
+            var toggleIcon = document.getElementById('togglePasswordIcon');
+            if (!passwordInput || !toggleButton || !toggleIcon) return;
+
+            toggleButton.addEventListener('click', function () {
+                var isHidden = passwordInput.type === 'password';
+                passwordInput.type = isHidden ? 'text' : 'password';
+                toggleIcon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+                toggleButton.setAttribute('aria-label', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                toggleButton.setAttribute('title', isHidden ? 'Ocultar contraseña' : 'Mostrar contraseña');
+                toggleButton.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+            });
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

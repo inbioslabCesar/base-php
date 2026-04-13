@@ -44,8 +44,22 @@ if (!empty($referencia_personalizada)) {
     }
 }
 $empresa = obtenerDatosEmpresa($pdo);
-$logo = $empresa['logo'] ? __DIR__ . '/../' . ltrim($empresa['logo'], './') : '';
-$firma = $empresa['firma'] ? __DIR__ . '/../' . ltrim($empresa['firma'], './') : '';
+$resolveEmpresaAssetPath = static function (string $storedPath): string {
+    $storedPath = trim($storedPath);
+    if ($storedPath === '') {
+        return '';
+    }
+    $normalized = str_replace('\\', '/', ltrim($storedPath, '/'));
+    if (strpos($normalized, '../uploads/') === 0) {
+        $normalized = substr($normalized, 3);
+    }
+    if (strpos($normalized, 'uploads/') === 0) {
+        return rtrim(__DIR__ . '/../../', '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+    }
+    return rtrim(__DIR__ . '/../', '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, ltrim($storedPath, './'));
+};
+$logo = !empty($empresa['logo']) ? $resolveEmpresaAssetPath((string)$empresa['logo']) : '';
+$firma = !empty($empresa['firma']) ? $resolveEmpresaAssetPath((string)$empresa['firma']) : '';
 $items = obtenerItemsResultados($pdo, $rows);
 $reporte = armarHtmlReporte($paciente, $referencia, $empresa, $items);
 

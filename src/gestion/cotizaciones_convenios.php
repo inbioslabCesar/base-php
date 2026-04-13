@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../cotizaciones/funciones/cotizaciones_utils.php';
 
 // Control de acceso seguro para convenio
 $id_convenio = $_SESSION['convenio_id'] ?? null;
@@ -48,7 +49,7 @@ if ($clientesAsociados) {
     $stmt->execute($paramsCot);
     $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } else {
-    // Si no hay clientes asociados, muestra solo las cotizaciones creadas por admin/recepcionista para la convenio
+    // Si no hay clientes asociados, muestra solo las cotizaciones creadas por admin/recepcionista para el convenio
     $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente, cl.dni 
             FROM cotizaciones c
             JOIN clientes cl ON c.id_cliente = cl.id
@@ -66,7 +67,7 @@ $totalconvenio = 0.0;
 $totalPagadoconvenio = 0.0;
 $saldoconvenio = 0.0;
 $pagosPorCotizacion = [];
-$examenesPorCotizacion = [];
+$porcentajePorCotizacion = [];
 $descargaAnticipadaPorCotizacion = [];
 
 if (!empty($cotizaciones)) {
@@ -85,16 +86,11 @@ if (!empty($cotizaciones)) {
             $pagosPorCotizacion[$pago['id_cotizacion']] = $pago['total_pagado'];
         }
 
-        // Exámenes
-        $sqlExamenes = "SELECT re.id AS id_resultado, re.id_cotizacion, re.id_examen, re.estado, e.nombre AS nombre_examen
-                        FROM resultados_examenes re
-                        JOIN examenes e ON re.id_examen = e.id
-                        WHERE re.id_cotizacion IN ($inQuery)";
-        $stmtEx = $pdo->prepare($sqlExamenes);
-        $stmtEx->execute($idsCotizaciones);
-        $examenes = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($examenes as $ex) {
-            $examenesPorCotizacion[$ex['id_cotizacion']][] = $ex;
+        foreach ($idsCotizaciones as $cotizacionIdTmp) {
+            $cotizacionIdTmp = (int)$cotizacionIdTmp;
+            if ($cotizacionIdTmp > 0) {
+                $porcentajePorCotizacion[$cotizacionIdTmp] = (int)obtenerPorcentajeResultadosCotizacion($pdo, $cotizacionIdTmp);
+            }
         }
 
         // Pagos con método descarga anticipada
@@ -120,7 +116,7 @@ if (!empty($cotizaciones)) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <div class="container mt-4">
-    <h4 class="mb-3">Cotizaciones de la convenio</h4>
+    <h4 class="mb-3">Cotizaciones del convenio</h4>
     <form class="row g-3 mb-3" method="get">
         <input type="hidden" name="vista" value="cotizaciones_convenios">
         <div class="col-auto">
@@ -177,10 +173,7 @@ if (!empty($cotizaciones)) {
     ? '<span class="badge bg-primary">S/ ' . number_format($pagado, 2) . '</span>'
     : '<span class="badge bg-secondary">S/ 0.00</span>';
 
-$examenes = $examenesPorCotizacion[$cotizacionId] ?? [];
-$totalExamenes = count($examenes);
-$completados = count(array_filter($examenes, fn($ex) => $ex['estado'] !== 'pendiente'));
-$porcentaje = $totalExamenes ? round(($completados / $totalExamenes) * 100) : 0;
+$porcentaje = (int)($porcentajePorCotizacion[$cotizacionId] ?? 0);
 
 if ((int)$porcentaje === 100) {
     $resultBadge = '<span class="badge bg-success">Completado: 100%</span>';
@@ -221,10 +214,13 @@ $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada)
 <?php endforeach; ?>
 <?php else: ?>
 <tr>
-    <td colspan="8" class="text-center">No hay cotizaciones registradas para la convenio.</td>
+    <td colspan="8" class="text-center">No hay cotizaciones registradas para el convenio.</td>
 </tr>
 <?php endif; ?>
 </tbody>
+</table>
+</div>
+</div>
 <!-- DataTables y extensiones para exportar -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>

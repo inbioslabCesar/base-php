@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS inventario_items (
     presentacion VARCHAR(120) NULL,
     factor_presentacion DECIMAL(12,4) NOT NULL DEFAULT 1,
     unidad_medida VARCHAR(30) NOT NULL,
+    controla_stock TINYINT(1) NOT NULL DEFAULT 1,
     stock_minimo DECIMAL(12,2) NOT NULL DEFAULT 0,
     stock_critico DECIMAL(12,2) NOT NULL DEFAULT 0,
     activo TINYINT(1) NOT NULL DEFAULT 1,
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS inventario_items (
     UNIQUE KEY uk_inventario_items_codigo (codigo),
     KEY idx_inventario_items_nombre (nombre),
     KEY idx_inventario_items_categoria (categoria),
+    KEY idx_inventario_items_controla_stock (controla_stock),
     KEY idx_inventario_items_activo (activo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -74,6 +76,40 @@ PREPARE stmt_add_factor_presentacion FROM @sql_add_factor_presentacion;
 EXECUTE stmt_add_factor_presentacion;
 DEALLOCATE PREPARE stmt_add_factor_presentacion;
 
+SET @sql_add_controla_stock := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'inventario_items'
+              AND COLUMN_NAME = 'controla_stock'
+        ),
+        'SELECT 1',
+        'ALTER TABLE inventario_items ADD COLUMN controla_stock TINYINT(1) NOT NULL DEFAULT 1 AFTER unidad_medida'
+    )
+);
+PREPARE stmt_add_controla_stock FROM @sql_add_controla_stock;
+EXECUTE stmt_add_controla_stock;
+DEALLOCATE PREPARE stmt_add_controla_stock;
+
+SET @sql_add_idx_controla_stock := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'inventario_items'
+              AND INDEX_NAME = 'idx_inventario_items_controla_stock'
+        ),
+        'SELECT 1',
+        'ALTER TABLE inventario_items ADD INDEX idx_inventario_items_controla_stock (controla_stock)'
+    )
+);
+PREPARE stmt_add_idx_controla_stock FROM @sql_add_idx_controla_stock;
+EXECUTE stmt_add_idx_controla_stock;
+DEALLOCATE PREPARE stmt_add_idx_controla_stock;
+
 CREATE TABLE IF NOT EXISTS inventario_lotes (
     id INT NOT NULL AUTO_INCREMENT,
     item_id INT NOT NULL,
@@ -97,12 +133,14 @@ CREATE TABLE IF NOT EXISTS inventario_movimientos (
     tipo VARCHAR(20) NOT NULL,
     cantidad DECIMAL(12,2) NOT NULL,
     observacion VARCHAR(255) NULL,
+    origen VARCHAR(30) NOT NULL DEFAULT 'inventario',
     usuario_id INT NULL,
     fecha_hora DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_inventario_mov_item (item_id),
     KEY idx_inventario_mov_lote (lote_id),
     KEY idx_inventario_mov_tipo (tipo),
+    KEY idx_inventario_mov_origen (origen),
     KEY idx_inventario_mov_fecha (fecha_hora),
     CONSTRAINT fk_inventario_mov_item FOREIGN KEY (item_id) REFERENCES inventario_items (id) ON DELETE CASCADE,
     CONSTRAINT fk_inventario_mov_lote FOREIGN KEY (lote_id) REFERENCES inventario_lotes (id) ON DELETE SET NULL

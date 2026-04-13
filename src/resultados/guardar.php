@@ -72,10 +72,17 @@ $getAlarmColumnMap = function () use ($pdo, &$alarmColumnMap) {
     ];
 
     try {
-        $stmtCols = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'resultados_examenes'");
-        $cols = $stmtCols->fetchAll(PDO::FETCH_COLUMN);
+        $stmtCols = $pdo->query("SHOW COLUMNS FROM resultados_examenes");
+        $cols = $stmtCols ? $stmtCols->fetchAll(PDO::FETCH_ASSOC) : [];
+        $existentes = [];
+        foreach ($cols as $def) {
+            if (!empty($def['Field'])) {
+                $existentes[] = (string)$def['Field'];
+            }
+        }
+
         foreach ($alarmColumnMap as $col => $_) {
-            $alarmColumnMap[$col] = in_array($col, $cols, true);
+            $alarmColumnMap[$col] = in_array($col, $existentes, true);
         }
     } catch (Exception $e) {
     }
@@ -180,6 +187,215 @@ $normalizarResultadosPorSnapshot = function (array $resultados, $snapshotSrc) us
     }
 
     return $salida;
+};
+
+$recalcularResultadosFormula = function (array $resultados, array $snapshotArr) use ($normKey, $buildStableKey) {
+    $extractVars = function ($formula) {
+        $vars = [];
+        if (!is_string($formula) || trim($formula) === '') {
+            return $vars;
+        }
+        if (preg_match_all('/\[(.*?)\]/', $formula, $m)) {
+            foreach ($m[1] as $v) {
+                $vars[] = trim((string)$v);
+            }
+        }
+        return $vars;
+    };
+
+    $formatResult = function ($value, $item) {
+        $dec = null;
+        if (is_array($item) && array_key_exists('decimales', $item)) {
+            $rawDec = $item['decimales'];
+            if ($rawDec !== '' && $rawDec !== null && is_numeric($rawDec)) {
+                $dec = (int)$rawDec;
+            }
+        }
+        if ($dec !== null && $dec >= 0) {
+            return number_format((float)$value, $dec, '.', '');
+        }
+        $num = (float)$value;
+        if (floor($num) == $num) {
+            return (string)intval($num);
+        }
+        return (string)$num;
+    };
+
+    $buildIndexNorm = function (array $vals) use ($normKey) {
+        $idx = [];
+        foreach ($vals as $k => $v) {
+            if ($k === 'imprimir_examen') {
+                continue;
+            }
+            $nk = $normKey((string)$k);
+            if ($nk !== '' && !array_key_exists($nk, $idx)) {
+                $idx[$nk] = $v;
+            }
+        }
+        return $idx;
+    };
+
+    $evalFormula = function ($formula, $indexNorm) use ($extractVars, $normKey) {
+        $vars = $extractVars($formula);
+        foreach ($vars as $varName) {
+            $k = $normKey($varName);
+            if (!array_key_exists($k, $indexNorm)) {
+                return null;
+            }
+            $raw = $indexNorm[$k];
+            $rawStr = str_replace(',', '', trim((string)$raw));
+            if ($rawStr === '' || !is_numeric($rawStr)) {
+                return null;
+            }
+        }
+
+        $expr = preg_replace_callback('/\[(.*?)\]/', function ($matches) use ($indexNorm, $normKey) {
+            $param = trim((string)$matches[1]);
+            $k = $normKey($param);
+            $v = $indexNorm[$k] ?? null;
+            $rawStr = str_replace(',', '', trim((string)$v));
+            return is_numeric($rawStr) ? $rawStr : '0';
+        }, (string)$formula);
+
+        $expr = preg_replace('/([0-9\.]|\))\s*\(/', '$1*(', $expr);
+        $expr = preg_replace('/\)\s*([0-9\.-])/', ')*$1', $expr);
+        if (strpos($expr, '^') !== false) {
+            $expr = str_replace('^', '**', $expr);
+        }
+        if (!preg_match('/^[0-9\.\+\-\*\/\(\)\s]+$/', str_replace('**', '*', $expr))) {
+            return null;
+        }
+
+        try {
+            $res = eval('return ' . $expr . ';');
+            return is_numeric($res) ? (float)$res : null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    };
+
+    $formulaItems = [];
+    foreach ($snapshotArr as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $tipo = (string)($item['tipo'] ?? '');
+        if (!in_array($tipo, ['Parámetro', 'Campo'], true)) {
+            continue;
+        }
+        $formula = trim((string)($item['formula'] ?? ''));
+        $nombre = trim((string)($item['nombre'] ?? ''));
+        if ($formula === '' || $nombre === '') {
+            continue;
+        }
+        $stable = $buildStableKey($item);
+        $targetKey = $stable !== '' ? $stable : $nombre;
+        $formulaItems[] = [
+            'item' => $item,
+            'formula' => $formula,
+            'nombre' => $nombre,
+            'target' => $targetKey,
+            'nombre_norm' => $normKey($nombre),
+        ];
+    }
+
+    if (empty($formulaItems)) {
+        return $resultados;
+    }
+
+    $maxIter = max(1, count($formulaItems) + 3);
+    for ($i = 0; $i < $maxIter; $i++) {
+        $changed = false;
+        $indexNorm = $buildIndexNorm($resultados);
+        foreach ($formulaItems as $fi) {
+            $res = $evalFormula($fi['formula'], $indexNorm);
+            if ($res === null) {
+                continue;
+            }
+            $formatted = $formatResult($res, $fi['item']);
+            $prev = isset($resultados[$fi['target']]) ? (string)$resultados[$fi['target']] : null;
+            if ($prev !== $formatted) {
+                $resultados[$fi['target']] = $formatted;
+                $changed = true;
+            }
+        }
+        if (!$changed) {
+            break;
+        }
+    }
+
+    return $resultados;
+};
+
+$estaLleno = function ($v) use ($isBlank) {
+    return !$isBlank($v);
+};
+
+$estaExamenCompleto = function (array $resultados, array $snapshotArr) use ($buildStableKey, $normKey, $estaLleno) {
+    $esperados = [];
+    foreach ($snapshotArr as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $tipo = (string)($item['tipo'] ?? '');
+        if (!in_array($tipo, ['Parámetro', 'Campo', 'Texto Largo'], true)) {
+            continue;
+        }
+        $esperados[] = $item;
+    }
+
+    if (empty($esperados)) {
+        foreach ($resultados as $key => $value) {
+            if ($key === 'imprimir_examen') {
+                continue;
+            }
+            if (!$estaLleno($value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    $indexNormalizado = [];
+    foreach ($resultados as $key => $value) {
+        if ($key === 'imprimir_examen') {
+            continue;
+        }
+        $indexNormalizado[$normKey((string)$key)] = $value;
+    }
+
+    foreach ($esperados as $item) {
+        $valor = null;
+        $encontrado = false;
+
+        $stable = $buildStableKey($item);
+        if ($stable !== '' && array_key_exists($stable, $resultados)) {
+            $valor = $resultados[$stable];
+            $encontrado = true;
+        }
+
+        if (!$encontrado) {
+            $nombre = trim((string)($item['nombre'] ?? ''));
+            if ($nombre !== '' && array_key_exists($nombre, $resultados)) {
+                $valor = $resultados[$nombre];
+                $encontrado = true;
+            }
+        }
+
+        if (!$encontrado) {
+            $nombreNorm = $normKey((string)($item['nombre'] ?? ''));
+            if ($nombreNorm !== '' && array_key_exists($nombreNorm, $indexNormalizado)) {
+                $valor = $indexNormalizado[$nombreNorm];
+                $encontrado = true;
+            }
+        }
+
+        if (!$encontrado || !$estaLleno($valor)) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
 $tieneTablasInventarioInterno = function () use ($pdo) {
@@ -616,35 +832,17 @@ if (!empty($examenes) && is_array($examenes)) {
 
             $resultados = $normalizarResultadosPorSnapshot($resultados, $snapshotArr);
 
-            // Índice normalizado de existentes para rescatar valores cuando cambian nombres.
-            $existingNorm = [];
-            foreach ($existing as $k => $v) {
-                if ($k === 'imprimir_examen') continue;
-                $nk = $normKey($k);
-                if ($nk !== '' && !array_key_exists($nk, $existingNorm)) {
-                    $existingNorm[$nk] = $v;
-                }
-            }
-
-            // Merge: mantener existentes; aplicar los del POST; rescatar valores antiguos si el POST llega vacío.
+            // Merge: mantener existentes y aplicar lo recibido en POST.
+            // Si el usuario envía vacío, se respeta para permitir limpiar resultados.
             $merged = $existing;
             foreach ($resultados as $k => $v) {
                 if ($k === 'imprimir_examen') {
                     continue;
                 }
-                if ($isBlank($v)) {
-                    $nk = $normKey($k);
-                    if ($nk !== '' && array_key_exists($nk, $existingNorm) && !$isBlank($existingNorm[$nk])) {
-                        $merged[$k] = $existingNorm[$nk];
-                        continue;
-                    }
-                    // Si el usuario realmente quiere borrar, seguirá vacío.
-                    $merged[$k] = $v;
-                    continue;
-                }
                 $merged[$k] = $v;
             }
             $merged['imprimir_examen'] = $imprimir_examen;
+            $merged = $recalcularResultadosFormula($merged, $snapshotArr);
 
             $hayDatoReal = false;
             foreach ($merged as $k => $v) {
@@ -657,12 +855,20 @@ if (!empty($examenes) && is_array($examenes)) {
                 }
             }
 
-            $estadoResultado = $hayDatoReal ? 'completado' : 'pendiente';
+            $completoAl100 = $estaExamenCompleto($merged, $snapshotArr);
+            $estadoResultado = $completoAl100 ? 'completado' : 'pendiente';
+
+            $alarmaActivaEf = $alarmaActiva;
+            $alarmaDiasEf = $alarmaDias;
+            if ($completoAl100) {
+                $alarmaActivaEf = 0;
+                $alarmaDiasEf = null;
+            }
 
             $json_resultados = json_encode($merged, JSON_UNESCAPED_UNICODE);
             if ($hasAlarmColumns) {
-                $setWhatsappDestino = !empty($alarmCols['alarma_whatsapp_destino']) ? ", alarma_whatsapp_destino = CASE WHEN :alarma_activa = 1 THEN :alarma_whatsapp_destino ELSE NULL END" : '';
-                $setUltimoAviso = !empty($alarmCols['alarma_ultimo_aviso']) ? ", alarma_ultimo_aviso = CASE WHEN :alarma_activa = 1 AND alarma_ultimo_aviso IS NULL THEN NULL WHEN :alarma_activa = 0 THEN NULL ELSE alarma_ultimo_aviso END" : '';
+                $setWhatsappDestino = !empty($alarmCols['alarma_whatsapp_destino']) ? ", alarma_whatsapp_destino = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 THEN :alarma_whatsapp_destino ELSE NULL END" : '';
+                $setUltimoAviso = !empty($alarmCols['alarma_ultimo_aviso']) ? ", alarma_ultimo_aviso = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 AND alarma_ultimo_aviso IS NULL THEN NULL WHEN :alarma_activa = 0 OR :alarma_dias IS NULL OR :alarma_dias <= 0 THEN NULL ELSE alarma_ultimo_aviso END" : '';
 
                 $sql = "UPDATE resultados_examenes
                         SET resultados = :resultados,
@@ -689,8 +895,8 @@ if (!empty($examenes) && is_array($examenes)) {
                 $stmt->execute([
                     'resultados' => $json_resultados,
                     'estado_resultado' => $estadoResultado,
-                    'alarma_activa' => $alarmaActiva,
-                    'alarma_dias' => $alarmaDias,
+                    'alarma_activa' => $alarmaActivaEf,
+                    'alarma_dias' => $alarmaDiasEf,
                     'alarma_whatsapp_destino' => $companyWhatsappNumber,
                     'id' => $id_resultado
                 ]);

@@ -1,11 +1,30 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../auth/empresa_config.php';
+require_once __DIR__ . '/../config/currency.php';
 
-$nombreUsuario = $_SESSION['usuario'] ?? 'Usuario';
+$usuarioSesion = $_SESSION['usuario'] ?? 'Usuario';
+
+if (is_array($usuarioSesion)) {
+    $nombreBase = trim((string)($usuarioSesion['nombre'] ?? ''));
+    $apellidoBase = trim((string)($usuarioSesion['apellido'] ?? ''));
+    $nombreUsuario = trim($nombreBase . ' ' . $apellidoBase);
+    if ($nombreUsuario === '') {
+        $nombreUsuario = trim((string)($usuarioSesion['usuario'] ?? ''));
+    }
+    if ($nombreUsuario === '') {
+        $nombreUsuario = 'Usuario';
+    }
+} else {
+    $nombreUsuario = trim((string)$usuarioSesion);
+    if ($nombreUsuario === '') {
+        $nombreUsuario = 'Usuario';
+    }
+}
 
 // Convierte solo la primera letra en mayúscula, el resto en minúscula
 $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
+$appCurrency = currency_get_config($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -129,6 +148,27 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
         }
         
     </style>
+    <script>
+        window.APP_CURRENCY = <?= json_encode($appCurrency, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+        window.formatMoney = function(amount) {
+            const cfg = window.APP_CURRENCY || {
+                symbol: 'S/',
+                position: 'prefix',
+                decimals: 2,
+                decimal_separator: '.',
+                thousands_separator: ','
+            };
+            const numeric = Number(amount || 0);
+            const fixed = Number.isFinite(numeric) ? numeric.toFixed(Number(cfg.decimals || 2)) : '0.00';
+            const parts = fixed.split('.');
+            const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, cfg.thousands_separator || ',');
+            const decimalPart = (cfg.decimals || 0) > 0 ? (cfg.decimal_separator || '.') + (parts[1] || '') : '';
+            const amountText = integerPart + decimalPart;
+            return (cfg.position === 'suffix')
+                ? (amountText + ' ' + (cfg.symbol || ''))
+                : ((cfg.symbol || '') + ' ' + amountText);
+        };
+    </script>
 </head>
 
 <body>
@@ -143,7 +183,7 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
                     <span class="fw-bold text-white" style="font-size:1.5rem; letter-spacing:1px;">
                         <?= htmlspecialchars($config['nombre']) ?>
                     </span><br>
-                    <span class="text-white-50" style="font-size:1.1rem;">Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!</span>
+                    <span class="text-white" style="font-size:1.1rem;">Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!</span>
                 </div>
             </div>
             <!-- Botón solo visible en móvil -->
@@ -154,7 +194,7 @@ $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
     </header>
     <style>
         .header-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0d6efd;
             border-radius: 0 0 24px 24px;
         }
         .header-logo-box {

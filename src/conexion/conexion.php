@@ -6,6 +6,12 @@ try {
     $pdo->exec("SET time_zone = '-05:00'");
 } catch (PDOException $e) {
     // Puedes registrar el error en un archivo y mostrar un mensaje genérico al usuario 
-    error_log('Error de conexión: ' . $e->getMessage());
+    $empresaActual = isset($empresa) ? (string)$empresa : 'desconocida';
+    error_log(
+        'Error de conexión [' . $empresaActual . ']: ' . $e->getMessage()
+        . ' | host=' . DB_HOST
+        . ' | db=' . DB_NAME
+        . ' | user=' . DB_USER
+    );
     die('No se pudo conectar a la base de datos. Intenta más tarde.');
 }

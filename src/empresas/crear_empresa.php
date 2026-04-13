@@ -74,6 +74,7 @@ if ($ruc && $razon_social && $email && $password) {
         $stmt->execute([$ruc]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El RUC ya está registrado.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_empresa');
             exit;
         }
@@ -83,6 +84,7 @@ if ($ruc && $razon_social && $email && $password) {
         $stmt->execute([$email]);
         if ($stmt->fetchColumn() > 0) {
             $_SESSION['mensaje'] = "El email ya está registrado.";
+            $_SESSION['mensaje_tipo'] = "warning";
             header('Location: dashboard.php?vista=form_empresa');
             exit;
         }
@@ -105,11 +107,14 @@ if ($ruc && $razon_social && $email && $password) {
         ]);
 
         $_SESSION['mensaje'] = "Empresa creada exitosamente.";
+        $_SESSION['mensaje_tipo'] = "success";
     } catch (PDOException $e) {
         $_SESSION['mensaje'] = "Error al crear la empresa: " . $e->getMessage();
+        $_SESSION['mensaje_tipo'] = "error";
     }
 } else {
     $_SESSION['mensaje'] = "Faltan datos obligatorios.";
+    $_SESSION['mensaje_tipo'] = "warning";
 }
 
 header('Location: dashboard.php?vista=empresas');

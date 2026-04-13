@@ -3,6 +3,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../cotizaciones/funciones/cotizaciones_utils.php';
+require_once __DIR__ . '/../config/currency.php';
 
 // Control de acceso seguro para empresa
 $id_empresa = $_SESSION['empresa_id'] ?? null;
@@ -11,6 +13,8 @@ if (!$id_empresa || strtolower(trim($rol)) !== 'empresa') {
     echo '<div class="container mt-4"><div class="alert alert-danger">Acceso no autorizado.</div></div>';
     return;
 }
+
+$currencyCfg = currency_get_config($pdo);
 
 // Filtro por fecha
 $fechaInicio = $_GET['fecha_inicio'] ?? '';
@@ -66,7 +70,7 @@ $totalEmpresa = 0.0;
 $totalPagadoEmpresa = 0.0;
 $saldoEmpresa = 0.0;
 $pagosPorCotizacion = [];
-$examenesPorCotizacion = [];
+$porcentajePorCotizacion = [];
 $descargaAnticipadaPorCotizacion = [];
 
 if (!empty($cotizaciones)) {
@@ -85,16 +89,11 @@ if (!empty($cotizaciones)) {
             $pagosPorCotizacion[$pago['id_cotizacion']] = $pago['total_pagado'];
         }
 
-        // Exámenes
-        $sqlExamenes = "SELECT re.id AS id_resultado, re.id_cotizacion, re.id_examen, re.estado, e.nombre AS nombre_examen
-                        FROM resultados_examenes re
-                        JOIN examenes e ON re.id_examen = e.id
-                        WHERE re.id_cotizacion IN ($inQuery)";
-        $stmtEx = $pdo->prepare($sqlExamenes);
-        $stmtEx->execute($idsCotizaciones);
-        $examenes = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($examenes as $ex) {
-            $examenesPorCotizacion[$ex['id_cotizacion']][] = $ex;
+        foreach ($idsCotizaciones as $cotizacionIdTmp) {
+            $cotizacionIdTmp = (int)$cotizacionIdTmp;
+            if ($cotizacionIdTmp > 0) {
+                $porcentajePorCotizacion[$cotizacionIdTmp] = (int)obtenerPorcentajeResultadosCotizacion($pdo, $cotizacionIdTmp);
+            }
         }
 
         // Pagos con método descarga anticipada
@@ -120,7 +119,7 @@ if (!empty($cotizaciones)) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 <div class="container mt-4">
-    <h4 class="mb-3">Cotizaciones de la Empresa</h4>
+    <h4 class="mb-3">Cotizaciones de la empresa</h4>
     <form class="row g-3 mb-3" method="get">
         <input type="hidden" name="vista" value="cotizaciones_empresas">
         <div class="col-auto">
@@ -137,11 +136,11 @@ if (!empty($cotizaciones)) {
         </div>
     </form>
     <div class="alert alert-secondary mb-3">
-        <strong>Total cotizado:</strong> S/ <?= number_format($totalEmpresa, 2) ?>  
-        <strong>Total pagado:</strong> S/ <?= number_format($totalPagadoEmpresa, 2) ?>  
+        <strong>Total cotizado:</strong> <?= htmlspecialchars(money_format_local($totalEmpresa, $currencyCfg)) ?>  
+        <strong>Total pagado:</strong> <?= htmlspecialchars(money_format_local($totalPagadoEmpresa, $currencyCfg)) ?>  
         <strong>Saldo pendiente:</strong>
         <span class="badge <?= $saldoEmpresa > 0 ? 'bg-danger' : 'bg-success' ?>">
-            S/ <?= number_format($saldoEmpresa, 2) ?>
+            <?= htmlspecialchars(money_format_local($saldoEmpresa, $currencyCfg)) ?>
         </span>
     </div>
     <div class="alert alert-info">
@@ -171,16 +170,13 @@ if (!empty($cotizaciones)) {
                     $pagado = floatval($pagosPorCotizacion[$cotizacionId] ?? 0);
                     $saldo = $total - $pagado;
                     $badgePendiente = $saldo > 0
-                        ? '<span class="badge bg-danger">S/ ' . number_format($saldo, 2) . '</span>'
-                        : '<span class="badge bg-success">S/ 0.00</span>';
+                        ? '<span class="badge bg-danger">' . htmlspecialchars(money_format_local($saldo, $currencyCfg)) . '</span>'
+                        : '<span class="badge bg-success">' . htmlspecialchars(money_format_local(0, $currencyCfg)) . '</span>';
                     $badgeAbonado = $pagado > 0
-    ? '<span class="badge bg-primary">S/ ' . number_format($pagado, 2) . '</span>'
-    : '<span class="badge bg-secondary">S/ 0.00</span>';
+    ? '<span class="badge bg-primary">' . htmlspecialchars(money_format_local($pagado, $currencyCfg)) . '</span>'
+    : '<span class="badge bg-secondary">' . htmlspecialchars(money_format_local(0, $currencyCfg)) . '</span>';
 
-$examenes = $examenesPorCotizacion[$cotizacionId] ?? [];
-$totalExamenes = count($examenes);
-$completados = count(array_filter($examenes, fn($ex) => $ex['estado'] !== 'pendiente'));
-$porcentaje = $totalExamenes ? round(($completados / $totalExamenes) * 100) : 0;
+$porcentaje = (int)($porcentajePorCotizacion[$cotizacionId] ?? 0);
 
 if ((int)$porcentaje === 100) {
     $resultBadge = '<span class="badge bg-success">Completado: 100%</span>';
@@ -200,7 +196,7 @@ $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada)
     <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
     <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
     <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
-    <td><span class="badge bg-info">S/ <?= number_format($total, 2) ?></span></td>
+    <td><span class="badge bg-info"><?= htmlspecialchars(money_format_local($total, $currencyCfg)) ?></span></td>
     <td><?= $badgeAbonado ?></td>
     <td><?= $badgePendiente ?></td>
     <td><?= $resultBadge ?></td>
@@ -225,6 +221,9 @@ $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada)
 </tr>
 <?php endif; ?>
 </tbody>
+</table>
+</div>
+</div>
 <!-- DataTables y extensiones para exportar -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>

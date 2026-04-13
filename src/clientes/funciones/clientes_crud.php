@@ -19,10 +19,15 @@ function clientes_listar($orderBy = 'id', $orderDir = 'asc', $start = 0, $length
     global $pdo;
     $orderBy = in_array($orderBy, ['id','codigo_cliente','nombre','apellido','dni','edad','email','telefono','estado','fecha_registro']) ? $orderBy : 'id';
     $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
-    $sql = "SELECT * FROM clientes ORDER BY $orderBy $orderDir LIMIT :start, :length";
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
-    $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+    if ((int)$length === -1) {
+        $sql = "SELECT * FROM clientes ORDER BY $orderBy $orderDir";
+        $stmt = $pdo->prepare($sql);
+    } else {
+        $sql = "SELECT * FROM clientes ORDER BY $orderBy $orderDir LIMIT :start, :length";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+        $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+    }
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -31,12 +36,17 @@ function clientes_buscar($search, $orderBy = 'id', $orderDir = 'asc', $start = 0
     global $pdo;
     $orderBy = in_array($orderBy, ['id','codigo_cliente','nombre','apellido','dni','edad','email','telefono','estado','fecha_registro']) ? $orderBy : 'id';
     $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';
-    $sql = "SELECT * FROM clientes WHERE dni LIKE :search OR nombre LIKE :search OR apellido LIKE :search ORDER BY $orderBy $orderDir LIMIT :start, :length";
-    $stmt = $pdo->prepare($sql);
+    if ((int)$length === -1) {
+        $sql = "SELECT * FROM clientes WHERE dni LIKE :search OR nombre LIKE :search OR apellido LIKE :search ORDER BY $orderBy $orderDir";
+        $stmt = $pdo->prepare($sql);
+    } else {
+        $sql = "SELECT * FROM clientes WHERE dni LIKE :search OR nombre LIKE :search OR apellido LIKE :search ORDER BY $orderBy $orderDir LIMIT :start, :length";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
+        $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+    }
     $searchLike = "%$search%";
     $stmt->bindValue(':search', $searchLike, PDO::PARAM_STR);
-    $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
-    $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
