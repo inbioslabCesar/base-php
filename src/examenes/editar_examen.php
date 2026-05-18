@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../resultados/servicios/SnapshotSyncService.php';
 
 function capitalizar($texto)
 {
@@ -78,7 +79,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vigente,
             $id
         ]);
+        $sincronizados = 0;
+        try {
+            $snapshotSyncService = new SnapshotSyncService($pdo);
+            $sincronizados = (int)$snapshotSyncService->syncExamSnapshotsPreservingHeaders($id);
+        } catch (Exception $e) {
+            $sincronizados = 0;
+        }
+
         $_SESSION['mensaje'] = "Examen actualizado correctamente.";
+        if ($sincronizados > 0) {
+            $_SESSION['mensaje'] .= " Se actualizaron automáticamente {$sincronizados} formato(s) pendiente(s) en resultados.";
+        }
         header('Location: dashboard.php?vista=examenes');
         exit;
     } catch (Exception $e) {
