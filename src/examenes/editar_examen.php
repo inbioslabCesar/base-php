@@ -9,6 +9,50 @@ function capitalizar($texto)
 {
     return mb_convert_case(trim($texto), MB_CASE_TITLE, "UTF-8");
 }
+
+function generarIdParametroUnico(array &$usados)
+{
+    do {
+        $id = 'param_' . (int)round(microtime(true) * 1000) . '_' . random_int(100000, 999999);
+    } while (isset($usados[$id]));
+    $usados[$id] = true;
+    return $id;
+}
+
+function normalizarIdsParametroUnicos($adicionalJson)
+{
+    $arr = json_decode((string)$adicionalJson, true);
+    if (!is_array($arr)) {
+        return [null, 0];
+    }
+
+    $tiposConValor = ['Parámetro', 'Campo', 'Texto Largo'];
+    $usados = [];
+    $regenerados = 0;
+
+    foreach ($arr as &$fila) {
+        if (!is_array($fila)) {
+            continue;
+        }
+
+        $tipo = (string)($fila['tipo'] ?? '');
+        if (!in_array($tipo, $tiposConValor, true)) {
+            continue;
+        }
+
+        $id = trim((string)($fila['id_parametro'] ?? ''));
+        if ($id === '' || isset($usados[$id])) {
+            $fila['id_parametro'] = generarIdParametroUnico($usados);
+            $regenerados++;
+            continue;
+        }
+
+        $usados[$id] = true;
+    }
+    unset($fila);
+
+    return [json_encode($arr, JSON_UNESCAPED_UNICODE), $regenerados];
+}
 $id = intval($_GET['id'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codigo = trim($_POST['codigo'] ?? '');
@@ -54,6 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($fila);
             $adicional = json_encode($adicional_dec, JSON_UNESCAPED_UNICODE);
         }
+
+        [$adicionalNormalizado, $idsRegenerados] = normalizarIdsParametroUnicos($adicional);
+        if ($adicionalNormalizado === null) {
+            $_SESSION['error'] = 'El formato de parámetros adicionales no es válido.';
+            header('Location: dashboard.php?vista=form_examen&id=' . $id);
+            exit;
+        }
+        $adicional = $adicionalNormalizado;
     }
 
 
@@ -88,6 +140,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $_SESSION['mensaje'] = "Examen actualizado correctamente.";
+        if (!empty($idsRegenerados)) {
+            $_SESSION['mensaje'] .= " Se normalizaron {$idsRegenerados} ID(s) de parámetros para evitar duplicados.";
+        }
         if ($sincronizados > 0) {
             $_SESSION['mensaje'] .= " Se actualizaron automáticamente {$sincronizados} formato(s) pendiente(s) en resultados.";
         }

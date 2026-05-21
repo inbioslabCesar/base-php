@@ -140,6 +140,13 @@ class SnapshotSyncService
                 if (!empty($it['id_parametro'])) {
                     continue;
                 }
+                $isCustomPaciente = (
+                    (isset($it['origen']) && (string)$it['origen'] === 'paciente') ||
+                    (!empty($it['custom_paciente']) && (int)$it['custom_paciente'] === 1)
+                );
+                if (!$isCustomPaciente) {
+                    continue;
+                }
                 $custom[] = [
                     'before' => $detectBefore($oldArr, $i),
                     'item' => $it,
@@ -169,6 +176,24 @@ class SnapshotSyncService
                 }
             }
 
+            $oldIdCounts = [];
+            foreach ($oldArr as $itOld) {
+                if (!is_array($itOld)) {
+                    continue;
+                }
+                if (!$isCampoValor($itOld['tipo'] ?? '')) {
+                    continue;
+                }
+                $idOld = trim((string)($itOld['id_parametro'] ?? ''));
+                if ($idOld === '') {
+                    continue;
+                }
+                if (!isset($oldIdCounts[$idOld])) {
+                    $oldIdCounts[$idOld] = 0;
+                }
+                $oldIdCounts[$idOld]++;
+            }
+
             $oldByName = [];
             $oldByOrder = [];
             foreach ($oldArr as $itOld) {
@@ -180,6 +205,10 @@ class SnapshotSyncService
                 }
                 $idOld = trim((string)($itOld['id_parametro'] ?? ''));
                 if ($idOld === '') {
+                    continue;
+                }
+                // Si un id aparece en más de un parámetro del snapshot viejo, no confiar en ese mapeo.
+                if (($oldIdCounts[$idOld] ?? 0) > 1) {
                     continue;
                 }
 
@@ -205,6 +234,8 @@ class SnapshotSyncService
                 }
             }
 
+            $usedChosenIds = [];
+
             foreach ($baseParamIdx as $idxBase) {
                 $itBase = $baseArr[$idxBase];
                 $idBase = trim((string)($itBase['id_parametro'] ?? ''));
@@ -222,8 +253,18 @@ class SnapshotSyncService
                     $idElegido = $resultadosStable[0];
                 }
 
+                // Evitar colisiones: no permitir que dos parámetros terminen con el mismo id en el snapshot nuevo.
+                if (
+                    $idElegido !== '' &&
+                    isset($usedChosenIds[$idElegido]) &&
+                    $usedChosenIds[$idElegido] !== $idxBase
+                ) {
+                    $idElegido = $idBase;
+                }
+
                 if ($idElegido !== '') {
                     $baseArr[$idxBase]['id_parametro'] = $idElegido;
+                    $usedChosenIds[$idElegido] = $idxBase;
                 }
             }
 

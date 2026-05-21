@@ -98,12 +98,17 @@ try {
                 }
             }
 
-            // Extraer cabeceras personalizadas: títulos/subtítulos SIN id_parametro
+            // Extraer cabeceras personalizadas de paciente: títulos/subtítulos SIN id_parametro
             $custom = [];
             foreach ($oldArr as $i => $it) {
                 $tipo = $it['tipo'] ?? '';
                 if (!in_array($tipo, ['Título', 'Subtítulo'], true)) continue;
                 if (!empty($it['id_parametro'])) continue; // las del CRUD ya están en base
+                $isCustomPaciente = (
+                    (isset($it['origen']) && (string)$it['origen'] === 'paciente') ||
+                    (!empty($it['custom_paciente']) && (int)$it['custom_paciente'] === 1)
+                );
+                if (!$isCustomPaciente) continue;
                 $custom[] = [
                     'before' => $detectBefore($oldArr, intval($i)),
                     'item' => $it
@@ -136,6 +141,18 @@ try {
                 }
             }
 
+            $oldIdCounts = [];
+            foreach ($oldArr as $itOld) {
+                if (!is_array($itOld)) continue;
+                if (!$isCampoValor($itOld['tipo'] ?? '')) continue;
+                $idOld = trim((string)($itOld['id_parametro'] ?? ''));
+                if ($idOld === '') continue;
+                if (!isset($oldIdCounts[$idOld])) {
+                    $oldIdCounts[$idOld] = 0;
+                }
+                $oldIdCounts[$idOld]++;
+            }
+
             $oldByName = [];
             $oldByOrder = [];
             foreach ($oldArr as $itOld) {
@@ -143,6 +160,7 @@ try {
                 if (!$isCampoValor($itOld['tipo'] ?? '')) continue;
                 $idOld = trim((string)($itOld['id_parametro'] ?? ''));
                 if ($idOld === '') continue;
+                if (($oldIdCounts[$idOld] ?? 0) > 1) continue;
 
                 $nameOld = trim((string)($itOld['nombre'] ?? ''));
                 $nkOld = $normKey($nameOld);
@@ -164,6 +182,8 @@ try {
                 }
             }
 
+            $usedChosenIds = [];
+
             foreach ($baseParamIdx as $idxBase) {
                 $itBase = $baseArr[$idxBase];
                 $idBase = trim((string)($itBase['id_parametro'] ?? ''));
@@ -181,8 +201,17 @@ try {
                     $idElegido = $resultadosStable[0];
                 }
 
+                if (
+                    $idElegido !== '' &&
+                    isset($usedChosenIds[$idElegido]) &&
+                    $usedChosenIds[$idElegido] !== $idxBase
+                ) {
+                    $idElegido = $idBase;
+                }
+
                 if ($idElegido !== '') {
                     $baseArr[$idxBase]['id_parametro'] = $idElegido;
+                    $usedChosenIds[$idElegido] = $idxBase;
                 }
             }
 
