@@ -18,3 +18,6 @@ Thumbs.db
 
 # Large local archives
 vendor.zip
+
+# Legacy image migration backups
+uploads/empresa/_legacy_backup_src_images_empresa_2026_05_20/
