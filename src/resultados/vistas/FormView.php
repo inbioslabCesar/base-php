@@ -23,7 +23,7 @@ class FormView {
             <?= \PdfConfigView::render($referencia_personalizada) ?>
             <div class="text-center d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
                 <a href="<?= htmlspecialchars($pdfDownloadUrl) ?>"
-                   class="btn btn-success"
+                   class="btn btn-success js-download-pdf-resultados"
                    id="btnDescargarPdfResultados"
                    target="_blank"
                    rel="noopener noreferrer"
@@ -32,6 +32,29 @@ class FormView {
                     Descargar PDF
                 </a>
                 <button type="submit" class="save-btn">
+                    <i class="bi bi-save me-2"></i>
+                    Guardar Resultados
+                </button>
+            </div>
+
+            <div id="resultsActionsDock" class="results-actions-dock" aria-label="Acciones rapidas de resultados">
+                <button
+                    type="button"
+                    id="resultsDockModeToggle"
+                    class="results-actions-dock__mode-btn"
+                    aria-pressed="false"
+                    title="Alternar visibilidad de la barra flotante">
+                    <i class="bi bi-pin-angle me-1"></i>Fijar
+                </button>
+                <a href="<?= htmlspecialchars($pdfDownloadUrl) ?>"
+                   class="btn btn-success results-actions-dock__btn js-download-pdf-resultados"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   title="Descargar PDF de resultados">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>
+                    Descargar PDF
+                </a>
+                <button type="submit" class="save-btn results-actions-dock__btn">
                     <i class="bi bi-save me-2"></i>
                     Guardar Resultados
                 </button>
@@ -67,7 +90,7 @@ class FormView {
         });
 
         document.addEventListener('click', function (event) {
-            const link = event.target.closest('#btnDescargarPdfResultados');
+            const link = event.target.closest('.js-download-pdf-resultados');
             if (!link) {
                 return;
             }

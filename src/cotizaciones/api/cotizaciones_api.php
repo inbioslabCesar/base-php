@@ -5,11 +5,27 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Evita que warnings/notices se impriman y rompan el JSON de DataTables.
+if (!headers_sent()) {
+    @ini_set('display_errors', '0');
+}
+if (ob_get_level() === 0) {
+    ob_start();
+}
+
 function sendJsonResponse(array $payload, int $statusCode = 200): void
 {
+    // Limpia cualquier salida previa accidental (warnings, espacios, BOM, etc).
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($statusCode);
     header('Content-Type: application/json; charset=utf-8');
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    $jsonOptions = JSON_UNESCAPED_UNICODE;
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $jsonOptions |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+    $json = json_encode($payload, $jsonOptions);
     if ($json === false) {
         echo json_encode([
             'error' => 'JSON_ENCODE_FAILED',
@@ -372,7 +388,7 @@ try {
         "recordsFiltered" => intval($totalFiltered),
         "data" => $dataFinal
     ]);
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     sendJsonResponse([
         "error" => $e->getMessage()
     ], 500);
