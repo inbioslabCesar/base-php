@@ -1,3 +1,34 @@
+<?php
+if (!function_exists('normalizar_ruta_empresa')) {
+    // Normaliza rutas legacy y rutas con separadores de Windows hacia uploads/empresa
+    function normalizar_ruta_empresa($ruta)
+    {
+        if (!is_string($ruta) || trim($ruta) === '') {
+            return '';
+        }
+
+        $ruta = trim($ruta);
+        if (preg_match('/^(https?:)?\/\//i', $ruta) || preg_match('/^data:image\//i', $ruta)) {
+            return $ruta;
+        }
+
+        $ruta = str_replace('\\', '/', $ruta);
+        $ruta = preg_replace('#/+#', '/', $ruta);
+        $ruta = ltrim($ruta, '/');
+        $ruta = preg_replace('#^(\.\./|\./)+#', '', $ruta);
+
+        if (strpos($ruta, 'src/images/empresa/') === 0) {
+            $ruta = 'uploads/empresa/' . substr($ruta, strlen('src/images/empresa/'));
+        } elseif (strpos($ruta, 'images/empresa/') === 0) {
+            $ruta = 'uploads/empresa/' . substr($ruta, strlen('images/empresa/'));
+        } elseif (strpos($ruta, 'uploads/empresa/') !== 0) {
+            $ruta = 'uploads/empresa/' . ltrim($ruta, '/');
+        }
+
+        return $ruta;
+    }
+}
+?>
 <!-- Carrusel dinámico y amigable -->
  <?php if (count($imagenes_carrusel) > 0): ?>
      <div id="sliderEmpresa" class="carousel slide mt-3" data-bs-ride="carousel">
@@ -11,7 +42,7 @@
          <div class="carousel-inner">
              <?php foreach ($imagenes_carrusel as $i => $img): ?>
                  <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
-                     <img src="src/<?= htmlspecialchars($img) ?>" class="d-block w-100" alt="Slider <?= $i + 1 ?>">
+                     <img src="<?= htmlspecialchars(normalizar_ruta_empresa($img)) ?>" class="d-block w-100" alt="Slider <?= $i + 1 ?>">
                  </div>
              <?php endforeach; ?>
          </div>
@@ -30,7 +61,7 @@
          <h5 style="color:<?= htmlspecialchars($color_principal) ?>;">Conócenos</h5>
          <div class="d-flex flex-wrap justify-content-center">
              <?php foreach ($imagenes_institucionales as $img): ?>
-                 <img src="src/<?= htmlspecialchars($img) ?>" class="institucional-img" alt="Imagen institucional">
+                 <img src="<?= htmlspecialchars(normalizar_ruta_empresa($img)) ?>" class="institucional-img" alt="Imagen institucional">
              <?php endforeach; ?>
          </div>
      </section>
@@ -118,7 +149,7 @@
              </div>
              <div class="col-md-5 text-center">
                  <?php if (!empty($imagenes_institucionales[0])): ?>
-                     <img src="src/<?= htmlspecialchars($imagenes_institucionales[0]) ?>" alt="Imagen institucional" style="max-width:250px;border-radius:10px;">
+                     <img src="<?= htmlspecialchars(normalizar_ruta_empresa($imagenes_institucionales[0])) ?>" alt="Imagen institucional" style="max-width:250px;border-radius:10px;">
                  <?php endif; ?>
              </div>
          </div>

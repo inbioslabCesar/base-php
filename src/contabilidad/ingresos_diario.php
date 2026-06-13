@@ -23,6 +23,9 @@ if ($page < 1) {
 $metodosObjetivo = ['efectivo', 'transferencia', 'tarjeta', 'yape', 'masivo'];
 $ingresosPorMetodo = array_fill_keys($metodosObjetivo, 0.0);
 $totalDia = 0.0;
+$egresosDia = 0.0;
+$totalEgresosRegistros = 0;
+$netoDia = 0.0;
 
 $stmtTotales = $pdo->prepare("SELECT LOWER(TRIM(metodo_pago)) AS metodo, SUM(monto) AS total FROM pagos WHERE fecha >= ? AND fecha < ? GROUP BY LOWER(TRIM(metodo_pago))");
 $stmtTotales->execute([$fechaInicio, $fechaFin]);
@@ -40,6 +43,21 @@ foreach ($rowsTotales as $row) {
     }
     $totalDia += $monto;
 }
+
+$stmtEgresosTable = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'egresos'");
+$stmtEgresosTable->execute();
+$existsEgresos = (int)$stmtEgresosTable->fetchColumn() > 0;
+
+if ($existsEgresos) {
+    $stmtEgresosTotales = $pdo->prepare("SELECT IFNULL(SUM(monto), 0) AS total_egresos, COUNT(*) AS total_registros FROM egresos WHERE fecha >= ? AND fecha < ?");
+    $stmtEgresosTotales->execute([$fechaInicio, $fechaFin]);
+    $rowEgresosTotales = $stmtEgresosTotales->fetch(\PDO::FETCH_ASSOC) ?: [];
+    $egresosDia = (float)($rowEgresosTotales['total_egresos'] ?? 0);
+    $totalEgresosRegistros = (int)($rowEgresosTotales['total_registros'] ?? 0);
+}
+
+$netoDia = $totalDia - $egresosDia;
+
 $stmtMovTable = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'caja_movimientos'");
 $stmtMovTable->execute();
 $existsMov = (int)$stmtMovTable->fetchColumn() > 0;
@@ -167,6 +185,48 @@ function metodo_label(string $metodo): string
         </div>
     </form>
 
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="card border-danger">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Egreso del día</small>
+                    <strong>S/ <?= number_format($egresosDia, 2) ?></strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="card border-success">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Ingreso bruto del día</small>
+                    <strong>S/ <?= number_format($totalDia, 2) ?></strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="card <?= $netoDia >= 0 ? 'border-primary' : 'border-danger' ?>">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Neto contable estimado</small>
+                    <strong>S/ <?= number_format($netoDia, 2) ?></strong>
+                    <small class="text-muted d-block">Ingresos - egresos del periodo</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="card border-secondary">
+                <div class="card-body py-2">
+                    <small class="text-muted d-block">Movimientos del día</small>
+                    <strong><?= (int)$totalRegistros ?> ingresos / <?= (int)$totalEgresosRegistros ?> egresos</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="dashboard.php?<?= htmlspecialchars(http_build_query(['vista' => 'egresos', 'desde' => $fecha, 'hasta' => $fecha])) ?>" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-cash"></i> Ver egresos de este día
+        </a>
+    </div>
+
     <div class="row g-2 mb-4">
         <div class="col-6 col-md-4 col-lg">
             <div class="card border-success">
@@ -211,7 +271,7 @@ function metodo_label(string $metodo): string
         <div class="col-6 col-md-4 col-lg">
             <div class="card border-dark">
                 <div class="card-body py-2">
-                    <small class="text-muted d-block">Total día</small>
+                    <small class="text-muted d-block">Ingresos brutos</small>
                     <strong>S/ <?= number_format($totalDia, 2) ?></strong>
                 </div>
             </div>

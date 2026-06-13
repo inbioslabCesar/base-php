@@ -25,6 +25,39 @@ if (is_array($usuarioSesion)) {
 // Convierte solo la primera letra en mayúscula, el resto en minúscula
 $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 $appCurrency = currency_get_config($pdo);
+
+$logoRaw = isset($config['logo']) ? trim((string)$config['logo']) : '';
+if ($logoRaw === '' || preg_match('/^data:image\//i', $logoRaw)) {
+    $logoRaw = '../uploads/empresa/logo_empresa.png';
+}
+
+$logoPublic = $logoRaw;
+if (!preg_match('/^(https?:)?\/\//i', $logoPublic)) {
+    $logoPublic = str_replace('\\', '/', $logoPublic);
+    $logoPublic = preg_replace('#/+#', '/', $logoPublic);
+    $logoPublic = preg_replace('#^(\./|\.\./)+#', '', $logoPublic);
+
+    if (strpos($logoPublic, 'src/images/empresa/') === 0) {
+        $logoPublic = 'uploads/empresa/' . substr($logoPublic, strlen('src/images/empresa/'));
+    } elseif (strpos($logoPublic, 'images/empresa/') === 0) {
+        $logoPublic = 'uploads/empresa/' . substr($logoPublic, strlen('images/empresa/'));
+    } elseif (strpos($logoPublic, 'uploads/empresa/') !== 0) {
+        $logoPublic = 'uploads/empresa/logo_empresa.png';
+    }
+
+    $logoPublic = rtrim((string)BASE_URL, '/\\') . '/../' . ltrim($logoPublic, '/');
+}
+
+$logoVersion = time();
+if (!preg_match('/^(https?:)?\/\//i', $logoPublic)) {
+    $logoLocalRel = preg_replace('#^' . preg_quote(rtrim((string)BASE_URL, '/\\') . '/../', '#') . '#', '', $logoPublic);
+    $logoLocalAbs = dirname(__DIR__, 2) . '/' . ltrim((string)$logoLocalRel, '/');
+    if (file_exists($logoLocalAbs)) {
+        $logoVersion = (int)filemtime($logoLocalAbs);
+    }
+}
+
+$logoTagSrc = $logoPublic . '?v=' . $logoVersion;
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -33,6 +66,8 @@ $appCurrency = currency_get_config($pdo);
     <meta charset="UTF-8">
     <title>Panel de Administración - <?= htmlspecialchars($config['nombre']) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="<?= htmlspecialchars($logoTagSrc, ENT_QUOTES, 'UTF-8') ?>" type="image/png">
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars($logoTagSrc, ENT_QUOTES, 'UTF-8') ?>">
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- DataTables CSS -->
@@ -177,7 +212,7 @@ $appCurrency = currency_get_config($pdo);
         <div class="container-fluid d-flex align-items-center justify-content-between py-3">
             <div class="d-flex align-items-center">
                 <div class="header-logo-box me-3">
-                    <img src="../src/<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:64px; border-radius:16px; box-shadow:0 2px 12px #764ba233;">
+                    <img src="<?= htmlspecialchars($logoTagSrc, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:64px; border-radius:16px; box-shadow:0 2px 12px #764ba233;">
                 </div>
                 <div>
                     <span class="fw-bold text-white" style="font-size:1.5rem; letter-spacing:1px;">

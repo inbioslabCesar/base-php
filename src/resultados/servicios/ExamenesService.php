@@ -2,6 +2,7 @@
 class ExamenesService {
     private $pdo;
     private $hasSnapshotCol = null;
+    private $hasOrderCol = null;
     private $alarmCols = null;
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -18,6 +19,19 @@ class ExamenesService {
             $this->hasSnapshotCol = false;
         }
         return $this->hasSnapshotCol;
+    }
+
+    private function hasOrderColumn() {
+        if ($this->hasOrderCol !== null) {
+            return $this->hasOrderCol;
+        }
+        try {
+            $col = $this->pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(\PDO::FETCH_ASSOC);
+            $this->hasOrderCol = !empty($col);
+        } catch (\Exception $e) {
+            $this->hasOrderCol = false;
+        }
+        return $this->hasOrderCol;
     }
 
     private function getAlarmColumnMap() {
@@ -59,6 +73,9 @@ class ExamenesService {
         $selectAlarmaDias = $alarmCols['alarma_dias'] ? 're.alarma_dias' : 'NULL AS alarma_dias';
         $selectAlarmaFechaObjetivo = $alarmCols['alarma_fecha_objetivo'] ? 're.alarma_fecha_objetivo' : 'NULL AS alarma_fecha_objetivo';
         $selectAlarmaEstado = $alarmCols['alarma_estado'] ? 're.alarma_estado' : 'NULL AS alarma_estado';
+        $orderSql = $this->hasOrderColumn()
+            ? ' ORDER BY COALESCE(re.orden_impresion, 2147483647), re.id'
+            : ' ORDER BY re.id';
 
         if ($this->hasSnapshotColumn()) {
             $sql = "SELECT re.id as id_resultado, re.id_examen, re.resultados,
@@ -75,7 +92,7 @@ class ExamenesService {
                            {$selectAlarmaEstado}
                     FROM resultados_examenes re
                     JOIN examenes e ON re.id_examen = e.id
-                    WHERE re.id_cotizacion = :cotizacion_id";
+                    WHERE re.id_cotizacion = :cotizacion_id" . $orderSql;
         } else {
             $sql = "SELECT re.id as id_resultado, re.id_examen, re.resultados,
                            e.adicional AS adicional,
@@ -91,7 +108,7 @@ class ExamenesService {
                            {$selectAlarmaEstado}
                     FROM resultados_examenes re
                     JOIN examenes e ON re.id_examen = e.id
-                    WHERE re.id_cotizacion = :cotizacion_id";
+                    WHERE re.id_cotizacion = :cotizacion_id" . $orderSql;
         }
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['cotizacion_id' => $cotizacion_id]);

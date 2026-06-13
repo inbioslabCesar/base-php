@@ -27,10 +27,10 @@ if (isset($_SESSION['usuario']) && is_array($_SESSION['usuario'])) {
 
 
 $acciones_por_rol = [
-    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'caja_reapertura_solicitar', 'caja_reapertura_aprobar', 'liquidar_referenciado', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_transferencia_guardar'],
+    'admin' => ['crear_cotizacion', 'crear_promocion', 'editar_promocion', 'eliminar_promocion', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'crear_empresa', 'editar_empresa', 'eliminar_empresa', 'crear_convenio', 'editar_convenio', 'eliminar_convenio', 'crear_examen', 'editar_examen', 'eliminar_examen', 'crear_usuario', 'editar_usuario', 'eliminar_usuario', 'crear_cotizacion_recepcionista','eliminar_cotizacion', 'config_empresa_guardar', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda', 'api_listado', 'guardar' ,'descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar', 'egresos_actualizar','confirmar_toma','buscar_cliente_accion','asociar_cliente_existente', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api', 'usuarios_api', 'empresas_api', 'convenios_api', 'ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'caja_reapertura_solicitar', 'caja_reapertura_aprobar', 'liquidar_referenciado', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_receta_reactivar', 'inventario_transferencia_guardar'],
 
     'laboratorista' => ['api_listado', 'guardar', 'descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'cotizaciones_api', 'examenes_api'],
-    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadisticas_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'caja_reapertura_solicitar', 'liquidar_referenciado', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_transferencia_guardar'],
+    'recepcionista' => ['crear_cotizacion', 'crear_cotizacion_recepcionista', 'crear_cliente', 'editar_cliente', 'eliminar_cliente', 'buscar_examenes_recepcionista', 'guardar_cotizacion_recepcionista', 'procesar_agenda','api_listado', 'guardar','descarga-pdf', 'actualizar_snapshot_resultados', 'resultados_repetir_prueba', 'pago_cotizacion_guardar', 'actualizar_total_cotizacion', 'egresos_eliminar','egresos_actualizar' ,'confirmar_toma', 'pago_masivo', 'editar_cotizacion', 'clientes_api', 'cotizaciones_api', 'examenes_api','ingresos_api', 'ingresos_export', 'ingresos_detalle', 'estadistica_api', 'estadisticas_export', 'descargar_cotizacion', 'emitir_comprobante', 'estado_comprobante', 'descargar_comprobante', 'caja_abrir', 'caja_cerrar', 'caja_ajuste', 'caja_reapertura_solicitar', 'liquidar_referenciado', 'comparar_resultados_export', 'inventario_item_guardar', 'inventario_item_actualizar', 'inventario_movimiento_guardar', 'inventario_export', 'inventario_receta_guardar', 'inventario_receta_eliminar', 'inventario_receta_reactivar', 'inventario_transferencia_guardar'],
     'empresa' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'cliente' => ['crear_cotizacion', 'procesar_agenda', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'convenio' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion']
@@ -97,6 +97,7 @@ $acciones = [
     'inventario_export' => __DIR__ . '/inventario/inventario_export.php',
     'inventario_receta_guardar' => __DIR__ . '/inventario/receta_guardar.php',
     'inventario_receta_eliminar' => __DIR__ . '/inventario/receta_eliminar.php',
+    'inventario_receta_reactivar' => __DIR__ . '/inventario/receta_reactivar.php',
     'inventario_transferencia_guardar' => __DIR__ . '/inventario/transferencia_guardar.php',
     'caja_abrir' => __DIR__ . '/contabilidad/caja_abrir.php',
     'caja_cerrar' => __DIR__ . '/contabilidad/caja_cerrar.php',
@@ -108,6 +109,23 @@ $acciones = [
 
 $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
 $action = isset($_GET['action']) ? $_GET['action'] : null;
+$vista = isset($_GET['vista']) ? strtolower(trim((string)$_GET['vista'])) : '';
+
+$titulosPorVista = [
+    'formulario' => 'Resultados de Examenes',
+    'listado' => 'Listado de Resultados',
+    'cotizaciones' => 'Cotizaciones',
+    'detalle_cotizacion' => 'Detalle de Cotizacion',
+    'ver_cotizacion' => 'Resumen de Cotizacion',
+    'pago_cotizacion' => 'Pago de Cotizacion',
+    'ingresos' => 'Ingresos',
+    'ingresos_diario' => 'Ingresos Diarios',
+    'contabilidad' => 'Contabilidad',
+    'inventario' => 'Inventario',
+    'inventario_interno' => 'Inventario Interno',
+    'estadisticas' => 'Estadisticas',
+];
+$pageTitle = $titulosPorVista[$vista] ?? 'Panel de Administracion';
 
 if ($action && isset($acciones[$action])) {
     if (isset($acciones_por_rol[$rol_actual]) && in_array($action, $acciones_por_rol[$rol_actual])) {
@@ -264,7 +282,6 @@ $vistas = [
 
 // Obtener rol y vista
 $rol_actual = isset($_SESSION['rol']) ? strtolower(trim($_SESSION['rol'])) : '';
-$vista = isset($_GET['vista']) ? strtolower(trim($_GET['vista'])) : '';
 
 // Validar acceso
 if ($vista && isset($vistas[$vista])) {

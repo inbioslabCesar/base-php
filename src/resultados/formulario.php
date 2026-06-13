@@ -30,17 +30,7 @@ if ($cotizacion_id) {
 
 $v_formulario_css = @filemtime(__DIR__ . '/recursos/formulario.css') ?: time();
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados de Exámeness - InbiosLab</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="<?= BASE_URL ?>resultados/recursos/formulario.css?v=<?= $v_formulario_css ?>">
-</head>
-<body>
+<link rel="stylesheet" href="<?= BASE_URL ?>resultados/recursos/formulario.css?v=<?= $v_formulario_css ?>">
 <div class="header-container">
     <div class="container">
         <div class="d-flex justify-content-between align-items-center">
@@ -64,12 +54,9 @@ $v_formulario_css = @filemtime(__DIR__ . '/recursos/formulario.css') ?: time();
     }
     ?>
 </div>
-</script>
 <?php
 $v_formulario_js = @filemtime(__DIR__ . '/recursos/formulario.js') ?: time();
 $v_validacion_js = @filemtime(__DIR__ . '/recursos/validacion-realtime.js') ?: time();
 ?>
 <script src="<?= BASE_URL ?>resultados/recursos/formulario.js?v=<?= $v_formulario_js ?>"></script>
 <script src="<?= BASE_URL ?>resultados/recursos/validacion-realtime.js?v=<?= $v_validacion_js ?>"></script>
-</body>
-</html>

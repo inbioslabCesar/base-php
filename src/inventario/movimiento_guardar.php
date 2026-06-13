@@ -33,6 +33,12 @@ $tiposEntrada = ['entrada', 'ajuste_pos'];
 $tiposSalida = ['salida', 'ajuste_neg', 'merma', 'vencido'];
 $tiposValidos = array_merge($tiposEntrada, $tiposSalida);
 
+$observacionLower = function_exists('mb_strtolower')
+    ? mb_strtolower($observacion, 'UTF-8')
+    : strtolower($observacion);
+$esSalidaLaboratorio = in_array($tipo, $tiposSalida, true)
+    && strpos($observacionLower, 'laboratorio') !== false;
+
 if ($itemId <= 0 || !in_array($tipo, $tiposValidos, true) || ($cantidad <= 0 && $cantidadPresentacion <= 0)) {
     $_SESSION['mensaje'] = 'Datos inválidos para registrar movimiento.';
     header('Location: dashboard.php?vista=inventario');
@@ -75,6 +81,10 @@ try {
     $hasFactorPresentacionCol = (bool)($stmtColFactor && $stmtColFactor->fetch(\PDO::FETCH_ASSOC));
     $stmtColOrigen = $pdo->query("SHOW COLUMNS FROM inventario_movimientos LIKE 'origen'");
     $hasOrigenMovCol = (bool)($stmtColOrigen && $stmtColOrigen->fetch(\PDO::FETCH_ASSOC));
+
+    $stmtTblInterno = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('inventario_transferencias','inventario_transferencias_detalle')");
+    $stmtTblInterno->execute();
+    $tablasInternoReady = ((int)$stmtTblInterno->fetchColumn() === 2);
 
     $stmtItem = $pdo->prepare(
         "SELECT id, nombre, unidad_medida, activo, " .
@@ -163,10 +173,28 @@ try {
         $stmtLotes->execute([$itemId]);
         $lotes = $stmtLotes->fetchAll(\PDO::FETCH_ASSOC);
 
+        $aplicarComoTransferenciaInterna = $esSalidaLaboratorio && $tablasInternoReady;
+        $transferenciaId = null;
+        if ($aplicarComoTransferenciaInterna) {
+            $obsTransfer = $observacion !== ''
+                ? ('Auto-conversión desde Inventario: ' . $observacion)
+                : 'Auto-conversión desde Inventario: salida a laboratorio';
+            $stmtTransfer = $pdo->prepare("INSERT INTO inventario_transferencias (origen, destino, usuario_id, observacion, fecha_hora) VALUES ('almacen_principal', 'laboratorio', ?, ?, NOW())");
+            $stmtTransfer->execute([
+                $usuarioId > 0 ? $usuarioId : null,
+                $obsTransfer,
+            ]);
+            $transferenciaId = (int)$pdo->lastInsertId();
+
+            $stmtTransferDet = $pdo->prepare("INSERT INTO inventario_transferencias_detalle (transferencia_id, item_id, cantidad, created_at) VALUES (?, ?, ?, NOW())");
+            $stmtTransferDet->execute([$transferenciaId, $itemId, $cantidad]);
+        }
+
         $restante = $cantidad;
         $stmtUpdLote = $pdo->prepare("UPDATE inventario_lotes SET cantidad_actual = cantidad_actual - ?, updated_at = NOW() WHERE id = ?");
         if ($hasOrigenMovCol) {
-            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, origen, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, 'inventario', ?, NOW())");
+            $origenMov = ($aplicarComoTransferenciaInterna && $transferenciaId) ? 'transferencia_interna' : 'inventario';
+            $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, origen, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
         } else {
             $stmtMov = $pdo->prepare("INSERT INTO inventario_movimientos (item_id, lote_id, tipo, cantidad, observacion, usuario_id, fecha_hora) VALUES (?, ?, ?, ?, ?, ?, NOW())");
         }
@@ -184,21 +212,45 @@ try {
             $consumo = min($actual, $restante);
             $stmtUpdLote->execute([$consumo, (int)$lote['id']]);
 
-            $stmtMov->execute([
-                $itemId,
-                (int)$lote['id'],
-                $tipo,
-                $consumo,
-                $observacion !== '' ? $observacion : null,
-                $usuarioId > 0 ? $usuarioId : null,
-            ]);
+            $obsMov = $observacion !== '' ? $observacion : null;
+            if ($aplicarComoTransferenciaInterna && $transferenciaId) {
+                $obsMov = 'Transferencia interna #' . $transferenciaId . ' a laboratorio';
+                if ($observacion !== '') {
+                    $obsMov .= ' | ' . $observacion;
+                }
+            }
+
+            if ($hasOrigenMovCol) {
+                $stmtMov->execute([
+                    $itemId,
+                    (int)$lote['id'],
+                    $tipo,
+                    $consumo,
+                    $obsMov,
+                    $origenMov,
+                    $usuarioId > 0 ? $usuarioId : null,
+                ]);
+            } else {
+                $stmtMov->execute([
+                    $itemId,
+                    (int)$lote['id'],
+                    $tipo,
+                    $consumo,
+                    $obsMov,
+                    $usuarioId > 0 ? $usuarioId : null,
+                ]);
+            }
 
             $restante = round($restante - $consumo, 2);
         }
     }
 
     $pdo->commit();
-    $_SESSION['mensaje'] = 'Movimiento registrado correctamente.';
+    if ($esSalidaLaboratorio && $tablasInternoReady) {
+        $_SESSION['mensaje'] = 'Movimiento registrado y convertido automáticamente en transferencia interna a laboratorio.';
+    } else {
+        $_SESSION['mensaje'] = 'Movimiento registrado correctamente.';
+    }
 } catch (\Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();

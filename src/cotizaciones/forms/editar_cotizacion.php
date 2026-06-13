@@ -404,18 +404,49 @@ if (!empty($_POST['id_cotizacion'])) {
     } catch (Exception $e) {
         $hasSnapshotCol = false;
     }
+
+    $hasOrderCol = false;
+    try {
+        $colOrder = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(PDO::FETCH_ASSOC);
+        $hasOrderCol = !empty($colOrder);
+    } catch (Exception $e) {
+        $hasOrderCol = false;
+    }
+
+    $nextOrderPos = 1;
+    if ($hasOrderCol) {
+        $stmtMaxOrder = $pdo->prepare("SELECT IFNULL(MAX(orden_impresion), 0) FROM resultados_examenes WHERE id_cotizacion = ?");
+        $stmtMaxOrder->execute([$id_cotizacion]);
+        $nextOrderPos = ((int)$stmtMaxOrder->fetchColumn()) + 1;
+    }
+
     foreach ($examenes_nuevos as $id_examen) {
         if ($hasSnapshotCol) {
             $stmtAd = $pdo->prepare('SELECT adicional FROM examenes WHERE id = ?');
             $stmtAd->execute([$id_examen]);
             $adicional_snapshot = $stmtAd->fetchColumn();
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
+            if ($hasOrderCol) {
+                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado, orden_impresion) VALUES (?, ?, ?, '{}', ?, 'pendiente', ?)";
+                $stmtRes = $pdo->prepare($sql);
+                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot, $nextOrderPos]);
+            } else {
+                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
+                $stmtRes = $pdo->prepare($sql);
+                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
+            }
         } else {
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+            if ($hasOrderCol) {
+                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado, orden_impresion) VALUES (?, ?, ?, '{}', 'pendiente', ?)";
+                $stmtRes = $pdo->prepare($sql);
+                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $nextOrderPos]);
+            } else {
+                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
+                $stmtRes = $pdo->prepare($sql);
+                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
+            }
+        }
+        if ($hasOrderCol) {
+            $nextOrderPos++;
         }
     }
     // Redirigir según el rol

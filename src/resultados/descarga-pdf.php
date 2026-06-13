@@ -114,5 +114,15 @@ $mpdf->WriteHTML($reporte['html'], \Mpdf\HTMLParserMode::HTML_BODY);
 $nombrePaciente = strtolower(str_replace([' ', 'á', 'é', 'í', 'ó', 'ú', 'ñ'], ['-', 'a', 'e', 'i', 'o', 'u', 'n'], $paciente['nombre']));
 $fechaReporte = date('d-m-Y', strtotime($paciente['fecha']));
 $nombreArchivo = $nombrePaciente . '-' . $fechaReporte . '.pdf';
-$mpdf->Output($nombreArchivo, 'I');
+$pdfContent = $mpdf->Output('', 'S');
+
+header('Content-Type: application/pdf');
+header('Content-Disposition: inline; filename="' . $nombreArchivo . '"');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: post-check=0, pre-check=0', false);
+header('Pragma: no-cache');
+header('Expires: 0');
+header('Content-Length: ' . strlen($pdfContent));
+
+echo $pdfContent;
 exit;

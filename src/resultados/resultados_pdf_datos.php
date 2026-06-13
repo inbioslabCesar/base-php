@@ -12,10 +12,24 @@ function obtenerDatosCotizacion($pdo, $cotizacion_id) {
 }
 
 function obtenerResultadosExamenes($pdo, $cotizacion_id) {
+    static $hasOrdenImpresion = null;
+    if ($hasOrdenImpresion === null) {
+        try {
+            $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(PDO::FETCH_ASSOC);
+            $hasOrdenImpresion = !empty($col);
+        } catch (Throwable $e) {
+            $hasOrdenImpresion = false;
+        }
+    }
+
+    $orderSql = $hasOrdenImpresion
+        ? " ORDER BY COALESCE(re.orden_impresion, 2147483647), re.id"
+        : " ORDER BY re.id";
+
     $sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.tipo_documento, c.id AS cliente_id
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
-        WHERE re.id_cotizacion = :cotizacion_id";
+        WHERE re.id_cotizacion = :cotizacion_id" . $orderSql;
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['cotizacion_id' => $cotizacion_id]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);

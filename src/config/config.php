@@ -49,6 +49,8 @@ if ($empresa === '') {
         'www.centromedicodelima.com' => 'cmdl',
         'jeycolab.com' => 'jeycolab',
         'www.jeycolab.com' => 'jeycolab',
+        'tecnolababrilatalaya.com' => 'tecnolab',
+        'www.tecnolababrilatalaya.com' => 'tecnolab',
 
         // Entornos locales
         'localhost' => 'desarrollo',

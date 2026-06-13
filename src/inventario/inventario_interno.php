@@ -430,10 +430,23 @@ try {
                                             </span>
                                         </td>
                                         <td>
-                                            <form method="post" action="dashboard.php?action=inventario_receta_eliminar" onsubmit="return confirm('¿Eliminar esta receta?');" class="d-inline">
-                                                <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                            </form>
+                                            <div class="d-flex gap-1">
+                                                <?php if (((int)($r['activo'] ?? 1) === 1)): ?>
+                                                    <form method="post" action="dashboard.php?action=inventario_receta_eliminar" onsubmit="return confirm('¿Desactivar esta receta? Se dejarán de aplicar consumos para nuevos resultados, pero el histórico se conserva.');" class="d-inline">
+                                                        <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Desactivar receta"><i class="bi bi-eye-slash"></i></button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <form method="post" action="dashboard.php?action=inventario_receta_reactivar" onsubmit="return confirm('¿Reactivar esta receta?');" class="d-inline">
+                                                        <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-info" title="Reactivar receta"><i class="bi bi-eye"></i></button>
+                                                    </form>
+                                                    <form method="post" action="dashboard.php?action=inventario_receta_eliminar" onsubmit="return confirm('¿Eliminar permanentemente esta receta inactiva? Esta acción no se puede deshacer.');" class="d-inline">
+                                                        <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar permanentemente"><i class="bi bi-trash"></i></button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

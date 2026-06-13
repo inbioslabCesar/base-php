@@ -35,6 +35,7 @@ $stmtClientes->execute([$id_empresa]);
 $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
 
 // Consulta cotizaciones asociadas a la empresa
+$whereEstadoActiva = " AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada') ";
 if ($clientesAsociados) {
     $inClientes = implode(',', array_fill(0, count($clientesAsociados), '?'));
     $paramsCot = array_merge([$id_empresa], $clientesAsociados, array_slice($params, 1));
@@ -46,6 +47,7 @@ if ($clientesAsociados) {
                   c.id_cliente IN ($inClientes)
                   OR c.rol_creador IN ('admin', 'recepcionista')
               )
+                            $whereEstadoActiva
               $whereFecha
             ORDER BY c.id DESC";
     $stmt = $pdo->prepare($sql);
@@ -58,6 +60,7 @@ if ($clientesAsociados) {
             JOIN clientes cl ON c.id_cliente = cl.id
             WHERE c.id_empresa = ? 
               AND c.rol_creador IN ('admin', 'recepcionista')
+                            $whereEstadoActiva
               $whereFecha
             ORDER BY c.id DESC";
     $stmt = $pdo->prepare($sql);

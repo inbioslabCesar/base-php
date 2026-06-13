@@ -2,6 +2,7 @@
 class FormView {
     public static function render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente = [], $areas_disponibles = []) {
         ob_start();
+        $pdfDownloadUrl = 'resultados/descarga-pdf.php?cotizacion_id=' . urlencode((string)$cotizacion_id);
         ?>
         <div class="alert alert-info" style="border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
             <strong>Importante:</strong> los cambios del CRUD de exámenes (nombre, metodología, parámetros o área)
@@ -20,7 +21,16 @@ class FormView {
             </div>
             <div id="examOrderInputs"></div>
             <?= \PdfConfigView::render($referencia_personalizada) ?>
-            <div class="text-center">
+            <div class="text-center d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
+                <a href="<?= htmlspecialchars($pdfDownloadUrl) ?>"
+                   class="btn btn-success"
+                   id="btnDescargarPdfResultados"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   title="Descargar PDF de resultados">
+                    <i class="bi bi-file-earmark-pdf me-2"></i>
+                    Descargar PDF
+                </a>
                 <button type="submit" class="save-btn">
                     <i class="bi bi-save me-2"></i>
                     Guardar Resultados
@@ -54,6 +64,16 @@ class FormView {
             if (!daysInput.value) {
                 daysInput.value = '1';
             }
+        });
+
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('#btnDescargarPdfResultados');
+            if (!link) {
+                return;
+            }
+
+            const baseUrl = <?= json_encode($pdfDownloadUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+            link.href = `${baseUrl}&_ts=${Date.now()}`;
         });
         </script>
 

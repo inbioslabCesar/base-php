@@ -4,14 +4,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 
-use PDO;
-use Exception;
-
 $examenes = $_POST['examenes'] ?? [];
 $cotizacion_id = $_POST['cotizacion_id'] ?? null;
 $stayOnForm = isset($_POST['stay_on_form']) && (int)$_POST['stay_on_form'] === 1;
 $referencia_personalizada = trim($_POST['referencia_personalizada'] ?? '');
 $usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
+$exam_order = $_POST['exam_order'] ?? [];
 
 $resumenConsumo = [
     'aplicados' => 0,
@@ -54,6 +52,20 @@ $hasSnapshotColumn = function () use ($pdo, &$hasSnapshotCol) {
         $hasSnapshotCol = false;
     }
     return $hasSnapshotCol;
+};
+
+$hasOrderCol = null;
+$hasOrderColumn = function () use ($pdo, &$hasOrderCol) {
+    if ($hasOrderCol !== null) {
+        return $hasOrderCol;
+    }
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(PDO::FETCH_ASSOC);
+        $hasOrderCol = !empty($col);
+    } catch (Exception $e) {
+        $hasOrderCol = false;
+    }
+    return $hasOrderCol;
 };
 
 $alarmColumnMap = null;
@@ -146,7 +158,8 @@ $normalizarResultadosPorSnapshot = function (array $resultados, $snapshotSrc) us
         return $resultados;
     }
 
-    $indexNombre = [];
+    $indexExact = [];
+    $indexNorm = [];
     foreach ($snapshotSrc as $item) {
         if (!is_array($item)) {
             continue;
@@ -159,11 +172,20 @@ $normalizarResultadosPorSnapshot = function (array $resultados, $snapshotSrc) us
         if ($nombre === '') {
             continue;
         }
+
+        if (!isset($indexExact[$nombre])) {
+            $indexExact[$nombre] = [];
+        }
+        $indexExact[$nombre][] = $item;
+
         $nk = $normKey($nombre);
-        if ($nk === '' || isset($indexNombre[$nk])) {
+        if ($nk === '') {
             continue;
         }
-        $indexNombre[$nk] = $item;
+        if (!isset($indexNorm[$nk])) {
+            $indexNorm[$nk] = [];
+        }
+        $indexNorm[$nk][] = $item;
     }
 
     $salida = [];
@@ -174,10 +196,28 @@ $normalizarResultadosPorSnapshot = function (array $resultados, $snapshotSrc) us
             continue;
         }
 
+        if (strpos($key, 'id_parametro_') === 0) {
+            // Respetar claves estables ya normalizadas.
+            $salida[$key] = $v;
+            continue;
+        }
+
         $destino = $key;
+
+        // 1) Preferir coincidencia exacta por nombre si es unica.
+        if (isset($indexExact[$key]) && count($indexExact[$key]) === 1) {
+            $stable = $buildStableKey($indexExact[$key][0]);
+            if ($stable !== '') {
+                $destino = $stable;
+            }
+            $salida[$destino] = $v;
+            continue;
+        }
+
+        // 2) Fallback por nombre normalizado solo si no es ambiguo.
         $nk = $normKey($key);
-        if ($nk !== '' && isset($indexNombre[$nk])) {
-            $stable = $buildStableKey($indexNombre[$nk]);
+        if ($nk !== '' && isset($indexNorm[$nk]) && count($indexNorm[$nk]) === 1) {
+            $stable = $buildStableKey($indexNorm[$nk][0]);
             if ($stable !== '') {
                 $destino = $stable;
             }
@@ -770,7 +810,9 @@ if (!empty($examenes) && is_array($examenes)) {
                             'color_fondo' => '#ffffff',
                             'color_texto' => $color,
                             'negrita' => 1,
-                            'alineacion' => 'left'
+                            'alineacion' => 'left',
+                            'origen' => 'paciente',
+                            'custom_paciente' => 1,
                         ];
 
                         $insertAt = null;
@@ -922,6 +964,25 @@ if (!empty($examenes) && is_array($examenes)) {
         }
     }
     
+    if ($cotizacion_id && $hasOrderColumn() && is_array($exam_order) && !empty($exam_order)) {
+        $stmtOrder = $pdo->prepare("UPDATE resultados_examenes SET orden_impresion = :orden WHERE id = :id AND id_cotizacion = :cotizacion_id");
+        $seen = [];
+        $orderPos = 1;
+        foreach ($exam_order as $idRaw) {
+            $idResultado = (int)$idRaw;
+            if ($idResultado <= 0 || isset($seen[$idResultado])) {
+                continue;
+            }
+            $seen[$idResultado] = true;
+            $stmtOrder->execute([
+                'orden' => $orderPos,
+                'id' => $idResultado,
+                'cotizacion_id' => $cotizacion_id,
+            ]);
+            $orderPos++;
+        }
+    }
+
     // Guardar referencia personalizada si fue proporcionada
     if ($cotizacion_id && $referencia_personalizada !== '') {
         // Verificar si ya existe una referencia personalizada para esta cotización

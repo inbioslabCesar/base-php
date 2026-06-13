@@ -375,7 +375,7 @@ function label_tipo_mov(string $tipo): string
 
         <div class="row g-3 mb-3">
             <div class="col-12 col-lg-5">
-                <div class="card shadow-sm h-100">
+                <div class="card shadow-sm h-100" id="lotes-por-vencer">
                     <div class="card-header bg-light"><strong><?= $itemEditar ? 'Editar ítem' : 'Nuevo ítem' ?></strong></div>
                     <div class="card-body">
                         <form method="post" action="dashboard.php?action=<?= $itemEditar ? 'inventario_item_actualizar' : 'inventario_item_guardar' ?>" class="row g-2" id="formItemInventario">
@@ -514,7 +514,7 @@ function label_tipo_mov(string $tipo): string
             </div>
         </div>
 
-        <div class="card shadow-sm mb-3">
+        <div class="card shadow-sm mb-3" id="stock-actual">
             <div class="card-header bg-light"><strong>Stock actual</strong></div>
             <div class="card-body">
                 <form method="get" class="row g-2 align-items-end mb-3" autocomplete="off">
@@ -560,8 +560,9 @@ function label_tipo_mov(string $tipo): string
                     </div>
                 </form>
 
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped align-middle">
+                <div id="stock-actual-result">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Código</th>
@@ -621,8 +622,8 @@ function label_tipo_mov(string $tipo): string
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </tbody>
-                    </table>
-                </div>
+                        </table>
+                    </div>
 
                 <?php
                     $queryPaginacionBase = [
@@ -634,7 +635,7 @@ function label_tipo_mov(string $tipo): string
                         'per_page_user' => 1,
                     ];
                 ?>
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-3 gap-2">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-3 gap-2">
                     <small class="text-muted">
                         Mostrando
                         <strong><?= $totalItemsTabla > 0 ? (($paginaItems - 1) * $itemsPorPagina + 1) : 0 ?></strong>
@@ -656,6 +657,7 @@ function label_tipo_mov(string $tipo): string
                             </li>
                         </ul>
                     </nav>
+                    </div>
                 </div>
             </div>
         </div>
@@ -687,7 +689,7 @@ function label_tipo_mov(string $tipo): string
                             </select>
                         </form>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="card-body p-0" id="lotes-result">
                         <div class="table-responsive">
                             <table class="table table-sm mb-0 align-middle">
                                 <thead class="table-light">
@@ -747,7 +749,7 @@ function label_tipo_mov(string $tipo): string
             </div>
 
             <div class="col-12 col-lg-7">
-                <div class="card shadow-sm h-100">
+                <div class="card shadow-sm h-100" id="ultimos-movimientos">
                     <div class="card-header bg-light d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                         <strong>Últimos movimientos</strong>
                         <div class="d-flex flex-wrap gap-2 align-items-center w-100 w-md-auto justify-content-md-end">
@@ -780,7 +782,7 @@ function label_tipo_mov(string $tipo): string
                             </a>
                         </div>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="card-body p-0" id="movimientos-result">
                         <div class="table-responsive">
                             <table class="table table-sm mb-0 align-middle">
                                 <thead class="table-light">
@@ -849,6 +851,201 @@ function label_tipo_mov(string $tipo): string
 </div>
 
 <script>
+(function () {
+    var sectionSelector = '#stock-actual';
+    var resultSelector = '#stock-actual-result';
+    var isLoading = false;
+
+    var setLoadingState = function (enabled) {
+        var section = document.querySelector(sectionSelector);
+        if (!section) return;
+        section.style.opacity = enabled ? '0.65' : '1';
+        section.style.pointerEvents = enabled ? 'none' : 'auto';
+    };
+
+    var loadStockPage = function (url, updateHistory) {
+        if (!url || isLoading) return;
+        isLoading = true;
+        setLoadingState(true);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar la paginación');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var nextResult = doc.querySelector(resultSelector);
+                var currentResult = document.querySelector(resultSelector);
+
+                if (!nextResult || !currentResult) {
+                    throw new Error('No se encontró el bloque de resultados');
+                }
+
+                currentResult.replaceWith(nextResult);
+
+                if (updateHistory && window.history && window.history.pushState) {
+                    window.history.pushState({ inventarioStockAjax: true }, '', url);
+                }
+            })
+            .catch(function (error) {
+                console.error(error);
+                window.location.href = url;
+            })
+            .finally(function () {
+                isLoading = false;
+                setLoadingState(false);
+            });
+    };
+
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest('#stock-actual nav[aria-label="Paginación inventario"] a.page-link');
+        if (!link) return;
+
+        var item = link.closest('.page-item');
+        if (item && item.classList.contains('disabled')) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        loadStockPage(link.href, true);
+    });
+
+    window.addEventListener('popstate', function () {
+        var params = new URLSearchParams(window.location.search || '');
+        if (params.get('vista') !== 'inventario') {
+            return;
+        }
+        loadStockPage(window.location.href, false);
+    });
+})();
+
+(function () {
+    var sectionSelector = '#lotes-por-vencer';
+    var resultSelector = '#lotes-result';
+    var isLoading = false;
+
+    var setLoadingState = function (enabled) {
+        var section = document.querySelector(sectionSelector);
+        if (!section) return;
+        section.style.opacity = enabled ? '0.65' : '1';
+        section.style.pointerEvents = enabled ? 'none' : 'auto';
+    };
+
+    var loadLotesPage = function (url) {
+        if (!url || isLoading) return;
+        isLoading = true;
+        setLoadingState(true);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar lotes por vencer');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var nextResult = doc.querySelector(resultSelector);
+                var currentResult = document.querySelector(resultSelector);
+
+                if (!nextResult || !currentResult) {
+                    throw new Error('No se encontró el bloque de lotes por vencer');
+                }
+
+                currentResult.replaceWith(nextResult);
+            })
+            .catch(function (error) {
+                console.error(error);
+                window.location.href = url;
+            })
+            .finally(function () {
+                isLoading = false;
+                setLoadingState(false);
+            });
+    };
+
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest('#lotes-por-vencer ul.pagination a.page-link');
+        if (!link) return;
+
+        var item = link.closest('.page-item');
+        if (item && item.classList.contains('disabled')) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        loadLotesPage(link.href);
+    });
+})();
+
+(function () {
+    var sectionSelector = '#ultimos-movimientos';
+    var resultSelector = '#movimientos-result';
+    var isLoading = false;
+
+    var setLoadingState = function (enabled) {
+        var section = document.querySelector(sectionSelector);
+        if (!section) return;
+        section.style.opacity = enabled ? '0.65' : '1';
+        section.style.pointerEvents = enabled ? 'none' : 'auto';
+    };
+
+    var loadMovimientosPage = function (url) {
+        if (!url || isLoading) return;
+        isLoading = true;
+        setLoadingState(true);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar ultimos movimientos');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var nextResult = doc.querySelector(resultSelector);
+                var currentResult = document.querySelector(resultSelector);
+
+                if (!nextResult || !currentResult) {
+                    throw new Error('No se encontró el bloque de movimientos');
+                }
+
+                currentResult.replaceWith(nextResult);
+            })
+            .catch(function (error) {
+                console.error(error);
+                window.location.href = url;
+            })
+            .finally(function () {
+                isLoading = false;
+                setLoadingState(false);
+            });
+    };
+
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest('#ultimos-movimientos ul.pagination a.page-link');
+        if (!link) return;
+
+        var item = link.closest('.page-item');
+        if (item && item.classList.contains('disabled')) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        loadMovimientosPage(link.href);
+    });
+})();
+
 (function () {
     var perPageSelect = document.getElementById('inventarioPerPage');
     var perPageLotes = document.getElementById('inventarioPerPageLotes');

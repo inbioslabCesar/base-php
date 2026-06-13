@@ -338,6 +338,10 @@ const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
     ? window.formatMoney(value)
     : `S/ ${Number(value || 0).toFixed(2)}`;
 
+function buildPdfDownloadUrl(cotizacionId) {
+    return `resultados/descarga-pdf.php?cotizacion_id=${encodeURIComponent(cotizacionId)}&_ts=${Date.now()}`;
+}
+
 function renderEstadoExamenBadge(row) {
     const estado = row.estado_examen;
     const porcentaje = row.porcentaje_examen;
@@ -590,7 +594,7 @@ function getSeleccionGlobal() {
                         if (!soloAnuladas && puedeAnularCotizacion) {
                             acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
                         }
-                        acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
+                        acciones += `<a href='${buildPdfDownloadUrl(row.id)}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
                         return acciones;
                     }
                 }
@@ -957,7 +961,7 @@ function renderCotizacionCard(row) {
     if (!soloAnuladas && puedeAnularCotizacion) {
         acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
     }
-    acciones += `<a href='resultados/descarga-pdf.php?cotizacion_id=${row.id}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
+    acciones += `<a href='${buildPdfDownloadUrl(row.id)}' class='btn btn-success btn-sm btn-cotizacion-accion' title='Descargar PDF de todos los resultados' target='_blank'><i class='bi bi-file-earmark-pdf'></i></a>`;
     // Checkbox selección
     const seleccionadas = getSeleccionadasManualMovil();
     const checked = seleccionadas.includes(row.id) ? 'checked' : '';

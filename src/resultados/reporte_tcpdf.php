@@ -37,9 +37,31 @@ $stmt3 = $pdo->prepare($sql3);
 $stmt3->execute();
 $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
 
-// 3. Rutas absolutas para imágenes
-$logo_path = __DIR__ . '/../../images/empresa/' . $empresa['logo'];
-$firma_path = __DIR__ . '/../../images/empresa/' . $empresa['firma'];
+// 3. Rutas absolutas para imágenes (compatibles con rutas legacy y nuevas)
+$resolverRutaEmpresaAbs = static function ($ruta) {
+    $ruta = is_string($ruta) ? trim($ruta) : '';
+    if ($ruta === '' || preg_match('/^data:image\//i', $ruta) || preg_match('/^(https?:)?\/\//i', $ruta)) {
+        return '';
+    }
+
+    $ruta = str_replace('\\', '/', $ruta);
+    $ruta = preg_replace('#/+#', '/', $ruta);
+    $ruta = ltrim($ruta, '/');
+    $ruta = preg_replace('#^(\.\./|\./)+#', '', $ruta);
+
+    if (strpos($ruta, 'src/images/empresa/') === 0) {
+        $ruta = 'uploads/empresa/' . substr($ruta, strlen('src/images/empresa/'));
+    } elseif (strpos($ruta, 'images/empresa/') === 0) {
+        $ruta = 'uploads/empresa/' . substr($ruta, strlen('images/empresa/'));
+    } elseif (strpos($ruta, 'uploads/empresa/') !== 0) {
+        $ruta = 'uploads/empresa/' . $ruta;
+    }
+
+    return dirname(__DIR__, 2) . '/' . $ruta;
+};
+
+$logo_path = $resolverRutaEmpresaAbs($empresa['logo'] ?? '');
+$firma_path = $resolverRutaEmpresaAbs($empresa['firma'] ?? '');
 
 // 4. Prepara los datos del paciente y empresa para el encabezado
 $paciente = $rows[0];

@@ -19,6 +19,7 @@ $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente
         FROM cotizaciones c
         JOIN clientes cl ON c.id_cliente = cl.id
         WHERE c.id_cliente = ?
+                    AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
           AND (
                 c.rol_creador = 'cliente'
                 OR (

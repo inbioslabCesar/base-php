@@ -22,10 +22,11 @@ $promociones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Consulta de cotizaciones y pagos/exámenes
 $sql = "SELECT c.*, cl.nombre AS nombre_cliente, cl.apellido AS apellido_cliente
-        FROM cotizaciones c
-        JOIN clientes cl ON c.id_cliente = cl.id
-        WHERE c.id_cliente = ?
-        ORDER BY c.id DESC";
+    FROM cotizaciones c
+    JOIN clientes cl ON c.id_cliente = cl.id
+    WHERE c.id_cliente = ?
+      AND (c.estado_pago IS NULL OR c.estado_pago <> 'anulada')
+    ORDER BY c.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute([$id_cliente]);
 $cotizaciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -170,8 +171,8 @@ foreach ($cotizaciones as $cotizacion) {
                 <div class="card-body d-flex align-items-center">
                     <i class="bi bi-check-circle display-5 text-success me-3"></i>
                     <div>
-                        <h6 class="card-title mb-1">Cotizaciones Canceladas</h6>
-                        <p class="mb-0"><?= $canceladas ?> pagadas</p>
+                        <h6 class="card-title mb-1">Cotizaciones Pagadas</h6>
+                        <p class="mb-0"><?= $canceladas ?> completadas</p>
                     </div>
                 </div>
             </div>

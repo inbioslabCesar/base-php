@@ -214,6 +214,17 @@ class ExamCardView {
                     <span><?= htmlspecialchars($examen['nombre_examen']) ?></span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <div class="exam-order-controls d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-sm btn-light js-exam-drag-handle" title="Arrastrar para reordenar">
+                            <i class="bi bi-grip-vertical"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light js-exam-move-up" title="Subir">
+                            <i class="bi bi-arrow-up"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light js-exam-move-down" title="Bajar">
+                            <i class="bi bi-arrow-down"></i>
+                        </button>
+                    </div>
                     <div class="form-check form-switch mb-0">
                         <input class="form-check-input" type="checkbox" 
                                name="examenes[<?= $examen['id_resultado'] ?>][imprimir_examen]" 

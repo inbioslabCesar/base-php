@@ -1,6 +1,29 @@
 
 // JS personalizado para formulario de resultados
 document.addEventListener('DOMContentLoaded', function () {
+    const buildScrollStateKey = () => {
+        const params = new URLSearchParams(window.location.search || '');
+        const cotizacionId = String(params.get('cotizacion_id') || '').trim();
+        return cotizacionId ? `resultados_form_scroll_${cotizacionId}` : 'resultados_form_scroll';
+    };
+
+    const scrollStateKey = buildScrollStateKey();
+    const savedScrollRaw = sessionStorage.getItem(scrollStateKey);
+    if (savedScrollRaw) {
+        try {
+            const data = JSON.parse(savedScrollRaw);
+            const y = Number(data && data.y);
+            const at = Number(data && data.at);
+            const isRecent = Number.isFinite(at) && (Date.now() - at) < 5 * 60 * 1000;
+            if (Number.isFinite(y) && y >= 0 && isRecent) {
+                window.scrollTo({ top: y, left: 0, behavior: 'auto' });
+            }
+        } catch (error) {
+            // Ignorar datos corruptos de sesion.
+        }
+        sessionStorage.removeItem(scrollStateKey);
+    }
+
     // Animación de aparición escalonada para las cards
     const cards = document.querySelectorAll('.exam-card');
     cards.forEach((card, index) => {
@@ -9,6 +32,230 @@ document.addEventListener('DOMContentLoaded', function () {
             card.style.transform = 'translateY(0)';
         }, index * 100);
     });
+
+    const examContainer = document.getElementById('examCardsContainer');
+    const orderInputsContainer = document.getElementById('examOrderInputs');
+    const formGuardar = document.querySelector('form[action="dashboard.php?action=guardar"]');
+    const actionsDock = document.getElementById('resultsActionsDock');
+    const dockModeToggle = document.getElementById('resultsDockModeToggle');
+    const dockModeStorageKey = 'resultados_actions_dock_mode';
+    const canUseDrag = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+
+    const getExamCards = () => {
+        if (!examContainer) return [];
+        return Array.from(examContainer.querySelectorAll('.exam-card[data-id-resultado]'));
+    };
+
+    const syncExamOrderInputs = () => {
+        if (!orderInputsContainer) return;
+        orderInputsContainer.innerHTML = '';
+        getExamCards().forEach((card) => {
+            const idResultado = String(card.getAttribute('data-id-resultado') || '').trim();
+            if (!idResultado) return;
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'exam_order[]';
+            hidden.value = idResultado;
+            orderInputsContainer.appendChild(hidden);
+        });
+    };
+
+    if (examContainer) {
+        let draggedCard = null;
+        let dragArmedCard = null;
+
+        const moveCard = (card, direction) => {
+            if (!card) return;
+
+            let moved = false;
+            if (direction === 'up') {
+                const prev = card.previousElementSibling;
+                if (prev && prev.classList.contains('exam-card')) {
+                    examContainer.insertBefore(card, prev);
+                    moved = true;
+                }
+            } else if (direction === 'down') {
+                const next = card.nextElementSibling;
+                if (next && next.classList.contains('exam-card')) {
+                    examContainer.insertBefore(next, card);
+                    moved = true;
+                }
+            }
+
+            if (!moved) {
+                return;
+            }
+
+            syncExamOrderInputs();
+        };
+
+        if (canUseDrag) {
+            getExamCards().forEach((card) => {
+                card.draggable = true;
+            });
+
+            examContainer.addEventListener('pointerdown', (event) => {
+                const handle = event.target.closest('.js-exam-drag-handle');
+                if (!handle) {
+                    dragArmedCard = null;
+                    return;
+                }
+                dragArmedCard = handle.closest('.exam-card');
+            });
+
+            examContainer.addEventListener('dragstart', (event) => {
+                const card = event.target.closest('.exam-card');
+                if (!card) {
+                    event.preventDefault();
+                    return;
+                }
+
+                const startedFromHandle = !!event.target.closest('.js-exam-drag-handle');
+                const isArmedCard = dragArmedCard && dragArmedCard === card;
+                if (!startedFromHandle && !isArmedCard) {
+                    event.preventDefault();
+                    return;
+                }
+
+                draggedCard = card;
+                draggedCard.classList.add('dragging');
+                dragArmedCard = null;
+                if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', card.getAttribute('data-id-resultado') || '');
+                }
+            });
+
+            examContainer.addEventListener('dragover', (event) => {
+                if (!draggedCard) return;
+                const overCard = event.target.closest('.exam-card');
+                if (!overCard || overCard === draggedCard) return;
+
+                event.preventDefault();
+                const rect = overCard.getBoundingClientRect();
+                const placeAfter = event.clientY > (rect.top + rect.height / 2);
+                if (placeAfter) {
+                    if (overCard.nextElementSibling !== draggedCard) {
+                        examContainer.insertBefore(draggedCard, overCard.nextElementSibling);
+                    }
+                } else if (overCard !== draggedCard.nextElementSibling) {
+                    examContainer.insertBefore(draggedCard, overCard);
+                }
+            });
+
+            examContainer.addEventListener('drop', (event) => {
+                if (!draggedCard) return;
+                event.preventDefault();
+                syncExamOrderInputs();
+            });
+
+            examContainer.addEventListener('dragend', () => {
+                if (draggedCard) {
+                    draggedCard.classList.remove('dragging');
+                    draggedCard = null;
+                    syncExamOrderInputs();
+                }
+                dragArmedCard = null;
+            });
+        }
+
+        examContainer.addEventListener('click', (event) => {
+            if (event.defaultPrevented) return;
+            const upBtn = event.target.closest('.js-exam-move-up');
+            const downBtn = event.target.closest('.js-exam-move-down');
+            if (!upBtn && !downBtn) return;
+
+            event.preventDefault();
+
+            const card = event.target.closest('.exam-card');
+            if (!card) return;
+
+            moveCard(card, upBtn ? 'up' : 'down');
+        });
+
+        // Fallback directo: algunos navegadores moviles/tactiles pueden no disparar
+        // de forma confiable el delegado sobre contenedores con controles complejos.
+        getExamCards().forEach((card) => {
+            const upBtn = card.querySelector('.js-exam-move-up');
+            const downBtn = card.querySelector('.js-exam-move-down');
+
+            if (upBtn) {
+                upBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    moveCard(card, 'up');
+                });
+            }
+
+            if (downBtn) {
+                downBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    moveCard(card, 'down');
+                });
+            }
+        });
+
+        syncExamOrderInputs();
+    }
+
+    if (formGuardar) {
+        formGuardar.addEventListener('submit', () => {
+            syncExamOrderInputs();
+        });
+    }
+
+    if (actionsDock) {
+        let ticking = false;
+        const isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+        const storedDockMode = localStorage.getItem(dockModeStorageKey);
+        let dockMode;
+        if (storedDockMode === 'always' || storedDockMode === 'auto') {
+            dockMode = storedDockMode;
+        } else {
+            dockMode = isMobileViewport ? 'always' : 'auto';
+        }
+
+        const updateDockModeToggle = () => {
+            if (!dockModeToggle) return;
+            const pinned = dockMode === 'always';
+            dockModeToggle.classList.toggle('is-pinned', pinned);
+            dockModeToggle.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+            dockModeToggle.innerHTML = pinned
+                ? '<i class="bi bi-pin-angle-fill me-1"></i>Siempre visible'
+                : '<i class="bi bi-pin-angle me-1"></i>Fijar';
+            dockModeToggle.title = pinned
+                ? 'La barra esta siempre visible. Clic para volver a modo automatico'
+                : 'La barra aparece al hacer scroll. Clic para dejarla siempre visible';
+        };
+
+        const updateDockVisibility = () => {
+            const shouldShow = dockMode === 'always' || window.scrollY > 220;
+            actionsDock.classList.toggle('is-visible', shouldShow);
+            ticking = false;
+        };
+
+        const onScroll = () => {
+            if (ticking) return;
+            ticking = true;
+            window.requestAnimationFrame(updateDockVisibility);
+        };
+
+        updateDockModeToggle();
+        updateDockVisibility();
+
+        if (dockModeToggle) {
+            dockModeToggle.addEventListener('click', () => {
+                dockMode = dockMode === 'always' ? 'auto' : 'always';
+                localStorage.setItem(dockModeStorageKey, dockMode);
+                updateDockModeToggle();
+                updateDockVisibility();
+            });
+        }
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
+    }
 
     // Efecto de enfoque mejorado para inputs
     const inputs = document.querySelectorAll('.form-control');
@@ -370,7 +617,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('form[action="dashboard.php?action=guardar"]');
     if (form) {
         form.addEventListener('submit', async function(e) {
+            if (form.dataset.forceNativeSubmit === '1') {
+                return;
+            }
             if (form.dataset.submitting === '1') {
+                e.preventDefault();
                 return;
             }
             e.preventDefault();
@@ -453,15 +704,89 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('Por favor, completa todos los campos obligatorios.');
                 return false;
             }
-            const submitBtn = document.querySelector('.save-btn');
-            // Animación del botón de envío
-            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Guardando...';
-            submitBtn.disabled = true;
-            setTimeout(() => {
-                submitBtn.style.transform = 'scale(0.95)';
-            }, 100);
+
+            const submitButtons = Array.from(document.querySelectorAll('.js-save-submit'));
+
+            const setSavingState = () => {
+                submitButtons.forEach((btn) => {
+                    if (!btn.dataset.originalHtml) {
+                        btn.dataset.originalHtml = btn.innerHTML;
+                    }
+                    btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Guardando...';
+                    btn.disabled = true;
+                    setTimeout(() => {
+                        btn.style.transform = 'scale(0.95)';
+                    }, 100);
+                });
+            };
+
+            const restoreButtons = () => {
+                submitButtons.forEach((btn) => {
+                    if (btn.dataset.originalHtml) {
+                        btn.innerHTML = btn.dataset.originalHtml;
+                    }
+                    btn.disabled = false;
+                    btn.style.transform = '';
+                });
+            };
+
+            const submitNativeFallback = () => {
+                sessionStorage.setItem(scrollStateKey, JSON.stringify({ y: window.scrollY, at: Date.now() }));
+                form.dataset.submitting = '1';
+                form.dataset.forceNativeSubmit = '1';
+                HTMLFormElement.prototype.submit.call(form);
+            };
+
+            setSavingState();
             form.dataset.submitting = '1';
-            form.submit();
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+                if (!response.ok || contentType.indexOf('application/json') === -1) {
+                    submitNativeFallback();
+                    return;
+                }
+
+                const payload = await response.json();
+                if (!payload || payload.success !== true) {
+                    restoreButtons();
+                    form.dataset.submitting = '0';
+                    const msgError = payload && payload.message ? payload.message : 'No se pudo guardar resultados.';
+                    alert(msgError);
+                    return false;
+                }
+
+                const msgOk = payload.message || 'Resultados guardados correctamente.';
+                if (window.Swal && typeof window.Swal.fire === 'function') {
+                    window.Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: msgOk,
+                        showConfirmButton: false,
+                        timer: 2600,
+                        timerProgressBar: true,
+                    });
+                } else {
+                    alert(msgOk);
+                }
+
+                restoreButtons();
+                form.dataset.submitting = '0';
+            } catch (error) {
+                submitNativeFallback();
+            }
         });
     }
 
