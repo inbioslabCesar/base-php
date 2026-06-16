@@ -3,12 +3,56 @@ class FormView {
     public static function render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente = [], $areas_disponibles = []) {
         ob_start();
         $pdfDownloadUrl = 'resultados/descarga-pdf.php?cotizacion_id=' . urlencode((string)$cotizacion_id);
+        $nombrePaciente = trim((string)($datos_paciente['nombre'] ?? '') . ' ' . (string)($datos_paciente['apellido'] ?? ''));
+        $dniPaciente = trim((string)($datos_paciente['dni'] ?? ''));
+        $edadPaciente = trim((string)($datos_paciente['edad'] ?? ''));
+        $sexoPaciente = trim((string)($datos_paciente['sexo'] ?? ''));
         ?>
         <div class="alert alert-info" style="border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
             <strong>Importante:</strong> los cambios del CRUD de exámenes (nombre, metodología, parámetros o área)
             se reflejan automáticamente en este formulario y en la impresión.
             Los controles manuales de actualización/reemplazo de formato están temporalmente deshabilitados para todos.
         </div>
+        <?php if ($nombrePaciente !== '' || $dniPaciente !== '' || $edadPaciente !== '' || $sexoPaciente !== ''): ?>
+        <div class="card mb-3" style="border-radius: 16px; border: 1px solid rgba(13,110,253,.15); box-shadow: 0 8px 20px rgba(13,110,253,.08); overflow: hidden;">
+            <div class="card-header bg-primary text-white d-flex align-items-center justify-content-between flex-wrap gap-2" style="border: 0;">
+                <div class="fw-semibold">
+                    <i class="bi bi-person-badge me-2"></i>Paciente en edición
+                </div>
+                <div class="small opacity-75">
+                    Cotización #<?= htmlspecialchars((string)$cotizacion_id) ?>
+                </div>
+            </div>
+            <div class="card-body bg-white">
+                <div class="row g-2 align-items-stretch">
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="p-3 rounded-3 h-100" style="background: linear-gradient(135deg, rgba(13,110,253,.08), rgba(13,110,253,.03));">
+                            <div class="text-uppercase small text-muted fw-semibold">Paciente</div>
+                            <div class="fs-5 fw-bold text-dark"><?= htmlspecialchars($nombrePaciente !== '' ? $nombrePaciente : 'Sin nombre registrado') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2 col-lg-2">
+                        <div class="p-3 rounded-3 h-100 bg-light">
+                            <div class="text-uppercase small text-muted fw-semibold">DNI</div>
+                            <div class="fw-semibold text-dark"><?= htmlspecialchars($dniPaciente !== '' ? $dniPaciente : '-') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2 col-lg-2">
+                        <div class="p-3 rounded-3 h-100 bg-light">
+                            <div class="text-uppercase small text-muted fw-semibold">Edad</div>
+                            <div class="fw-semibold text-dark"><?= htmlspecialchars($edadPaciente !== '' ? $edadPaciente : '-') ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2 col-lg-2">
+                        <div class="p-3 rounded-3 h-100 bg-light">
+                            <div class="text-uppercase small text-muted fw-semibold">Sexo</div>
+                            <div class="fw-semibold text-dark"><?= htmlspecialchars($sexoPaciente !== '' ? $sexoPaciente : '-') ?></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         <form method="post" action="dashboard.php?action=guardar">
             <input type="hidden" name="cotizacion_id" value="<?= htmlspecialchars($cotizacion_id) ?>">
             <input type="hidden" name="stay_on_form" value="1">
