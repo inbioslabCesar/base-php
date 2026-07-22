@@ -188,7 +188,7 @@ if ($esEdicion) {
                         <th class="col-unidad">Unidad</th>
                         <th class="col-opciones">Opciones</th>
                         <th class="col-referencias">Valor(es) Referencia</th>
-                        <th class="col-formula">Fórmula</th>
+                        <th class="col-formula">Fórmula / Plantilla</th>
                         <th>Neg.</th>
                         <th>Cur.</th>
                         <th>Alineación</th>

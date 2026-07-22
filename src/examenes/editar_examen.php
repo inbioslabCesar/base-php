@@ -82,20 +82,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Normalizar decimales en referencias (comas → puntos) antes de guardar
         $adicional_dec = json_decode($adicional, true);
         if (is_array($adicional_dec)) {
+            $normalizarRef = static function (&$ref) {
+                if (!is_array($ref)) {
+                    return;
+                }
+                foreach (['valor_min', 'valor_max'] as $key) {
+                    if (isset($ref[$key]) && $ref[$key] !== '') {
+                        $ref[$key] = str_replace(',', '.', (string)$ref[$key]);
+                    }
+                }
+            };
+
+            // Legacy: filas con "referencias".
             foreach ($adicional_dec as &$fila) {
                 if (!empty($fila['referencias']) && is_array($fila['referencias'])) {
                     foreach ($fila['referencias'] as &$ref) {
-                        foreach (['valor_min', 'valor_max'] as $key) {
-                            if (isset($ref[$key]) && $ref[$key] !== '') {
-                                $v = str_replace(',', '.', (string)$ref[$key]);
-                                $ref[$key] = $v;
-                            }
-                        }
+                        $normalizarRef($ref);
                     }
                     unset($ref);
                 }
             }
             unset($fila);
+
+            // V2: layout.rows[*].reference_ranges[colId][*]
+            if (isset($adicional_dec['schema_version'])
+                && intval($adicional_dec['schema_version']) >= 2
+                && isset($adicional_dec['layout']['rows'])
+                && is_array($adicional_dec['layout']['rows'])) {
+                foreach ($adicional_dec['layout']['rows'] as &$row) {
+                    if (empty($row['reference_ranges']) || !is_array($row['reference_ranges'])) {
+                        continue;
+                    }
+                    foreach ($row['reference_ranges'] as &$rangesPorCol) {
+                        if (!is_array($rangesPorCol)) {
+                            continue;
+                        }
+                        foreach ($rangesPorCol as &$refRange) {
+                            $normalizarRef($refRange);
+                        }
+                        unset($refRange);
+                    }
+                    unset($rangesPorCol);
+                }
+                unset($row);
+            }
+
             $adicional = json_encode($adicional_dec, JSON_UNESCAPED_UNICODE);
         }
 
@@ -131,21 +162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vigente,
             $id
         ]);
-        $sincronizados = 0;
-        try {
-            $snapshotSyncService = new SnapshotSyncService($pdo);
-            $sincronizados = (int)$snapshotSyncService->syncExamSnapshotsPreservingHeaders($id);
-        } catch (Exception $e) {
-            $sincronizados = 0;
-        }
-
         $_SESSION['mensaje'] = "Examen actualizado correctamente.";
         if (!empty($idsRegenerados)) {
             $_SESSION['mensaje'] .= " Se normalizaron {$idsRegenerados} ID(s) de parámetros para evitar duplicados.";
         }
-        if ($sincronizados > 0) {
-            $_SESSION['mensaje'] .= " Se actualizaron automáticamente {$sincronizados} formato(s) pendiente(s) en resultados.";
-        }
+        $_SESSION['mensaje'] .= " Los resultados históricos conservarán su snapshot actual hasta actualizar manualmente cada examen.";
         header('Location: dashboard.php?vista=examenes');
         exit;
     } catch (Exception $e) {

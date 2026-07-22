@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
 
 $examenes = $_POST['examenes'] ?? [];
 $cotizacion_id = $_POST['cotizacion_id'] ?? null;
@@ -10,6 +11,18 @@ $stayOnForm = isset($_POST['stay_on_form']) && (int)$_POST['stay_on_form'] === 1
 $referencia_personalizada = trim($_POST['referencia_personalizada'] ?? '');
 $usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
 $exam_order = $_POST['exam_order'] ?? [];
+$forceIncompleteSave = isset($_POST['force_incomplete_save']) && (int)$_POST['force_incomplete_save'] === 1;
+
+$requestedWith = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+$acceptHeader = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+$isAjaxRequest = ($requestedWith === 'xmlhttprequest') || (strpos($acceptHeader, 'application/json') !== false);
+
+$sendJson = function (array $payload, int $statusCode = 200) {
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit;
+};
 
 $resumenConsumo = [
     'aplicados' => 0,
@@ -367,6 +380,196 @@ $recalcularResultadosFormula = function (array $resultados, array $snapshotArr) 
     return $resultados;
 };
 
+$calcularProgresoExamen = function (array $resultados, $adicionalRaw) use ($normKey, $buildStableKey) {
+    $formatDef = lab_format_decode_definition($adicionalRaw ?? []);
+    $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+    $legacy = $formatDef['legacy_items'];
+
+    $total = 0;
+    $filled = 0;
+
+    $valorLleno = function ($valor) {
+        if ($valor === 0 || $valor === '0') {
+            return true;
+        }
+        if ($valor === null) {
+            return false;
+        }
+        if (is_string($valor)) {
+            return trim($valor) !== '';
+        }
+        if (is_array($valor)) {
+            return count($valor) > 0;
+        }
+        return $valor !== '';
+    };
+
+    if ($isFormatV2) {
+        $cols = lab_format_v2_columns($formatDef);
+        $rows = lab_format_v2_rows($formatDef);
+        $rowsResolved = lab_format_v2_resolve_rows($cols, $rows, $resultados);
+
+        $colIdSet = [];
+        foreach ($cols as $colDef) {
+            if (!is_array($colDef)) {
+                continue;
+            }
+            $cid = trim((string)($colDef['id'] ?? ''));
+            if ($cid !== '') {
+                $colIdSet[$cid] = true;
+            }
+        }
+
+        $rowIdSet = [];
+        foreach ($rowsResolved as $rowDef) {
+            if (!is_array($rowDef)) {
+                continue;
+            }
+            $rid = trim((string)($rowDef['id'] ?? ''));
+            if ($rid !== '') {
+                $rowIdSet[$rid] = true;
+            }
+        }
+
+        foreach ($rowsResolved as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+            if ($rowType === 'long_text') {
+                $rowId = trim((string)($row['id'] ?? ''));
+                if ($rowId === '') {
+                    continue;
+                }
+                $isEditableTemplate = !array_key_exists('template_editable', $row) || (bool)$row['template_editable'];
+                if (!$isEditableTemplate) {
+                    continue;
+                }
+                $total++;
+                $defaultTemplate = (string)($row['template_text'] ?? '');
+                $valorTemplate = lab_format_v2_get_result_value($resultados, $rowId, lab_format_v2_long_text_col_id(), $defaultTemplate);
+                if ($valorLleno($valorTemplate)) {
+                    $filled++;
+                }
+                continue;
+            }
+            if ($rowType !== 'data') {
+                continue;
+            }
+            $rowId = trim((string)($row['id'] ?? ''));
+            if ($rowId === '') {
+                continue;
+            }
+            $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
+            $formulas = is_array($row['formulas'] ?? null) ? $row['formulas'] : [];
+
+            foreach ($cols as $col) {
+                if (!is_array($col)) {
+                    continue;
+                }
+                if (!lab_format_v2_col_visible($col, 'capture')) {
+                    continue;
+                }
+                if (!lab_format_v2_col_editable($col)) {
+                    continue;
+                }
+
+                $colId = trim((string)($col['id'] ?? ''));
+                if ($colId === '') {
+                    continue;
+                }
+
+                $formulaExpr = trim((string)($formulas[$colId] ?? ''));
+                if ($formulaExpr !== '') {
+                    $tokens = lab_format_v2_parse_tokens($formulaExpr);
+                    if (count($tokens) === 0) {
+                        continue;
+                    }
+
+                    $depsDefined = true;
+                    foreach ($tokens as $token) {
+                        [$refRow, $refCol] = lab_format_v2_resolve_token_target($token, $rowId);
+                        if ($refRow === null || $refCol === null) {
+                            $depsDefined = false;
+                            break;
+                        }
+                        if (!isset($rowIdSet[$refRow]) || !isset($colIdSet[$refCol])) {
+                            $depsDefined = false;
+                            break;
+                        }
+                    }
+
+                    if (!$depsDefined) {
+                        continue;
+                    }
+                }
+
+                $total++;
+                $defaultVal = $cells[$colId] ?? '';
+                $valor = lab_format_v2_get_result_value($resultados, $rowId, $colId, $defaultVal);
+                if ($formulaExpr !== '' && !$valorLleno($valor)) {
+                    $valor = $cells[$colId] ?? $valor;
+                }
+                if ($valorLleno($valor)) {
+                    $filled++;
+                }
+            }
+        }
+
+        $pct = $total > 0 ? (int)round(($filled / $total) * 100) : 0;
+        return ['total' => $total, 'filled' => $filled, 'percent' => $pct];
+    }
+
+    if (!is_array($legacy)) {
+        $legacy = [];
+    }
+
+    $resultadosNorm = [];
+    foreach ($resultados as $k => $v) {
+        if ($k === 'imprimir_examen') {
+            continue;
+        }
+        $nk = $normKey((string)$k);
+        if ($nk !== '' && !array_key_exists($nk, $resultadosNorm)) {
+            $resultadosNorm[$nk] = $v;
+        }
+    }
+
+    foreach ($legacy as $item) {
+        $tipo = (string)($item['tipo'] ?? '');
+        if (!in_array($tipo, ['Parámetro', 'Campo', 'Texto Largo'], true)) {
+            continue;
+        }
+
+        $total++;
+        $nombre = (string)($item['nombre'] ?? '');
+        $stableKey = $buildStableKey($item);
+
+        $valor = null;
+        $encontrado = false;
+        if ($stableKey !== '' && array_key_exists($stableKey, $resultados)) {
+            $valor = $resultados[$stableKey];
+            $encontrado = true;
+        } elseif ($nombre !== '' && array_key_exists($nombre, $resultados)) {
+            $valor = $resultados[$nombre];
+            $encontrado = true;
+        } else {
+            $nombreNorm = $normKey($nombre);
+            if ($nombreNorm !== '' && array_key_exists($nombreNorm, $resultadosNorm)) {
+                $valor = $resultadosNorm[$nombreNorm];
+                $encontrado = true;
+            }
+        }
+
+        if ($encontrado && $valorLleno($valor)) {
+            $filled++;
+        }
+    }
+
+    $pct = $total > 0 ? (int)round(($filled / $total) * 100) : 0;
+    return ['total' => $total, 'filled' => $filled, 'percent' => $pct];
+};
+
 $estaLleno = function ($v) use ($isBlank) {
     return !$isBlank($v);
 };
@@ -663,6 +866,78 @@ $inventarioInternoDisponible = $tieneTablasInventarioInterno();
 $alarmCols = $getAlarmColumnMap();
 $hasAlarmColumns = !empty($alarmCols['alarma_activa']) && !empty($alarmCols['alarma_dias']) && !empty($alarmCols['alarma_fecha_objetivo']) && !empty($alarmCols['alarma_estado']);
 $companyWhatsappNumber = $getCompanyWhatsappNumber();
+$progresoGlobal = [
+    'total' => 0,
+    'filled' => 0,
+    'percent' => 0,
+];
+
+if (!empty($examenes) && is_array($examenes)) {
+    foreach ($examenes as $examenPrevio) {
+        $idResultadoPrevio = isset($examenPrevio['id_resultado']) ? (int)$examenPrevio['id_resultado'] : 0;
+        if ($idResultadoPrevio <= 0) {
+            continue;
+        }
+
+        $resultadosPrevios = $examenPrevio['resultados'] ?? [];
+        if (!is_array($resultadosPrevios)) {
+            $resultadosPrevios = [];
+        }
+
+        $stmtSnapshotPrevio = $pdo->prepare("SELECT COALESCE(re.adicional_snapshot, e.adicional) AS adicional
+            FROM resultados_examenes re
+            JOIN examenes e ON e.id = re.id_examen
+            WHERE re.id = :id
+            LIMIT 1");
+        $stmtSnapshotPrevio->execute(['id' => $idResultadoPrevio]);
+        $snapshotRowPrevio = $stmtSnapshotPrevio->fetch(PDO::FETCH_ASSOC);
+        $snapshotRawPrevio = $snapshotRowPrevio['adicional'] ?? [];
+
+        $snapshotArrPrevio = [];
+        if (!empty($snapshotRawPrevio)) {
+            $snapshotArrPrevio = json_decode((string)$snapshotRawPrevio, true);
+            if (!is_array($snapshotArrPrevio)) {
+                $snapshotArrPrevio = [];
+            }
+        }
+
+        $resultadosPrevios = $normalizarResultadosPorSnapshot($resultadosPrevios, $snapshotArrPrevio);
+        $resultadosPrevios = $recalcularResultadosFormula($resultadosPrevios, $snapshotArrPrevio);
+
+        $progresoExamenPrevio = $calcularProgresoExamen($resultadosPrevios, $snapshotRawPrevio);
+        $progresoGlobal['total'] += (int)$progresoExamenPrevio['total'];
+        $progresoGlobal['filled'] += (int)$progresoExamenPrevio['filled'];
+    }
+}
+
+if ($progresoGlobal['total'] > 0) {
+    $progresoGlobal['percent'] = (int)round(($progresoGlobal['filled'] / $progresoGlobal['total']) * 100);
+}
+
+if ($progresoGlobal['total'] > 0 && $progresoGlobal['percent'] < 100 && !$forceIncompleteSave) {
+    $faltantes = max(0, $progresoGlobal['total'] - $progresoGlobal['filled']);
+    $mensajeIncompleto = 'El formulario está al ' . $progresoGlobal['percent'] . '% y faltan ' . $faltantes . ' campos por completar.';
+
+    if ($isAjaxRequest) {
+        $sendJson([
+            'success' => false,
+            'require_confirmation' => true,
+            'message' => $mensajeIncompleto,
+            'progress_percent' => $progresoGlobal['percent'],
+            'progress_total' => $progresoGlobal['total'],
+            'progress_filled' => $progresoGlobal['filled'],
+        ], 200);
+    }
+
+    $_SESSION['mensaje'] = $mensajeIncompleto;
+    $_SESSION['mensaje_tipo'] = 'warning';
+    if ($stayOnForm && $cotizacion_id) {
+        header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
+    } else {
+        header("Location: dashboard.php?vista=cotizaciones");
+    }
+    exit;
+}
 
 if (!empty($examenes) && is_array($examenes)) {
     foreach ($examenes as $examen) {
@@ -1297,6 +1572,16 @@ if (!empty($examenes) && is_array($examenes)) {
         $_SESSION['mensaje_tipo'] = 'success';
     }
 
+    if ($isAjaxRequest) {
+        $sendJson([
+            'success' => true,
+            'message' => $_SESSION['mensaje'] ?? 'Resultados guardados correctamente.',
+            'progress_percent' => (int)($progresoGlobal['percent'] ?? 0),
+            'progress_total' => (int)($progresoGlobal['total'] ?? 0),
+            'progress_filled' => (int)($progresoGlobal['filled'] ?? 0),
+        ], 200);
+    }
+
     if ($stayOnForm && $cotizacion_id) {
         header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
     } else {
@@ -1304,6 +1589,12 @@ if (!empty($examenes) && is_array($examenes)) {
     }
     exit;
 } else {
+    if ($isAjaxRequest) {
+        $sendJson([
+            'success' => false,
+            'message' => 'No se recibieron datos válidos.',
+        ], 400);
+    }
     echo "Error: No se recibieron datos válidos.";
 }
 ?>

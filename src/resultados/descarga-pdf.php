@@ -64,8 +64,12 @@ $items = obtenerItemsResultados($pdo, $rows);
 $reporte = armarHtmlReporte($paciente, $referencia, $empresa, $items);
 
 $mpdf = new Mpdf([
-    'margin_top' => 62,
-    'margin_bottom' => 35
+    // Reservar espacio estable para un header alto (logo + QR + datos de paciente)
+    // y evitar solapes del contenido desde la segunda hoja.
+    'margin_top' => 75,
+    'margin_bottom' => 35,
+    'margin_header' => 4,
+    'margin_footer' => 4
 ]);
 
 // Generar código QR con datos clave para el header
@@ -84,29 +88,32 @@ try {
     }
 } catch (\Exception $e) {}
 
-$logo_html = $logo && file_exists($logo) ? '<img src="' . $logo . '" class="logo" style="max-height:100px;max-width:160px;">' : '';
-$qr_html = $qrBase64 ? '<img src="data:image/png;base64,' . $qrBase64 . '" style="max-height:100px;max-width:100px;">' : '<div style="width:100px;height:100px;border:2px solid #222;text-align:center;line-height:100px;font-size:40px;">X</div>';
-$direccion_html = '<div style="font-size:17px;font-weight:bold;color:#1a237e;">' . htmlspecialchars($empresa['nombre']) . '</div>'
-    . '<div style="font-size:13px;color:#555;">' . htmlspecialchars($empresa['dominio'] ?? '') . '</div>'
-    . '<div style="font-size:13px;color:#555;">RUC: ' . htmlspecialchars($empresa['ruc'] ?? '') . '</div>'
-    . '<div style="font-size:13px;color:#555;">' . htmlspecialchars($empresa['direccion']) . '</div>'
-    . '<div style="font-size:13px;color:#555;">Tel: ' . htmlspecialchars($empresa['telefono']) . ' | Cel: ' . htmlspecialchars($empresa['celular']) . '</div>';
+$logo_html = $logo && file_exists($logo) ? '<img src="' . $logo . '" class="logo" style="max-height:86px;max-width:150px;">' : '';
+$qr_html = $qrBase64 ? '<img src="data:image/png;base64,' . $qrBase64 . '" style="max-height:86px;max-width:86px;">' : '<div style="width:86px;height:86px;border:2px solid #222;text-align:center;line-height:86px;font-size:34px;">X</div>';
+$direccion_html = '<div style="font-size:16px;font-weight:bold;color:#1a237e;line-height:1.2;">' . htmlspecialchars($empresa['nombre']) . '</div>'
+    . '<div style="font-size:12px;color:#555;line-height:1.2;">' . htmlspecialchars($empresa['dominio'] ?? '') . '</div>'
+    . '<div style="font-size:12px;color:#555;line-height:1.2;">RUC: ' . htmlspecialchars($empresa['ruc'] ?? '') . '</div>'
+    . '<div style="font-size:12px;color:#555;line-height:1.2;">' . htmlspecialchars($empresa['direccion']) . '</div>'
+    . '<div style="font-size:12px;color:#555;line-height:1.2;">Tel: ' . htmlspecialchars($empresa['telefono']) . ' | Cel: ' . htmlspecialchars($empresa['celular']) . '</div>';
 
-$mpdf->SetHTMLHeader('
-    <table style="width:100%;margin-bottom:0px;border-bottom:2px solid #eee;">
+$headerHtml = '
+    <table style="width:100%;margin-bottom:0px;border-bottom:1px solid #e2e8f0;">
         <tr>
-            <td style="width:120px;vertical-align:middle;text-align:left;">' . $logo_html . '</td>
-            <td style="width:50%;vertical-align:middle;text-align:center;" colspan="1">' . $qr_html . '</td>
-            <td style="width:120px;vertical-align:middle;text-align:right;">' . $direccion_html . '</td>
+            <td style="width:120px;vertical-align:middle;text-align:left;padding:0;">' . $logo_html . '</td>
+            <td style="width:50%;vertical-align:middle;text-align:center;padding:0;" colspan="1">' . $qr_html . '</td>
+            <td style="width:120px;vertical-align:middle;text-align:right;padding:0;">' . $direccion_html . '</td>
         </tr>
     </table>
-    <table class="datos-cliente-tabla">
-        <tr><td><strong>Paciente:</strong> ' . htmlspecialchars($paciente['nombre']) . '</td><td><strong>Código Paciente:</strong> ' . htmlspecialchars($paciente['codigo_cliente']) . '</td></tr>
-        <tr><td><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td><td><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td></tr>
-        <tr><td colspan="2"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td></tr>
-        <tr><td colspan="2"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td></tr>
+    <table class="datos-cliente-tabla" style="font-size:12px; line-height:1.2; margin:6px 0 10px 0;">
+        <tr><td style="padding:1px 6px;"><strong>Paciente:</strong> ' . htmlspecialchars($paciente['nombre']) . '</td><td style="padding:1px 6px;"><strong>Código Paciente:</strong> ' . htmlspecialchars($paciente['codigo_cliente']) . '</td></tr>
+        <tr><td style="padding:1px 6px;"><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td><td style="padding:1px 6px;"><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td></tr>
+        <tr><td colspan="2" style="padding:1px 6px;"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td></tr>
+        <tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td></tr>
     </table>
-', 'O', true);
+    <div style="text-align:center; font-size:18px; font-weight:700; color:#1a237e; letter-spacing:1px; margin:4px 0 2px 0;">Reporte de Resultados</div>
+';
+$mpdf->SetHTMLHeader($headerHtml, 'O', true);
+$mpdf->SetHTMLHeader($headerHtml, 'E', true);
 $firma_html = $firma && file_exists($firma) ? '<img src="' . $firma . '" style="height:95px;"><br>' : '';
 $mpdf->SetHTMLFooter('<div class="firma-footer">' . $firma_html . '<hr class="my-3" style="margin:8px 0;"><div style="font-size: 11px; color: #555; text-align:left;">Informe confidencial. Prohibida su reproducción total o parcial.<br><strong>Nota:</strong> Resultados fuera de los rangos referenciales se verán con un <strong>*</strong>.</div></div>');
 $mpdf->WriteHTML($reporte['css'], \Mpdf\HTMLParserMode::HEADER_CSS);

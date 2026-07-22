@@ -9,9 +9,9 @@ class FormView {
         $sexoPaciente = trim((string)($datos_paciente['sexo'] ?? ''));
         ?>
         <div class="alert alert-info" style="border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
-            <strong>Importante:</strong> los cambios del CRUD de exámenes (nombre, metodología, parámetros o área)
-            se reflejan automáticamente en este formulario y en la impresión.
-            Los controles manuales de actualización/reemplazo de formato están temporalmente deshabilitados para todos.
+            <strong>Importante:</strong> los resultados históricos usan snapshot por cotización.
+            Si cambias el formato en el CRUD de exámenes, puedes actualizar manualmente cada sección con el botón
+            "Actualizar formato" (conserva cabeceras personalizadas del paciente).
         </div>
         <?php if ($nombrePaciente !== '' || $dniPaciente !== '' || $edadPaciente !== '' || $sexoPaciente !== ''): ?>
         <div class="card mb-3" style="border-radius: 16px; border: 1px solid rgba(13,110,253,.15); box-shadow: 0 8px 20px rgba(13,110,253,.08); overflow: hidden;">
@@ -56,8 +56,24 @@ class FormView {
         <form method="post" action="dashboard.php?action=guardar">
             <input type="hidden" name="cotizacion_id" value="<?= htmlspecialchars($cotizacion_id) ?>">
             <input type="hidden" name="stay_on_form" value="1">
+            <input type="hidden" name="force_incomplete_save" id="forceIncompleteSave" value="0">
             <input type="hidden" id="edad-paciente" value="<?= htmlspecialchars($datos_paciente['edad'] ?? '') ?>">
             <input type="hidden" id="sexo-paciente" value="<?= htmlspecialchars($datos_paciente['sexo'] ?? '') ?>">
+            <div class="results-progress-card mb-3" id="resultsProgressCard" aria-live="polite">
+                <div class="results-progress-card__top">
+                    <div class="results-progress-card__title">
+                        <i class="bi bi-clipboard-check me-2"></i>
+                        Progreso de llenado
+                    </div>
+                    <span class="results-progress-card__badge badge bg-danger" id="resultsProgressBadge">Pendiente 0%</span>
+                </div>
+                <div class="progress results-progress-card__bar-wrap" role="progressbar" aria-label="Progreso de resultados" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div id="resultsProgressBar" class="progress-bar bg-danger" style="width: 0%">0%</div>
+                </div>
+                <div class="results-progress-card__hint" id="resultsProgressHint">
+                    Completa todos los campos requeridos para llegar al 100% antes de guardar.
+                </div>
+            </div>
             <div id="examCardsContainer" class="exam-cards-container">
                 <?php foreach ($examenes as $index => $examen): ?>
                     <?= \ExamCardView::render($examen, $index, $datos_paciente, $areas_disponibles) ?>
@@ -67,15 +83,17 @@ class FormView {
             <?= \PdfConfigView::render($referencia_personalizada) ?>
             <div class="text-center d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
                 <a href="<?= htmlspecialchars($pdfDownloadUrl) ?>"
-                   class="btn btn-success js-download-pdf-resultados"
+                   class="btn btn-success js-download-pdf-resultados results-action-btn-with-progress"
                    id="btnDescargarPdfResultados"
                    target="_blank"
                    rel="noopener noreferrer"
                    title="Descargar PDF de resultados">
+                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-file-earmark-pdf me-2"></i>
                     Descargar PDF
                 </a>
-                <button type="submit" class="save-btn">
+                <button type="submit" class="save-btn js-save-submit results-action-btn-with-progress">
+                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-save me-2"></i>
                     Guardar Resultados
                 </button>
@@ -91,14 +109,16 @@ class FormView {
                     <i class="bi bi-pin-angle me-1"></i>Fijar
                 </button>
                 <a href="<?= htmlspecialchars($pdfDownloadUrl) ?>"
-                   class="btn btn-success results-actions-dock__btn js-download-pdf-resultados"
+                   class="btn btn-success results-actions-dock__btn js-download-pdf-resultados results-action-btn-with-progress"
                    target="_blank"
                    rel="noopener noreferrer"
                    title="Descargar PDF de resultados">
+                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-file-earmark-pdf me-2"></i>
                     Descargar PDF
                 </a>
-                <button type="submit" class="save-btn results-actions-dock__btn">
+                <button type="submit" class="save-btn results-actions-dock__btn js-save-submit results-action-btn-with-progress">
+                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-save me-2"></i>
                     Guardar Resultados
                 </button>

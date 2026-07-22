@@ -86,6 +86,13 @@ if (!function_exists('lab_format_v2_cell_key')) {
     }
 }
 
+if (!function_exists('lab_format_v2_long_text_col_id')) {
+    function lab_format_v2_long_text_col_id()
+    {
+        return '__texto';
+    }
+}
+
 if (!function_exists('lab_format_v2_get_result_value')) {
     function lab_format_v2_get_result_value(array $resultados, $rowId, $colId, $default = '')
     {
@@ -165,8 +172,32 @@ if (!function_exists('lab_format_v2_resolve_rows')) {
             if (!is_array($row)) {
                 continue;
             }
+            $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
             $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
             $rowId = trim((string)($row['id'] ?? ''));
+            if ($rowType === 'long_text') {
+                $defaultTemplate = (string)($row['template_text'] ?? '');
+                if ($rowId !== '') {
+                    $row['template_text'] = (string)lab_format_v2_get_result_value($resultados, $rowId, lab_format_v2_long_text_col_id(), $defaultTemplate);
+                } else {
+                    $row['template_text'] = $defaultTemplate;
+                }
+                $row['template_editable'] = !array_key_exists('template_editable', $row) || (bool)$row['template_editable'];
+                $row['template_visible_pdf'] = !array_key_exists('template_visible_pdf', $row) || (bool)$row['template_visible_pdf'];
+                $row['template_align'] = strtolower(trim((string)($row['template_align'] ?? 'left')));
+                if (!in_array($row['template_align'], ['left', 'center', 'right'], true)) {
+                    $row['template_align'] = 'left';
+                }
+                $row['cells'] = $cells;
+                $resolvedRows[] = $row;
+                continue;
+            }
+            if ($rowType === 'title' || $rowType === 'subtitle') {
+                $row['alineacion'] = strtolower(trim((string)($row['alineacion'] ?? ($rowType === 'title' ? 'center' : 'left'))));
+                if (!in_array($row['alineacion'], ['left', 'center', 'right'], true)) {
+                    $row['alineacion'] = ($rowType === 'title' ? 'center' : 'left');
+                }
+            }
             foreach ($columns as $col) {
                 $colId = trim((string)($col['id'] ?? ''));
                 if ($colId === '') {

@@ -139,6 +139,34 @@ if ($id_resultado && $id_examen) {
                 continue;
             }
 
+            if ($rowType === 'long_text') {
+                $label = trim((string)($rowV2['label'] ?? ''));
+                $text = (string)($rowV2['template_text'] ?? '');
+                $align = strtolower(trim((string)($rowV2['template_align'] ?? 'left')));
+                $textColor = trim((string)($rowV2['color_texto'] ?? ''));
+                $bgColor = trim((string)($rowV2['color_fondo'] ?? ''));
+                $isBold = !empty($rowV2['negrita']);
+                $isItalic = !empty($rowV2['cursiva']);
+                if (!in_array($align, ['left', 'center', 'right'], true)) {
+                    $align = 'left';
+                }
+                if ($textColor === '') {
+                    $textColor = '#1f2d5c';
+                }
+                if ($bgColor === '') {
+                    $bgColor = '#fafcff';
+                }
+                $styleLabel = 'text-align:' . htmlspecialchars($align) . '; color:' . htmlspecialchars($textColor) . '; font-weight:' . ($isBold ? '700' : '400') . '; font-style:' . ($isItalic ? 'italic' : 'normal') . ';';
+                $styleBody = 'text-align:' . htmlspecialchars($align) . '; color:' . htmlspecialchars($textColor) . '; font-weight:400; font-style:normal;';
+                echo "<tr><td colspan='" . max(1, count($cols)) . "'>";
+                if ($label !== '') {
+                    echo "<div style='" . $styleLabel . "'>" . htmlspecialchars($label) . "</div>";
+                }
+                echo "<div style='white-space:pre-wrap; background:" . htmlspecialchars($bgColor) . "; " . $styleBody . "'>" . nl2br(htmlspecialchars($text)) . "</div>";
+                echo "</td></tr>";
+                continue;
+            }
+
             echo "<tr>";
             foreach ($cols as $col) {
                 $colId = trim((string)($col['id'] ?? ''));

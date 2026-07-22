@@ -66,6 +66,60 @@ function obtenerDatosEmpresa($pdo) {
 }
 
 function obtenerItemsResultados($pdo, $rows) {
+    $buildReferenceSummaryPublic = static function ($ranges) {
+        if (!is_array($ranges)) {
+            return '';
+        }
+        $lines = [];
+        foreach ($ranges as $r) {
+            if (!is_array($r)) {
+                continue;
+            }
+            $desc = trim((string)($r['desc'] ?? ''));
+            $valor = trim((string)($r['valor'] ?? ''));
+            $min = trim((string)($r['valor_min'] ?? ''));
+            $max = trim((string)($r['valor_max'] ?? ''));
+            $rango = ($min !== '' || $max !== '')
+                ? trim(($min !== '' ? $min : '') . ' - ' . ($max !== '' ? $max : ''))
+                : '';
+            $visible = $valor !== '' ? $valor : $rango;
+
+            if ($desc !== '' && $visible !== '') {
+                $lines[] = $desc . ' (' . $visible . ')';
+            } elseif ($desc !== '') {
+                $lines[] = $desc;
+            } elseif ($visible !== '') {
+                $lines[] = $visible;
+            }
+        }
+        return implode(' | ', $lines);
+    };
+
+    $sanitizeReferenceTextPublic = static function ($value) {
+        $raw = trim((string)$value);
+        if ($raw === '') {
+            return '';
+        }
+        $parts = preg_split('/\s*\|\s*|\r\n|\r|\n|\s*;\s*/u', $raw);
+        $out = [];
+        foreach ((array)$parts as $part) {
+            $line = trim((string)$part);
+            if ($line === '') {
+                continue;
+            }
+            // Quitar metadata interna visible (edad/sexo).
+            $line = preg_replace('/\s*,\s*edad\s*[^\),]*/iu', '', $line);
+            $line = preg_replace('/\s*,\s*(masculino|femenino|cualquiera)\b/iu', '', $line);
+            $line = preg_replace('/\(\s*,/u', '(', $line);
+            $line = preg_replace('/\s{2,}/u', ' ', $line);
+            $line = trim($line, " \t\n\r\0\x0B,");
+            if ($line !== '') {
+                $out[] = $line;
+            }
+        }
+        return implode(' | ', $out);
+    };
+
     $items = [];
     foreach ($rows as $row) {
         $sql2 = "SELECT nombre AS nombre_examen, adicional FROM examenes WHERE id = :id_examen";
@@ -76,20 +130,9 @@ function obtenerItemsResultados($pdo, $rows) {
         $snapshot_src = $row['adicional_snapshot'] ?? null;
         $examen_src = $examen['adicional'] ?? null;
 
-        $snapshotDef = lab_format_decode_definition($snapshot_src);
-        $examenDef = lab_format_decode_definition($examen_src);
-
         $adicional_src = $snapshot_src;
         if ($adicional_src === null || $adicional_src === '') {
             $adicional_src = $examen_src;
-        } else {
-            $snapshotIsV2 = !empty($snapshotDef['is_v2']);
-            $examenIsV2 = !empty($examenDef['is_v2']);
-            // Si snapshot quedó en legacy pero el examen actual ya es v2,
-            // usar formato vigente para evitar PDF vacío o desalineado.
-            if ($examenIsV2 && !$snapshotIsV2) {
-                $adicional_src = $examen_src;
-            }
         }
 
         $formatDef = lab_format_decode_definition($adicional_src);
@@ -123,10 +166,12 @@ function obtenerItemsResultados($pdo, $rows) {
                 $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
                 $cells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
                 $rowDecimals = is_array($rowV2['decimales'] ?? null) ? $rowV2['decimales'] : [];
+                $rowReferenceRanges = is_array($rowV2['reference_ranges'] ?? null) ? $rowV2['reference_ranges'] : [];
                 $cellsOut = [];
                 foreach ($cols as $col) {
                     $colId = $col['id'];
                     $rawValue = $cells[$colId] ?? '';
+                    $colKind = strtolower(trim((string)($col['kind'] ?? 'text')));
                     $colDec = null;
                     if (array_key_exists($colId, $rowDecimals) && $rowDecimals[$colId] !== '' && $rowDecimals[$colId] !== null && is_numeric($rowDecimals[$colId])) {
                         $tmpDec = intval($rowDecimals[$colId]);
@@ -134,7 +179,18 @@ function obtenerItemsResultados($pdo, $rows) {
                             $colDec = $tmpDec;
                         }
                     }
-                    if ($colDec !== null && is_numeric($rawValue)) {
+
+                    if ($colKind === 'reference') {
+                        $ranges = (isset($rowReferenceRanges[$colId]) && is_array($rowReferenceRanges[$colId]))
+                            ? $rowReferenceRanges[$colId]
+                            : [];
+                        $summaryPublic = $buildReferenceSummaryPublic($ranges);
+                        if ($summaryPublic !== '') {
+                            $cellsOut[$colId] = $summaryPublic;
+                        } else {
+                            $cellsOut[$colId] = $sanitizeReferenceTextPublic($rawValue);
+                        }
+                    } elseif ($colDec !== null && is_numeric($rawValue)) {
                         $cellsOut[$colId] = number_format((float)$rawValue, $colDec, '.', '');
                     } else {
                         $cellsOut[$colId] = $rawValue;
@@ -144,11 +200,15 @@ function obtenerItemsResultados($pdo, $rows) {
                     'id' => $rowId,
                     'type' => $rowType,
                     'label' => (string)($rowV2['label'] ?? ''),
+                    'template_text' => (string)($rowV2['template_text'] ?? ''),
+                    'template_visible_pdf' => !array_key_exists('template_visible_pdf', $rowV2) || (bool)$rowV2['template_visible_pdf'],
+                    'template_align' => (string)($rowV2['template_align'] ?? 'left'),
                     'color_texto' => (string)($rowV2['color_texto'] ?? ''),
                     'color_fondo' => (string)($rowV2['color_fondo'] ?? ''),
                     'negrita' => !empty($rowV2['negrita']) ? 1 : 0,
                     'cursiva' => !empty($rowV2['cursiva']) ? 1 : 0,
                     'alineacion' => (string)($rowV2['alineacion'] ?? ''),
+                    'reference_ranges' => $rowReferenceRanges,
                     'cells' => $cellsOut,
                 ];
             }

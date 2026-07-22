@@ -10,14 +10,162 @@ function createTypeSelect() {
   return select;
 }
 
-function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', sexo = 'cualquiera', edad_min = '', edad_max = '') {
+const REF_ALERT_DEFAULT_MODE = 'both';
+const REF_ALERT_DEFAULT_COLOR = '#c62828';
+
+function normalizeRefAlertMode(mode) {
+  const raw = String(mode || '').trim().toLowerCase();
+  if (['none', 'asterisk', 'color', 'both'].includes(raw)) {
+    return raw;
+  }
+  return REF_ALERT_DEFAULT_MODE;
+}
+
+function normalizeRefAlertColor(color) {
+  const raw = String(color || '').trim();
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : REF_ALERT_DEFAULT_COLOR;
+}
+
+function normalizeRefAlertTexts(value) {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v || '').trim()).filter(Boolean).join(', ');
+  }
+  return String(value || '').trim();
+}
+
+function normalizeRefAlertTextColors(value) {
+  return String(value || '').trim();
+}
+
+function splitRefTextList(value) {
+  return String(value || '')
+    .split(/[|,;\/]+/)
+    .map(v => String(v || '').trim())
+    .filter(Boolean);
+}
+
+function parseRefAlertTextColorMap(value) {
+  const out = {};
+  const src = String(value || '').trim();
+  if (!src) return out;
+  src.split(/[;,]+/).forEach((part) => {
+    const token = String(part || '').trim();
+    if (!token) return;
+    const idxEq = token.indexOf('=');
+    const idxColon = token.indexOf(':');
+    const sep = idxEq >= 0 ? idxEq : idxColon;
+    if (sep <= 0) return;
+    const key = String(token.slice(0, sep)).trim();
+    const color = normalizeRefAlertColor(token.slice(sep + 1));
+    if (key) out[key] = color;
+  });
+  return out;
+}
+
+function serializeRefAlertTextColorMap(mapObj) {
+  if (!mapObj || typeof mapObj !== 'object') return '';
+  return Object.keys(mapObj)
+    .map((k) => String(k || '').trim())
+    .filter(Boolean)
+    .map((k) => `${k}=${normalizeRefAlertColor(mapObj[k])}`)
+    .join(', ');
+}
+
+function splitLegacyRowOptions(tr) {
+  if (!tr) return [];
+  const raw = tr.querySelector('.opciones-input')?.value || '';
+  return raw.split(',').map(v => String(v || '').trim()).filter(Boolean);
+}
+
+function syncLegacyAlertVisualEditor(group) {
+  if (!group) return;
+  const tr = group.closest('tr');
+  if (!tr) return;
+
+  const alertModeEl = group.querySelector('.alerta-modo-ref');
+  const defaultColor = normalizeRefAlertColor(group.querySelector('.alerta-color-ref')?.value || REF_ALERT_DEFAULT_COLOR);
+  const hiddenTexts = group.querySelector('.alerta-textos-ref');
+  const hiddenMap = group.querySelector('.alerta-colores-texto-ref');
+  const listWrap = group.querySelector('.alerta-text-color-list');
+  if (!hiddenTexts || !hiddenMap || !listWrap) return;
+
+  const selectedTokens = new Set(splitRefTextList(hiddenTexts.value));
+  const map = parseRefAlertTextColorMap(hiddenMap.value);
+  const fromOptions = splitLegacyRowOptions(tr);
+  const merged = Array.from(new Set([...fromOptions, ...Object.keys(map), ...Array.from(selectedTokens)]));
+
+  listWrap.innerHTML = '';
+  if (merged.length === 0) {
+    listWrap.innerHTML = '<div class="small text-muted">Primero define opciones en la columna Resultado.</div>';
+    return;
+  }
+
+  const mode = normalizeRefAlertMode(alertModeEl?.value || REF_ALERT_DEFAULT_MODE);
+  const showColorControls = mode === 'color' || mode === 'both';
+
+  merged.forEach((txt) => {
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center gap-2 mb-1';
+    const checked = selectedTokens.has(txt) || Object.prototype.hasOwnProperty.call(map, txt);
+    const color = normalizeRefAlertColor(map[txt] || defaultColor);
+    row.innerHTML = `
+      <label class="form-check mb-0" style="min-width:18px;">
+        <input type="checkbox" class="form-check-input alerta-text-toggle" ${checked ? 'checked' : ''}>
+      </label>
+      <input type="text" class="form-control form-control-sm alerta-text-label" value="${txt.replace(/"/g, '&quot;')}" readonly style="max-width:190px;">
+      <input type="color" class="form-control form-control-sm alerta-text-color" value="${color}" ${showColorControls ? '' : 'disabled'}>
+    `;
+    const toggle = row.querySelector('.alerta-text-toggle');
+    const colorInput = row.querySelector('.alerta-text-color');
+    const rebuildHidden = () => {
+      const rows = Array.from(listWrap.querySelectorAll('.d-flex'));
+      const nextTexts = [];
+      const nextMap = {};
+      rows.forEach((r) => {
+        const t = String(r.querySelector('.alerta-text-label')?.value || '').trim();
+        const on = !!r.querySelector('.alerta-text-toggle')?.checked;
+        const c = normalizeRefAlertColor(r.querySelector('.alerta-text-color')?.value || defaultColor);
+        if (!t || !on) return;
+        nextTexts.push(t);
+        nextMap[t] = c;
+      });
+      hiddenTexts.value = nextTexts.join(', ');
+      hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
+      updatePreview();
+    };
+    toggle.addEventListener('change', rebuildHidden);
+    colorInput.addEventListener('input', rebuildHidden);
+    listWrap.appendChild(row);
+  });
+
+  // Normalize hidden payload from rendered visual state.
+  const rows = Array.from(listWrap.querySelectorAll('.d-flex'));
+  const nextTexts = [];
+  const nextMap = {};
+  rows.forEach((r) => {
+    const t = String(r.querySelector('.alerta-text-label')?.value || '').trim();
+    const on = !!r.querySelector('.alerta-text-toggle')?.checked;
+    const c = normalizeRefAlertColor(r.querySelector('.alerta-text-color')?.value || defaultColor);
+    if (!t || !on) return;
+    nextTexts.push(t);
+    nextMap[t] = c;
+  });
+  hiddenTexts.value = nextTexts.join(', ');
+  hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
+}
+
+function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', sexo = 'cualquiera', edad_min = '', edad_max = '', alerta_modo = REF_ALERT_DEFAULT_MODE, alerta_color = REF_ALERT_DEFAULT_COLOR, alerta_textos = '', alerta_colores_texto = '') {
   const div = document.createElement('div');
   // Normalizar decimales a punto
   let valorMinStr = valor_min !== '' ? valor_min.toString().replace(',', '.') : '';
   let valorMaxStr = valor_max !== '' ? valor_max.toString().replace(',', '.') : '';
   valorMinStr = valorMinStr !== '' ? parseFloat(valorMinStr).toString() : '';
   valorMaxStr = valorMaxStr !== '' ? parseFloat(valorMaxStr).toString() : '';
-  const showAdv = (valorMinStr !== '' || valorMaxStr !== '' || (sexo && sexo !== 'cualquiera') || (edad_min !== '' || edad_max !== ''));
+  const alertModeNorm = normalizeRefAlertMode(alerta_modo);
+  const alertColorNorm = normalizeRefAlertColor(alerta_color);
+  const alertTextsNorm = normalizeRefAlertTexts(alerta_textos);
+  const alertTextColorsNorm = normalizeRefAlertTextColors(alerta_colores_texto);
+  const showAdv = (valorMinStr !== '' || valorMaxStr !== '' || (sexo && sexo !== 'cualquiera') || (edad_min !== '' || edad_max !== '') || alertModeNorm !== REF_ALERT_DEFAULT_MODE || alertColorNorm.toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alertTextsNorm !== '' || alertTextColorsNorm !== '');
   div.className = 'valores-ref-group' + (showAdv ? ' show-advanced' : '');
   div.innerHTML = `
     <div class="ref-header">
@@ -60,8 +208,34 @@ function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', s
         <label class="label-sm">Edad max</label>
         <input type="number" class="form-control form-control-sm edad-max" placeholder="Edad max" value="${edad_max}">
       </div>
+      <div class="field">
+        <label class="label-sm">Alerta</label>
+        <select class="form-select form-select-sm alerta-modo-ref">
+          <option value="none" ${alertModeNorm === 'none' ? 'selected' : ''}>Sin marca</option>
+          <option value="asterisk" ${alertModeNorm === 'asterisk' ? 'selected' : ''}>Solo *</option>
+          <option value="color" ${alertModeNorm === 'color' ? 'selected' : ''}>Solo color</option>
+          <option value="both" ${alertModeNorm === 'both' ? 'selected' : ''}>* + color</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label-sm">Color alerta</label>
+        <input type="color" class="form-control form-control-sm alerta-color-ref" value="${alertColorNorm}">
+      </div>
+      <div class="field" style="min-width:220px; flex: 2 1 220px;">
+        <label class="label-sm">Textos alerta (coma)</label>
+        <input type="hidden" class="alerta-textos-ref" value="${alertTextsNorm}">
+        <div class="small text-muted">Se sincroniza automaticamente desde la lista desplegable.</div>
+      </div>
+      <div class="field" style="min-width:260px; flex: 2 1 260px;">
+        <label class="label-sm">Color por texto</label>
+        <input type="hidden" class="alerta-colores-texto-ref" value="${alertTextColorsNorm}">
+        <div class="alerta-text-color-list border rounded p-2 bg-light"></div>
+      </div>
     </div>
   `;
+  setTimeout(() => {
+    syncLegacyAlertVisualEditor(div);
+  }, 0);
   return div;
 }
 
@@ -112,9 +286,9 @@ function addRow(data = {}) {
   tdRef.setAttribute('data-label', 'Referencia');
   const refList = document.createElement('div');
   refList.className = 'valores-ref-list';
-  const referencias = data.referencias || [{valor:'', desc:'', valor_min:'', valor_max:'', sexo:'cualquiera', edad_min:'', edad_max:''}];
+  const referencias = data.referencias || [{valor:'', desc:'', valor_min:'', valor_max:'', sexo:'cualquiera', edad_min:'', edad_max:'', alerta_modo:REF_ALERT_DEFAULT_MODE, alerta_color:REF_ALERT_DEFAULT_COLOR, alerta_textos:'', alerta_colores_texto:''}];
   referencias.forEach(ref => {
-    refList.appendChild(createRefGroup(ref.valor, ref.desc, ref.valor_min, ref.valor_max, ref.sexo, ref.edad_min, ref.edad_max));
+    refList.appendChild(createRefGroup(ref.valor, ref.desc, ref.valor_min, ref.valor_max, ref.sexo, ref.edad_min, ref.edad_max, ref.alerta_modo, ref.alerta_color, (ref.alerta_textos ?? ref.alert_text_values ?? ref.alerta_valores ?? ''), (ref.alerta_colores_texto ?? ref.alert_text_colors ?? ref.alerta_colores ?? '')));
   });
   const btnAddRef = document.createElement('button');
   btnAddRef.type = 'button';
@@ -123,11 +297,17 @@ function addRow(data = {}) {
   tdRef.appendChild(refList);
   tdRef.appendChild(btnAddRef);
   tr.appendChild(tdRef);
-  // Fórmula
+  const rowType = String(data.tipo || 'Parámetro');
+  const initialTemplateText = String(data.template_text ?? data.template ?? data.valor_template ?? data.valor ?? '');
+  const initialFormula = rowType === 'Texto Largo' ? '' : String(data.formula || '');
+  // Fórmula / Plantilla
   const tdFormula = document.createElement('td');
   tdFormula.className = 'col-formula';
-  tdFormula.setAttribute('data-label', 'Fórmula');
-  tdFormula.innerHTML = `<input type="text" class="form-control form-control-sm formula-input" value="${data.formula || ''}" placeholder="Ej: [Hemoglobina]/[Hematocrito]">`;
+  tdFormula.setAttribute('data-label', 'Fórmula / Plantilla');
+  tdFormula.innerHTML = `
+    <input type="text" class="form-control form-control-sm formula-input" value="${initialFormula}" placeholder="Ej: [Hemoglobina]/[Hematocrito]">
+    <textarea class="form-control form-control-sm template-text-input d-none mt-1" rows="3" placeholder="Plantilla precargada para captura (Texto Largo)">${initialTemplateText}</textarea>
+  `;
   tr.appendChild(tdFormula);
   // Negrita
   const tdBold = document.createElement('td');
@@ -194,6 +374,7 @@ function addRow(data = {}) {
   attachRowListeners(tr);
   // Numerar referencias de la fila
   renumerarReferenciasEnFila(tr);
+  refreshLegacyAlertVisualEditors(tr);
   // Ajuste visual según tipo
   selectType.addEventListener('change', () => updateRowUI(tr));
   updateRowUI(tr);
@@ -291,6 +472,7 @@ document.addEventListener('click', function(e) {
     const tr = btnAdd.closest('tr');
     attachRowListeners(tr);
     renumerarReferenciasEnFila(tr);
+    refreshLegacyAlertVisualEditors(tr);
     updatePreview();
     return;
   }
@@ -313,6 +495,7 @@ document.addEventListener('click', function(e) {
     if (group) group.remove();
     const tr = btnRemRef.closest('tr');
     renumerarReferenciasEnFila(tr);
+    refreshLegacyAlertVisualEditors(tr);
     updatePreview();
   }
 });
@@ -345,18 +528,117 @@ function renumerarReferenciasEnFila(tr) {
   });
 }
 
+function refreshLegacyAlertVisualEditors(tr) {
+  if (!tr) return;
+  tr.querySelectorAll('.valores-ref-group').forEach((group) => {
+    syncLegacyAlertVisualEditor(group);
+  });
+}
+
+function getV2RowSelectableTexts(row) {
+  const out = [];
+  if (!row || !row.select_options || typeof row.select_options !== 'object') return out;
+  Object.keys(row.select_options).forEach((cid) => {
+    const arr = row.select_options[cid];
+    if (!Array.isArray(arr)) return;
+    arr.forEach((v) => {
+      const txt = String(v || '').trim();
+      if (txt) out.push(txt);
+    });
+  });
+  return Array.from(new Set(out));
+}
+
+function syncV2AlertVisualEditor(refItem, row) {
+  if (!refItem || !row) return;
+  const defaultColor = normalizeRefAlertColor(refItem.querySelector('.v2-ref-alert-color')?.value || REF_ALERT_DEFAULT_COLOR);
+  const alertMode = normalizeRefAlertMode(refItem.querySelector('.v2-ref-alert-mode')?.value || REF_ALERT_DEFAULT_MODE);
+  const hiddenTexts = refItem.querySelector('.v2-ref-alert-texts');
+  const hiddenMap = refItem.querySelector('.v2-ref-alert-text-colors');
+  const listWrap = refItem.querySelector('.v2-ref-alert-text-color-list');
+  if (!hiddenTexts || !hiddenMap || !listWrap) return;
+
+  const selectedTokens = new Set(splitRefTextList(hiddenTexts.value));
+  const map = parseRefAlertTextColorMap(hiddenMap.value);
+  const merged = Array.from(new Set([...getV2RowSelectableTexts(row), ...Object.keys(map), ...Array.from(selectedTokens)]));
+
+  listWrap.innerHTML = '';
+  if (merged.length === 0) {
+    listWrap.innerHTML = '<div class="small text-muted">Define opciones en alguna columna de resultado/lista.</div>';
+    return;
+  }
+
+  const showColorControls = alertMode === 'color' || alertMode === 'both';
+  merged.forEach((txt) => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'd-flex align-items-center gap-2 mb-1';
+    const checked = selectedTokens.has(txt) || Object.prototype.hasOwnProperty.call(map, txt);
+    const color = normalizeRefAlertColor(map[txt] || defaultColor);
+    rowEl.innerHTML = `
+      <label class="form-check mb-0" style="min-width:18px;">
+        <input type="checkbox" class="form-check-input v2-alert-text-toggle" ${checked ? 'checked' : ''}>
+      </label>
+      <input type="text" class="form-control form-control-sm v2-alert-text-label" value="${txt.replace(/"/g, '&quot;')}" readonly style="max-width:190px;">
+      <input type="color" class="form-control form-control-sm v2-alert-text-color" value="${color}" ${showColorControls ? '' : 'disabled'}>
+    `;
+    const rebuild = () => {
+      const rows = Array.from(listWrap.querySelectorAll('.d-flex'));
+      const nextTexts = [];
+      const nextMap = {};
+      rows.forEach((r) => {
+        const t = String(r.querySelector('.v2-alert-text-label')?.value || '').trim();
+        const on = !!r.querySelector('.v2-alert-text-toggle')?.checked;
+        const c = normalizeRefAlertColor(r.querySelector('.v2-alert-text-color')?.value || defaultColor);
+        if (!t || !on) return;
+        nextTexts.push(t);
+        nextMap[t] = c;
+      });
+      hiddenTexts.value = nextTexts.join(', ');
+      hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
+      updatePreview();
+      renderV2Preview();
+    };
+    rowEl.querySelector('.v2-alert-text-toggle')?.addEventListener('change', rebuild);
+    rowEl.querySelector('.v2-alert-text-color')?.addEventListener('input', rebuild);
+    listWrap.appendChild(rowEl);
+  });
+
+  const rows = Array.from(listWrap.querySelectorAll('.d-flex'));
+  const nextTexts = [];
+  const nextMap = {};
+  rows.forEach((r) => {
+    const t = String(r.querySelector('.v2-alert-text-label')?.value || '').trim();
+    const on = !!r.querySelector('.v2-alert-text-toggle')?.checked;
+    const c = normalizeRefAlertColor(r.querySelector('.v2-alert-text-color')?.value || defaultColor);
+    if (!t || !on) return;
+    nextTexts.push(t);
+    nextMap[t] = c;
+  });
+  hiddenTexts.value = nextTexts.join(', ');
+  hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
+}
+
 function attachRowListeners(tr) {
   if (!tr) return;
   const controls = tr.querySelectorAll('textarea, input, select');
   controls.forEach(el => {
     el.removeEventListener('input', updatePreview);
     el.addEventListener('input', updatePreview);
+    el.addEventListener('change', () => {
+      if (el.classList.contains('opciones-input') || el.classList.contains('alerta-modo-ref') || el.classList.contains('alerta-color-ref')) {
+        refreshLegacyAlertVisualEditors(tr);
+      }
+    });
   });
 }
 
 // Delegation fallback: any input inside the table triggers preview
 document.addEventListener('input', function(e) {
   if (e.target && e.target.closest('#formatTable')) {
+    const tr = e.target.closest('tr');
+    if (tr && (e.target.classList.contains('opciones-input') || e.target.classList.contains('alerta-modo-ref') || e.target.classList.contains('alerta-color-ref'))) {
+      refreshLegacyAlertVisualEditors(tr);
+    }
     updatePreview();
   }
 });
@@ -413,6 +695,7 @@ function updatePreview() {
     const metodologia = tr.children[2].querySelector('input').value;
     const unidad = tr.children[3].querySelector('input').value;
     const opciones = tr.children[4].querySelector('.opciones-input').value;
+    const templateText = tr.children[6].querySelector('.template-text-input')?.value || '';
     let refHtml = '';
     const refGroups = tr.children[5].querySelectorAll('.valores-ref-group');
     refGroups.forEach(refDiv => {
@@ -473,7 +756,7 @@ function updatePreview() {
       html += `<tr>
         <td colspan="8" style="background:${colorFondo};color:${colorTexto};${fontStyle}text-align:${alineacion};">
           <div><b>${nombre || 'Observación'}</b></div>
-          <div class="text-muted">(bloque de texto largo)</div>
+          <div style="white-space:pre-wrap;">${templateText ? templateText.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '<span class="text-muted">(bloque de texto largo)</span>'}</div>
         </td>
       </tr>`;
     } else {
@@ -551,6 +834,7 @@ function addV2Column(col = {}) {
 
 function addV2DataRow(row = {}) {
   const rowId = ensureUniqueRowId(row.id || `fila_${v2State.rows.length + 1}`);
+  const rowType = String(row.type || 'data').trim() || 'data';
   const cells = {};
   const formulas = {};
   const selectOptions = {};
@@ -582,8 +866,12 @@ function addV2DataRow(row = {}) {
           valor_max: String((r && r.valor_max) || '').trim(),
           sexo: String((r && r.sexo) || 'cualquiera').trim() || 'cualquiera',
           edad_min: String((r && r.edad_min) || '').trim(),
-          edad_max: String((r && r.edad_max) || '').trim()
-        })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera'))
+          edad_max: String((r && r.edad_max) || '').trim(),
+          alerta_modo: normalizeRefAlertMode((r && (r.alerta_modo ?? r.alert_mode)) || REF_ALERT_DEFAULT_MODE),
+          alerta_color: normalizeRefAlertColor((r && (r.alerta_color ?? r.alert_color)) || REF_ALERT_DEFAULT_COLOR),
+          alerta_textos: normalizeRefAlertTexts((r && (r.alerta_textos ?? r.alert_text_values ?? r.alerta_valores)) || ''),
+          alerta_colores_texto: normalizeRefAlertTextColors((r && (r.alerta_colores_texto ?? r.alert_text_colors ?? r.alerta_colores)) || '')
+        })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '')
       : [];
     referenceRanges[c.id] = ranges;
     if (String(c.kind || '').toLowerCase() === 'reference' && ranges.length > 0 && String(cells[c.id] || '').trim() === '') {
@@ -600,10 +888,28 @@ function addV2DataRow(row = {}) {
       }
     }
   });
+  const defaultAlign = (rowType === 'title') ? 'center' : 'left';
+  const rawAlign = String(row.alineacion || '').trim().toLowerCase();
+  const safeAlign = ['left', 'center', 'right'].includes(rawAlign) ? rawAlign : defaultAlign;
+  const defaultTemplateAlign = String(row.template_align || '').trim().toLowerCase();
+  const safeTemplateAlign = ['left', 'center', 'right'].includes(defaultTemplateAlign) ? defaultTemplateAlign : 'left';
+  const defaultBold = Object.prototype.hasOwnProperty.call(row, 'negrita')
+    ? !!row.negrita
+    : (rowType === 'title' || rowType === 'subtitle');
+
   v2State.rows.push({
     id: rowId,
-    type: row.type || 'data',
+    type: rowType,
     label: row.label || '',
+    template_text: String(row.template_text || row.template || '').trim(),
+    template_editable: row.template_editable !== false,
+    template_visible_pdf: row.template_visible_pdf !== false,
+    template_align: safeTemplateAlign,
+    color_texto: String(row.color_texto || '').trim(),
+    color_fondo: String(row.color_fondo || '').trim(),
+    negrita: defaultBold,
+    cursiva: !!row.cursiva,
+    alineacion: safeAlign,
     cells,
     formulas,
     select_options: selectOptions,
@@ -619,19 +925,15 @@ function buildV2ReferenceSummary(ranges) {
     const valor = String((r && r.valor) || '').trim();
     const min = String((r && r.valor_min) || '').trim();
     const max = String((r && r.valor_max) || '').trim();
-    const sexo = String((r && r.sexo) || '').trim();
-    const edadMin = String((r && r.edad_min) || '').trim();
-    const edadMax = String((r && r.edad_max) || '').trim();
 
-    const encabezado = desc || valor;
-    const extra = [];
-    if (min || max) extra.push(`${min || ''} - ${max || ''}`.trim());
-    if (sexo && sexo !== 'cualquiera') extra.push(sexo);
-    if (edadMin || edadMax) extra.push(`edad ${edadMin || ''}-${edadMax || ''}`.trim());
+    // Mostrar solo información pública (desc + valor/rango). Edad/sexo se
+    // mantienen en reference_ranges para la discriminación interna.
+    const rango = (min || max) ? `${min || ''} - ${max || ''}`.trim() : '';
+    const visible = valor || rango;
 
-    if (encabezado && extra.length > 0) return `${encabezado} (${extra.join(', ')})`;
-    if (encabezado) return encabezado;
-    if (extra.length > 0) return extra.join(', ');
+    if (desc && visible) return `${desc} (${visible})`;
+    if (desc) return desc;
+    if (visible) return visible;
     return '';
   }).map(s => String(s || '').trim()).filter(Boolean);
   return lines.join(' | ');
@@ -798,6 +1100,7 @@ function renderV2Rows() {
   tbody.innerHTML = '';
   v2State.rows.forEach((row, rowIdx) => {
     const tr = document.createElement('tr');
+    const moveActionsHtml = '<button type="button" class="btn btn-secondary btn-sm v2-row-up">↑</button> <button type="button" class="btn btn-secondary btn-sm v2-row-down">↓</button> <button type="button" class="btn btn-danger btn-sm v2-row-del">✕</button>';
     let html = `
       <td><input type="text" class="form-control form-control-sm v2-row-id" value="${row.id}"></td>
       <td>
@@ -805,10 +1108,216 @@ function renderV2Rows() {
           <option value="data" ${row.type === 'data' ? 'selected' : ''}>Data</option>
           <option value="title" ${row.type === 'title' ? 'selected' : ''}>Titulo</option>
           <option value="subtitle" ${row.type === 'subtitle' ? 'selected' : ''}>Subtitulo</option>
+          <option value="long_text" ${row.type === 'long_text' ? 'selected' : ''}>Texto largo</option>
         </select>
       </td>
-      <td><input type="text" class="form-control form-control-sm v2-row-label" value="${row.label || ''}" placeholder="Solo para titulo/subtitulo"></td>
+      <td><input type="text" class="form-control form-control-sm v2-row-label" value="${row.label || ''}" placeholder="Titulo opcional de bloque"></td>
     `;
+    if (row.type === 'title' || row.type === 'subtitle') {
+      const align = ['left', 'center', 'right'].includes(String(row.alineacion || '').toLowerCase())
+        ? String(row.alineacion || '').toLowerCase()
+        : (row.type === 'title' ? 'center' : 'left');
+      const textColor = String(row.color_texto || '').trim() || '#1f2d5c';
+      const bgColor = String(row.color_fondo || '').trim() || (row.type === 'title' ? '#eef4ff' : '#f4f7fb');
+      html += `<td colspan="${Math.max(1, visibleCols.length)}">
+        <div class="row g-2 align-items-end">
+          <div class="col-3">
+            <label class="small text-muted d-block mb-1">Alineacion</label>
+            <select class="form-select form-select-sm v2-row-style-align">
+              <option value="left" ${align === 'left' ? 'selected' : ''}>Izquierda</option>
+              <option value="center" ${align === 'center' ? 'selected' : ''}>Centro</option>
+              <option value="right" ${align === 'right' ? 'selected' : ''}>Derecha</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="small text-muted d-block mb-1">Color texto</label>
+            <input type="color" class="form-control form-control-sm v2-row-style-text-color" value="${textColor}">
+          </div>
+          <div class="col-3">
+            <label class="small text-muted d-block mb-1">Color fondo</label>
+            <input type="color" class="form-control form-control-sm v2-row-style-bg-color" value="${bgColor}">
+          </div>
+          <div class="col-3">
+            <label class="small text-muted d-block mb-1">Estilo</label>
+            <div class="d-flex gap-3">
+              <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-style-bold" ${row.negrita ? 'checked' : ''}> Negrita</label>
+              <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-style-italic" ${row.cursiva ? 'checked' : ''}> Cursiva</label>
+            </div>
+          </div>
+        </div>
+      </td>`;
+      html += `<td>${moveActionsHtml}</td>`;
+      tr.innerHTML = html;
+
+      tr.querySelector('.v2-row-id').addEventListener('input', (e) => {
+        row.id = ensureUniqueRowId(e.target.value || 'fila', rowIdx);
+        e.target.value = row.id;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-type').addEventListener('change', (e) => {
+        row.type = e.target.value;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-label').addEventListener('input', (e) => {
+        row.label = e.target.value;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-style-align')?.addEventListener('change', (e) => {
+        row.alineacion = String(e.target.value || 'left');
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-style-text-color')?.addEventListener('input', (e) => {
+        row.color_texto = String(e.target.value || '').trim();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-style-bg-color')?.addEventListener('input', (e) => {
+        row.color_fondo = String(e.target.value || '').trim();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-style-bold')?.addEventListener('change', (e) => {
+        row.negrita = !!e.target.checked;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-style-italic')?.addEventListener('change', (e) => {
+        row.cursiva = !!e.target.checked;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-up')?.addEventListener('click', () => {
+        if (rowIdx === 0) return;
+        const tmp = v2State.rows[rowIdx - 1];
+        v2State.rows[rowIdx - 1] = v2State.rows[rowIdx];
+        v2State.rows[rowIdx] = tmp;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-down')?.addEventListener('click', () => {
+        if (rowIdx >= v2State.rows.length - 1) return;
+        const tmp = v2State.rows[rowIdx + 1];
+        v2State.rows[rowIdx + 1] = v2State.rows[rowIdx];
+        v2State.rows[rowIdx] = tmp;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-del').addEventListener('click', () => {
+        v2State.rows.splice(rowIdx, 1);
+        renderV2Rows();
+        renderV2Preview();
+      });
+
+      tbody.appendChild(tr);
+      return;
+    }
+    if (row.type === 'long_text') {
+      const templateText = String(row.template_text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const templateAlign = ['left', 'center', 'right'].includes(String(row.template_align || '').toLowerCase())
+        ? String(row.template_align || '').toLowerCase()
+        : 'left';
+      const textColor = String(row.color_texto || '').trim() || '#1f2d5c';
+      const bgColor = String(row.color_fondo || '').trim() || '#fafcff';
+      html += `<td colspan="${Math.max(1, visibleCols.length)}">
+        <textarea class="form-control form-control-sm v2-row-template-text" rows="4" placeholder="Plantilla de texto precargada para el formulario">${templateText}</textarea>
+        <div class="d-flex gap-3 mt-2">
+          <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-template-editable" ${row.template_editable !== false ? 'checked' : ''}> Editable en captura</label>
+          <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-template-pdf" ${row.template_visible_pdf !== false ? 'checked' : ''}> Visible en PDF</label>
+          <label class="form-check-label">Alineacion
+            <select class="form-select form-select-sm d-inline-block ms-1 v2-row-template-align" style="width:auto;">
+              <option value="left" ${templateAlign === 'left' ? 'selected' : ''}>Izquierda</option>
+              <option value="center" ${templateAlign === 'center' ? 'selected' : ''}>Centro</option>
+              <option value="right" ${templateAlign === 'right' ? 'selected' : ''}>Derecha</option>
+            </select>
+          </label>
+        </div>
+        <div class="row g-2 mt-2 align-items-end">
+          <div class="col-4">
+            <label class="small text-muted d-block mb-1">Color texto</label>
+            <input type="color" class="form-control form-control-sm v2-row-template-text-color" value="${textColor}">
+          </div>
+          <div class="col-4">
+            <label class="small text-muted d-block mb-1">Color fondo</label>
+            <input type="color" class="form-control form-control-sm v2-row-template-bg-color" value="${bgColor}">
+          </div>
+          <div class="col-4">
+            <label class="small text-muted d-block mb-1">Estilo</label>
+            <div class="d-flex gap-3">
+              <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-template-bold" ${row.negrita ? 'checked' : ''}> Negrita</label>
+              <label class="form-check-label"><input type="checkbox" class="form-check-input v2-row-template-italic" ${row.cursiva ? 'checked' : ''}> Cursiva</label>
+            </div>
+          </div>
+        </div>
+      </td>`;
+      html += `<td>${moveActionsHtml}</td>`;
+      tr.innerHTML = html;
+
+      tr.querySelector('.v2-row-id').addEventListener('input', (e) => {
+        row.id = ensureUniqueRowId(e.target.value || 'fila', rowIdx);
+        e.target.value = row.id;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-type').addEventListener('change', (e) => {
+        row.type = e.target.value;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-label').addEventListener('input', (e) => {
+        row.label = e.target.value;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-text')?.addEventListener('input', (e) => {
+        row.template_text = String(e.target.value || '');
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-editable')?.addEventListener('change', (e) => {
+        row.template_editable = !!e.target.checked;
+      });
+      tr.querySelector('.v2-row-template-pdf')?.addEventListener('change', (e) => {
+        row.template_visible_pdf = !!e.target.checked;
+      });
+      tr.querySelector('.v2-row-template-align')?.addEventListener('change', (e) => {
+        row.template_align = String(e.target.value || 'left');
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-text-color')?.addEventListener('input', (e) => {
+        row.color_texto = String(e.target.value || '').trim();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-bg-color')?.addEventListener('input', (e) => {
+        row.color_fondo = String(e.target.value || '').trim();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-bold')?.addEventListener('change', (e) => {
+        row.negrita = !!e.target.checked;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-template-italic')?.addEventListener('change', (e) => {
+        row.cursiva = !!e.target.checked;
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-up')?.addEventListener('click', () => {
+        if (rowIdx === 0) return;
+        const tmp = v2State.rows[rowIdx - 1];
+        v2State.rows[rowIdx - 1] = v2State.rows[rowIdx];
+        v2State.rows[rowIdx] = tmp;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-down')?.addEventListener('click', () => {
+        if (rowIdx >= v2State.rows.length - 1) return;
+        const tmp = v2State.rows[rowIdx + 1];
+        v2State.rows[rowIdx + 1] = v2State.rows[rowIdx];
+        v2State.rows[rowIdx] = tmp;
+        renderV2Rows();
+        renderV2Preview();
+      });
+      tr.querySelector('.v2-row-del').addEventListener('click', () => {
+        v2State.rows.splice(rowIdx, 1);
+        renderV2Rows();
+        renderV2Preview();
+      });
+
+      tbody.appendChild(tr);
+      return;
+    }
     visibleCols.forEach(c => {
       const cellValue = (row.cells && Object.prototype.hasOwnProperty.call(row.cells, c.id)) ? row.cells[c.id] : '';
       const disabled = row.type !== 'data' || !c.editable;
@@ -863,6 +1372,21 @@ function renderV2Rows() {
             <div class="row g-1">
               <div class="col-3"><input type="number" class="form-control form-control-sm v2-ref-edad-max" value="${String(r.edad_max || '')}" placeholder="Edad max"></div>
             </div>
+            <div class="row g-1 mt-1">
+              <div class="col-4">
+                <select class="form-select form-select-sm v2-ref-alert-mode">
+                  <option value="none" ${(normalizeRefAlertMode(r.alerta_modo || r.alert_mode) === 'none') ? 'selected' : ''}>Sin marca</option>
+                  <option value="asterisk" ${(normalizeRefAlertMode(r.alerta_modo || r.alert_mode) === 'asterisk') ? 'selected' : ''}>Solo *</option>
+                  <option value="color" ${(normalizeRefAlertMode(r.alerta_modo || r.alert_mode) === 'color') ? 'selected' : ''}>Solo color</option>
+                  <option value="both" ${(normalizeRefAlertMode(r.alerta_modo || r.alert_mode) === 'both') ? 'selected' : ''}>* + color</option>
+                </select>
+              </div>
+              <div class="col-3"><input type="color" class="form-control form-control-sm v2-ref-alert-color" value="${normalizeRefAlertColor(r.alerta_color || r.alert_color)}"></div>
+              <div class="col-5"><input type="hidden" class="v2-ref-alert-texts" value="${normalizeRefAlertTexts(r.alerta_textos || r.alert_text_values || r.alerta_valores || '')}"><div class="small text-muted">Se sincroniza automaticamente desde opciones.</div></div>
+            </div>
+            <div class="row g-1 mt-1">
+              <div class="col-12"><input type="hidden" class="v2-ref-alert-text-colors" value="${normalizeRefAlertTextColors(r.alerta_colores_texto || r.alert_text_colors || r.alerta_colores || '')}"><div class="v2-ref-alert-text-color-list border rounded p-2 bg-light"></div></div>
+            </div>
           </div>`;
         }).join('');
         html += `<td>
@@ -893,8 +1417,12 @@ function renderV2Rows() {
         </td>`;
       }
     });
-    html += '<td><button type="button" class="btn btn-danger btn-sm v2-row-del">✕</button></td>';
+    html += `<td>${moveActionsHtml}</td>`;
     tr.innerHTML = html;
+
+    tr.querySelectorAll('.v2-ref-item').forEach((refItem) => {
+      syncV2AlertVisualEditor(refItem, row);
+    });
 
     tr.querySelector('.v2-row-id').addEventListener('input', (e) => {
       row.id = ensureUniqueRowId(e.target.value || 'fila', rowIdx);
@@ -943,6 +1471,15 @@ function renderV2Rows() {
             row.cells[cid] = '';
           }
         }
+        // Mantener foco al escribir: no re-renderizar toda la tabla en cada tecla.
+        // El re-render completo se aplica al confirmar (change) para refrescar controles.
+        tr.querySelectorAll('.v2-ref-item').forEach((refItem) => {
+          syncV2AlertVisualEditor(refItem, row);
+        });
+        renderV2Preview();
+      });
+
+      optionsInput.addEventListener('change', () => {
         renderV2Rows();
         renderV2Preview();
       });
@@ -975,8 +1512,12 @@ function renderV2Rows() {
         valor_max: String(it.querySelector('.v2-ref-max')?.value || '').trim(),
         sexo: String(it.querySelector('.v2-ref-sexo')?.value || 'cualquiera').trim() || 'cualquiera',
         edad_min: String(it.querySelector('.v2-ref-edad-min')?.value || '').trim(),
-        edad_max: String(it.querySelector('.v2-ref-edad-max')?.value || '').trim()
-      })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera'));
+        edad_max: String(it.querySelector('.v2-ref-edad-max')?.value || '').trim(),
+        alerta_modo: normalizeRefAlertMode(it.querySelector('.v2-ref-alert-mode')?.value || REF_ALERT_DEFAULT_MODE),
+        alerta_color: normalizeRefAlertColor(it.querySelector('.v2-ref-alert-color')?.value || REF_ALERT_DEFAULT_COLOR),
+        alerta_textos: normalizeRefAlertTexts(it.querySelector('.v2-ref-alert-texts')?.value || ''),
+        alerta_colores_texto: normalizeRefAlertTextColors(it.querySelector('.v2-ref-alert-text-colors')?.value || '')
+      })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '');
       if (!row.cells) row.cells = {};
       row.cells[cid] = buildV2ReferenceSummary(row.reference_ranges[cid]);
       renderV2Preview();
@@ -994,7 +1535,11 @@ function renderV2Rows() {
           valor_max: '',
           sexo: 'cualquiera',
           edad_min: '',
-          edad_max: ''
+          edad_max: '',
+          alerta_modo: REF_ALERT_DEFAULT_MODE,
+          alerta_color: REF_ALERT_DEFAULT_COLOR,
+          alerta_textos: '',
+          alerta_colores_texto: ''
         });
         renderV2Rows();
         renderV2Preview();
@@ -1022,12 +1567,20 @@ function renderV2Rows() {
 
     tr.querySelectorAll('.v2-ref-item input, .v2-ref-item select').forEach((ctrl) => {
       ctrl.addEventListener('input', () => {
+        const refItem = ctrl.closest('.v2-ref-item');
+        if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
+          syncV2AlertVisualEditor(refItem, row);
+        }
         const editor = ctrl.closest('.v2-ref-editor');
         if (!editor) return;
         const cid = editor.getAttribute('data-col-id');
         syncRangesForColumn(cid);
       });
       ctrl.addEventListener('change', () => {
+        const refItem = ctrl.closest('.v2-ref-item');
+        if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
+          syncV2AlertVisualEditor(refItem, row);
+        }
         const editor = ctrl.closest('.v2-ref-editor');
         if (!editor) return;
         const cid = editor.getAttribute('data-col-id');
@@ -1042,6 +1595,22 @@ function renderV2Rows() {
         row.formulas[cid] = e.target.value;
         renderV2Preview();
       });
+    });
+    tr.querySelector('.v2-row-up')?.addEventListener('click', () => {
+      if (rowIdx === 0) return;
+      const tmp = v2State.rows[rowIdx - 1];
+      v2State.rows[rowIdx - 1] = v2State.rows[rowIdx];
+      v2State.rows[rowIdx] = tmp;
+      renderV2Rows();
+      renderV2Preview();
+    });
+    tr.querySelector('.v2-row-down')?.addEventListener('click', () => {
+      if (rowIdx >= v2State.rows.length - 1) return;
+      const tmp = v2State.rows[rowIdx + 1];
+      v2State.rows[rowIdx + 1] = v2State.rows[rowIdx];
+      v2State.rows[rowIdx] = tmp;
+      renderV2Rows();
+      renderV2Preview();
     });
     tr.querySelector('.v2-row-del').addEventListener('click', () => {
       v2State.rows.splice(rowIdx, 1);
@@ -1065,8 +1634,37 @@ function renderV2Preview() {
   html += '</tr></thead><tbody>';
 
   v2State.rows.forEach(r => {
+    if (String(r.type || '').toLowerCase() === 'long_text') {
+      const title = String(r.label || '').trim();
+      const body = String(r.template_text || '').trim();
+      const tAlign = ['left', 'center', 'right'].includes(String(r.template_align || '').toLowerCase())
+        ? String(r.template_align || '').toLowerCase()
+        : 'left';
+      const textColor = String(r.color_texto || '').trim() || '#1f2d5c';
+      const bgColor = String(r.color_fondo || '').trim() || '#fafcff';
+      const fw = r.negrita ? 'bold' : 'normal';
+      const fs = r.cursiva ? 'italic' : 'normal';
+      const safeTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeBody = body.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      let blockHtml = '';
+      if (safeTitle) {
+        blockHtml += `<div style="font-weight:${fw}; font-style:${fs}; margin-bottom:4px;">${safeTitle}</div>`;
+      }
+      if (safeBody) {
+        blockHtml += `<div style="white-space:pre-wrap; font-weight:normal; font-style:normal;">${safeBody}</div>`;
+      }
+      html += `<tr><td colspan="${Math.max(1, cols.length)}" style="background:${bgColor}; color:${textColor}; text-align:${tAlign};">${blockHtml}</td></tr>`;
+      return;
+    }
     if (r.type === 'title' || r.type === 'subtitle') {
-      html += `<tr><td colspan="${Math.max(1, cols.length)}"><strong>${r.label || ''}</strong></td></tr>`;
+      const textColor = String(r.color_texto || '').trim() || '#1f2d5c';
+      const bgColor = String(r.color_fondo || '').trim() || (r.type === 'title' ? '#eef4ff' : '#f4f7fb');
+      const align = ['left', 'center', 'right'].includes(String(r.alineacion || '').toLowerCase())
+        ? String(r.alineacion || '').toLowerCase()
+        : (r.type === 'title' ? 'center' : 'left');
+      const fw = r.negrita ? 'bold' : 'normal';
+      const fs = r.cursiva ? 'italic' : 'normal';
+      html += `<tr><td colspan="${Math.max(1, cols.length)}" style="color:${textColor}; background:${bgColor}; text-align:${align}; font-weight:${fw}; font-style:${fs};">${String(r.label || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td></tr>`;
       return;
     }
     html += '<tr>';
@@ -1158,7 +1756,12 @@ function migrateLegacyToV2(legacyItems) {
       addV2DataRow({
         id: `titulo_${idx + 1}`,
         type: 'title',
-        label: nombre
+        label: nombre,
+        color_texto: String(item.color_texto || '').trim(),
+        color_fondo: String(item.color_fondo || '').trim(),
+        negrita: !!item.negrita,
+        cursiva: !!item.cursiva,
+        alineacion: String(item.alineacion || '').trim()
       });
       return;
     }
@@ -1166,12 +1769,33 @@ function migrateLegacyToV2(legacyItems) {
       addV2DataRow({
         id: `subtitulo_${idx + 1}`,
         type: 'subtitle',
-        label: nombre
+        label: nombre,
+        color_texto: String(item.color_texto || '').trim(),
+        color_fondo: String(item.color_fondo || '').trim(),
+        negrita: !!item.negrita,
+        cursiva: !!item.cursiva,
+        alineacion: String(item.alineacion || '').trim()
+      });
+      return;
+    }
+    if (tipo === 'Texto Largo') {
+      addV2DataRow({
+        id: `texto_${idx + 1}`,
+        type: 'long_text',
+        label: nombre,
+        template_text: String(item.template_text ?? item.valor ?? ''),
+        template_editable: true,
+        template_visible_pdf: true,
+        template_align: String(item.alineacion || 'left').trim().toLowerCase(),
+        color_texto: String(item.color_texto || '').trim(),
+        color_fondo: String(item.color_fondo || '').trim(),
+        negrita: !!item.negrita,
+        cursiva: !!item.cursiva
       });
       return;
     }
 
-    if (!['Parámetro', 'Campo', 'Texto Largo'].includes(tipo)) {
+    if (!['Parámetro', 'Campo'].includes(tipo)) {
       return;
     }
 
@@ -1201,8 +1825,12 @@ function migrateLegacyToV2(legacyItems) {
               valor_max: String((ref && ref.valor_max) || '').trim(),
               sexo: String((ref && ref.sexo) || 'cualquiera').trim() || 'cualquiera',
               edad_min: String((ref && ref.edad_min) || '').trim(),
-              edad_max: String((ref && ref.edad_max) || '').trim()
-            })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera'))
+              edad_max: String((ref && ref.edad_max) || '').trim(),
+              alerta_modo: normalizeRefAlertMode((ref && (ref.alerta_modo ?? ref.alert_mode)) || REF_ALERT_DEFAULT_MODE),
+              alerta_color: normalizeRefAlertColor((ref && (ref.alerta_color ?? ref.alert_color)) || REF_ALERT_DEFAULT_COLOR),
+              alerta_textos: normalizeRefAlertTexts((ref && (ref.alerta_textos ?? ref.alert_text_values ?? ref.alerta_valores)) || ''),
+              alerta_colores_texto: normalizeRefAlertTextColors((ref && (ref.alerta_colores_texto ?? ref.alert_text_colors ?? ref.alerta_colores)) || '')
+            })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '')
           : []
       },
       formulas: {
@@ -1295,8 +1923,12 @@ function buildV2Payload() {
             valor_max: String((rr && rr.valor_max) || '').trim(),
             sexo: String((rr && rr.sexo) || 'cualquiera').trim() || 'cualquiera',
             edad_min: String((rr && rr.edad_min) || '').trim(),
-            edad_max: String((rr && rr.edad_max) || '').trim()
-          })).filter(rr => rr.desc || rr.valor || rr.valor_min || rr.valor_max || rr.edad_min || rr.edad_max || (rr.sexo && rr.sexo !== 'cualquiera'))
+            edad_max: String((rr && rr.edad_max) || '').trim(),
+            alerta_modo: normalizeRefAlertMode((rr && (rr.alerta_modo ?? rr.alert_mode)) || REF_ALERT_DEFAULT_MODE),
+            alerta_color: normalizeRefAlertColor((rr && (rr.alerta_color ?? rr.alert_color)) || REF_ALERT_DEFAULT_COLOR),
+            alerta_textos: normalizeRefAlertTexts((rr && (rr.alerta_textos ?? rr.alert_text_values ?? rr.alerta_valores)) || ''),
+            alerta_colores_texto: normalizeRefAlertTextColors((rr && (rr.alerta_colores_texto ?? rr.alert_text_colors ?? rr.alerta_colores)) || '')
+          })).filter(rr => rr.desc || rr.valor || rr.valor_min || rr.valor_max || rr.edad_min || rr.edad_max || (rr.sexo && rr.sexo !== 'cualquiera') || rr.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(rr.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || rr.alerta_textos !== '' || rr.alerta_colores_texto !== '')
         : [];
       if (ranges.length > 0) {
         outReferenceRanges[c.id] = ranges;
@@ -1316,6 +1948,15 @@ function buildV2Payload() {
       id: String(r.id || '').trim(),
       type: String(r.type || 'data').trim(),
       label: String(r.label || ''),
+      template_text: String(r.template_text || ''),
+      template_editable: r.template_editable !== false,
+      template_visible_pdf: r.template_visible_pdf !== false,
+      template_align: ['left', 'center', 'right'].includes(String(r.template_align || '').toLowerCase()) ? String(r.template_align || '').toLowerCase() : 'left',
+      color_texto: String(r.color_texto || '').trim(),
+      color_fondo: String(r.color_fondo || '').trim(),
+      negrita: !!r.negrita,
+      cursiva: !!r.cursiva,
+      alineacion: ['left', 'center', 'right'].includes(String(r.alineacion || '').toLowerCase()) ? String(r.alineacion || '').toLowerCase() : (String(r.type || '') === 'title' ? 'center' : 'left'),
       cells: outCells,
       formulas: outFormulas,
       select_options: outSelectOptions,
@@ -1404,15 +2045,12 @@ function validateV2Payload(payload) {
     errors.push('Debe existir al menos una columna visible en captura.');
   }
 
-  if (editableCount === 0) {
-    errors.push('Debe existir al menos una columna editable para ingresar resultados.');
-  }
-
   if (rows.length === 0) {
     errors.push('Debes registrar al menos una fila.');
   }
 
   let dataRows = 0;
+  let editableLongTextRows = 0;
   rows.forEach((r, idx) => {
     const rid = String(r.id || '').trim();
     const type = String(r.type || 'data').trim();
@@ -1427,6 +2065,16 @@ function validateV2Payload(payload) {
 
     if ((type === 'title' || type === 'subtitle') && !String(r.label || '').trim()) {
       errors.push(`La fila #${idx + 1} de tipo ${type} debe tener etiqueta.`);
+    }
+
+    if (type === 'long_text' && !String(r.id || '').trim()) {
+      errors.push(`La fila #${idx + 1} de tipo long_text debe tener ID.`);
+    }
+    if (type === 'long_text') {
+      const editableTemplate = !Object.prototype.hasOwnProperty.call(r, 'template_editable') || !!r.template_editable;
+      if (editableTemplate) {
+        editableLongTextRows++;
+      }
     }
 
     Object.keys(cells).forEach(cellColId => {
@@ -1472,6 +2120,10 @@ function validateV2Payload(payload) {
 
   if (dataRows === 0) {
     errors.push('Debes tener al menos una fila de tipo data.');
+  }
+
+  if (editableCount === 0 && editableLongTextRows === 0) {
+    errors.push('Debe existir al menos un campo editable para ingresar resultados.');
   }
 
   return errors;
@@ -1568,6 +2220,7 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
   const tbody = document.querySelector('#formatTable tbody');
   let rows = Array.from(tbody.querySelectorAll('tr'));
   let formato = rows.map(tr => {
+  const tipoFila = tr.querySelector('.type-select').value;
     let referencias = [];
     const refGroups = tr.children[5].querySelectorAll('.valores-ref-group');
     refGroups.forEach(refDiv => {
@@ -1579,8 +2232,12 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
       const sexo = refDiv.querySelector('.sexo-ref').value;
       const edad_min = refDiv.querySelector('.edad-min').value;
       const edad_max = refDiv.querySelector('.edad-max').value;
-      if (valor || desc || valor_min || valor_max) {
-        referencias.push({ valor, desc, valor_min, valor_max, sexo, edad_min, edad_max });
+      const alerta_modo = normalizeRefAlertMode(refDiv.querySelector('.alerta-modo-ref')?.value || REF_ALERT_DEFAULT_MODE);
+      const alerta_color = normalizeRefAlertColor(refDiv.querySelector('.alerta-color-ref')?.value || REF_ALERT_DEFAULT_COLOR);
+      const alerta_textos = normalizeRefAlertTexts(refDiv.querySelector('.alerta-textos-ref')?.value || '');
+      const alerta_colores_texto = normalizeRefAlertTextColors(refDiv.querySelector('.alerta-colores-texto-ref')?.value || '');
+      if (valor || desc || valor_min || valor_max || edad_min || edad_max || (sexo && sexo !== 'cualquiera') || alerta_modo !== REF_ALERT_DEFAULT_MODE || String(alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alerta_textos !== '' || alerta_colores_texto !== '') {
+        referencias.push({ valor, desc, valor_min, valor_max, sexo, edad_min, edad_max, alerta_modo, alerta_color, alerta_textos, alerta_colores_texto });
       }
     });
     let opciones = tr.children[4].querySelector('.opciones-input').value
@@ -1595,15 +2252,19 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
       tr.setAttribute('data-id-parametro', id_parametro);
     }
 
+    const formulaRaw = tr.children[6].querySelector('.formula-input')?.value || '';
+    const templateTextRaw = tr.children[6].querySelector('.template-text-input')?.value || '';
+
     return {
       id_parametro: id_parametro,
-      tipo: tr.querySelector('.type-select').value,
+      tipo: tipoFila,
       nombre: tr.children[1].querySelector('textarea').value,
       metodologia: tr.children[2].querySelector('input').value,
       unidad: tr.children[3].querySelector('input').value,
       opciones: opciones,
       referencias: referencias,
-      formula: tr.children[6].querySelector('input').value,
+      formula: tipoFila === 'Texto Largo' ? '' : formulaRaw,
+      template_text: tipoFila === 'Texto Largo' ? templateTextRaw : '',
       negrita: tr.children[7].querySelector('input').checked,
       cursiva: tr.children[8].querySelector('input').checked,
       alineacion: tr.children[9].querySelector('select').value,
@@ -1623,7 +2284,7 @@ function updateRowUI(tr) {
   const tipo = tr.querySelector('.type-select').value;
   const isLongText = tipo === 'Texto Largo';
   // Índices: 0 Tipo,1 Nombre,2 Metod,3 Unidad,4 Opciones,5 Referencias,6 Fórmula,7 Negrita,8 Cursiva,9 Alineación,10 Color texto,11 Color fondo,12 Decimales,13 Filas,14 Orden,15 Acciones
-  const indicesParaDeshabilitar = [2, 3, 4, 5, 6, 12];
+  const indicesParaDeshabilitar = [2, 3, 4, 5, 12];
   indicesParaDeshabilitar.forEach(idx => {
     const td = tr.children[idx];
     if (!td) return;
@@ -1641,6 +2302,23 @@ function updateRowUI(tr) {
   if (tdRows) {
     tdRows.style.display = '';
     tdRows.querySelectorAll('input').forEach(ctrl => ctrl.disabled = !isLongText);
+  }
+
+  // En Texto Largo se usa plantilla precargada (textarea) en vez de fórmula.
+  const formulaInput = tr.querySelector('.formula-input');
+  const templateInput = tr.querySelector('.template-text-input');
+  if (formulaInput && templateInput) {
+    if (isLongText) {
+      formulaInput.classList.add('d-none');
+      formulaInput.disabled = true;
+      templateInput.classList.remove('d-none');
+      templateInput.disabled = false;
+    } else {
+      formulaInput.classList.remove('d-none');
+      formulaInput.disabled = false;
+      templateInput.classList.add('d-none');
+      templateInput.disabled = true;
+    }
   }
 }
 // Panel flotante para seleccionar parámetros y operadores en la fórmula

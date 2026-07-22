@@ -36,14 +36,269 @@ document.addEventListener('DOMContentLoaded', function () {
     const examContainer = document.getElementById('examCardsContainer');
     const orderInputsContainer = document.getElementById('examOrderInputs');
     const formGuardar = document.querySelector('form[action="dashboard.php?action=guardar"]');
+    const forceIncompleteInput = document.getElementById('forceIncompleteSave');
     const actionsDock = document.getElementById('resultsActionsDock');
     const dockModeToggle = document.getElementById('resultsDockModeToggle');
     const dockModeStorageKey = 'resultados_actions_dock_mode';
     const canUseDrag = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+    const resultsProgressBar = document.getElementById('resultsProgressBar');
+    const resultsProgressBadge = document.getElementById('resultsProgressBadge');
+    const resultsProgressHint = document.getElementById('resultsProgressHint');
+    const resultsProgressWrap = document.querySelector('#resultsProgressCard .results-progress-card__bar-wrap');
+    const actionProgressCircles = Array.from(document.querySelectorAll('.js-results-progress-circle'));
+
+    const submitSnapshotUpdate = (cotizacionId, idResultado) => {
+        const cid = String(cotizacionId || '').trim();
+        const rid = String(idResultado || '').trim();
+        if (!cid || !rid) {
+            window.alert('No se pudo identificar la cotizacion o el examen para actualizar formato.');
+            return;
+        }
+
+        const confirmed = window.confirm('Se actualizara solo este examen al formato actual. Se conservaran cabeceras personalizadas de este paciente. ¿Continuar?');
+        if (!confirmed) {
+            return;
+        }
+
+        sessionStorage.setItem(scrollStateKey, JSON.stringify({ y: window.scrollY, at: Date.now() }));
+
+        const postForm = document.createElement('form');
+        postForm.method = 'post';
+        postForm.action = 'dashboard.php?action=actualizar_snapshot_resultados';
+        postForm.style.display = 'none';
+
+        const appendHidden = (name, value) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = String(value);
+            postForm.appendChild(input);
+        };
+
+        appendHidden('cotizacion_id', cid);
+        appendHidden('id_resultado', rid);
+        appendHidden('preserve_headers', '1');
+
+        document.body.appendChild(postForm);
+        postForm.submit();
+    };
+
+    const updateActionProgressCircles = (porcentaje) => {
+        const pctSafe = Math.max(0, Math.min(100, Number(porcentaje || 0)));
+        const angle = Math.round((pctSafe / 100) * 360);
+        actionProgressCircles.forEach((circle) => {
+            circle.style.setProperty('--progress-angle', `${angle}deg`);
+            circle.textContent = `${pctSafe}%`;
+            circle.classList.toggle('is-empty', pctSafe <= 0);
+            circle.classList.toggle('is-complete', pctSafe >= 100);
+            circle.setAttribute('aria-label', `Progreso global ${pctSafe}%`);
+        });
+    };
 
     const getExamCards = () => {
         if (!examContainer) return [];
         return Array.from(examContainer.querySelectorAll('.exam-card[data-id-resultado]'));
+    };
+
+    const normalizarValorProgreso = (value) => {
+        if (value === null || value === undefined) return '';
+        return String(value).trim();
+    };
+
+    const parseDecimalWithLocale = (rawValue) => {
+        if (rawValue === null || rawValue === undefined) return null;
+        let normalized = String(rawValue).trim().replace(/\s+/g, '');
+        if (normalized === '') return null;
+
+        const hasComma = normalized.indexOf(',') !== -1;
+        const hasDot = normalized.indexOf('.') !== -1;
+        if (hasComma && hasDot) {
+            const lastComma = normalized.lastIndexOf(',');
+            const lastDot = normalized.lastIndexOf('.');
+            if (lastComma > lastDot) {
+                normalized = normalized.replace(/\./g, '').replace(',', '.');
+            } else {
+                normalized = normalized.replace(/,/g, '');
+            }
+        } else if (hasComma && !hasDot) {
+            normalized = normalized.replace(',', '.');
+        } else {
+            normalized = normalized.replace(/,/g, '');
+        }
+
+        const num = Number(normalized);
+        return Number.isFinite(num) ? num : null;
+    };
+
+    const countFractionDigitsRaw = (rawValue) => {
+        const src = String(rawValue ?? '').trim();
+        if (!src) return 0;
+        const cleaned = src.replace(/\s+/g, '');
+        const lastDot = cleaned.lastIndexOf('.');
+        const lastComma = cleaned.lastIndexOf(',');
+        const sep = Math.max(lastDot, lastComma);
+        if (sep < 0) return 0;
+        return Math.max(0, cleaned.length - sep - 1);
+    };
+
+    const trimTrailingZeros = (numStr) => {
+        return String(numStr || '')
+            .replace(/(\.\d*?[1-9])0+$/g, '$1')
+            .replace(/\.0+$/g, '')
+            .replace(/\.$/g, '');
+    };
+
+    const applyDecimalConstraint = (field, finalize = false) => {
+        if (!field || !field.getAttribute) return;
+        const rawDec = String(field.getAttribute('data-decimales') || '').trim();
+        if (rawDec === '') {
+            field.classList.remove('is-invalid');
+            field.removeAttribute('title');
+            return;
+        }
+        const maxDec = parseInt(rawDec, 10);
+        if (!Number.isFinite(maxDec) || maxDec < 0) {
+            field.classList.remove('is-invalid');
+            field.removeAttribute('title');
+            return;
+        }
+
+        const rawVal = String(field.value ?? '').trim();
+        if (rawVal === '') {
+            field.classList.remove('is-invalid');
+            field.removeAttribute('title');
+            return;
+        }
+
+        const decCount = countFractionDigitsRaw(rawVal);
+        const exceeds = decCount > maxDec;
+        field.classList.toggle('is-invalid', exceeds);
+        if (exceeds) {
+            field.setAttribute('title', `Maximo ${maxDec} decimales permitidos`);
+        } else {
+            field.removeAttribute('title');
+        }
+
+        if (!finalize) return;
+        const parsed = parseDecimalWithLocale(rawVal);
+        if (parsed === null) return;
+        if (maxDec === 0) {
+            field.value = String(Math.round(parsed));
+            field.classList.remove('is-invalid');
+            field.removeAttribute('title');
+            return;
+        }
+        const fixed = parsed.toFixed(maxDec);
+        field.value = trimTrailingZeros(fixed);
+        field.classList.remove('is-invalid');
+        field.removeAttribute('title');
+    };
+
+    const campoLlenoParaProgreso = (field) => {
+        if (!field) return false;
+        const tag = String(field.tagName || '').toLowerCase();
+        if (tag === 'select') {
+            return normalizarValorProgreso(field.value) !== '';
+        }
+        if (tag === 'input' || tag === 'textarea') {
+            const value = normalizarValorProgreso(field.value);
+            if (value === '') return false;
+            return true;
+        }
+        return false;
+    };
+
+    const getCamposProgresoCard = (card) => {
+        if (!card) return [];
+        return Array.from(card.querySelectorAll('[data-progress-track="1"]'));
+    };
+
+    const calcularProgresoCard = (card, markMissing = false) => {
+        const campos = getCamposProgresoCard(card);
+        let llenos = 0;
+        campos.forEach((field) => {
+            const filled = campoLlenoParaProgreso(field);
+            if (filled) {
+                llenos++;
+            }
+            if (markMissing) {
+                field.classList.toggle('progress-missing', !filled);
+            } else if (filled) {
+                field.classList.remove('progress-missing');
+            }
+        });
+        const total = campos.length;
+        const porcentaje = total > 0 ? Math.round((llenos / total) * 100) : 0;
+        return { total, llenos, porcentaje };
+    };
+
+    const actualizarBadgeCard = (card, progreso) => {
+        if (!card || !progreso) return;
+        const badge = card.querySelector('.js-exam-progress-badge');
+        if (!badge) return;
+        badge.textContent = `${progreso.porcentaje}%`;
+        badge.classList.remove('bg-danger', 'bg-warning', 'bg-success', 'text-dark');
+        if (progreso.porcentaje >= 100) {
+            badge.classList.add('bg-success');
+        } else if (progreso.porcentaje <= 0) {
+            badge.classList.add('bg-danger');
+        } else {
+            badge.classList.add('bg-warning', 'text-dark');
+        }
+    };
+
+    const recalcularProgresoFormulario = (markMissing = false) => {
+        const cards = getExamCards();
+        let total = 0;
+        let llenos = 0;
+        let cardsCompletas = 0;
+        cards.forEach((card) => {
+            const p = calcularProgresoCard(card, markMissing);
+            total += p.total;
+            llenos += p.llenos;
+            if (p.total > 0 && p.porcentaje === 100) {
+                cardsCompletas++;
+            }
+            actualizarBadgeCard(card, p);
+        });
+
+        const porcentaje = total > 0 ? Math.round((llenos / total) * 100) : 0;
+        if (resultsProgressBar) {
+            resultsProgressBar.style.width = `${porcentaje}%`;
+            resultsProgressBar.textContent = `${porcentaje}%`;
+            resultsProgressBar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
+            if (porcentaje >= 100) {
+                resultsProgressBar.classList.add('bg-success');
+            } else if (porcentaje <= 0) {
+                resultsProgressBar.classList.add('bg-danger');
+            } else {
+                resultsProgressBar.classList.add('bg-warning');
+            }
+        }
+
+        if (resultsProgressBadge) {
+            resultsProgressBadge.classList.remove('bg-danger', 'bg-warning', 'bg-success', 'text-dark');
+            if (porcentaje >= 100) {
+                resultsProgressBadge.classList.add('bg-success');
+                resultsProgressBadge.textContent = 'Completado 100%';
+            } else if (porcentaje <= 0) {
+                resultsProgressBadge.classList.add('bg-danger');
+                resultsProgressBadge.textContent = 'Pendiente 0%';
+            } else {
+                resultsProgressBadge.classList.add('bg-warning', 'text-dark');
+                resultsProgressBadge.textContent = `Pendiente ${porcentaje}%`;
+            }
+        }
+
+        if (resultsProgressHint) {
+            resultsProgressHint.textContent = `Examenes completos: ${cardsCompletas}/${cards.length}. Campos llenos: ${llenos}/${total}.`;
+        }
+        if (resultsProgressWrap) {
+            resultsProgressWrap.setAttribute('aria-valuenow', String(porcentaje));
+        }
+        updateActionProgressCircles(porcentaje);
+
+        return { porcentaje, total, llenos, cardsTotal: cards.length, cardsCompletas };
     };
 
     const syncExamOrderInputs = () => {
@@ -204,6 +459,58 @@ document.addEventListener('DOMContentLoaded', function () {
             syncExamOrderInputs();
         });
     }
+
+    document.addEventListener('input', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.matches('input[data-decimales], textarea[data-decimales]')) {
+            applyDecimalConstraint(target, false);
+        }
+        if (target.matches('[data-progress-track="1"]')) {
+            recalcularProgresoFormulario(false);
+        }
+    });
+
+    document.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.matches('input[data-decimales], textarea[data-decimales]')) {
+            applyDecimalConstraint(target, true);
+        }
+        if (target.matches('[data-progress-track="1"]')) {
+            recalcularProgresoFormulario(false);
+        }
+    });
+
+    document.addEventListener('click', (event) => {
+        const btn = event.target.closest('.js-update-snapshot-exam');
+        if (!btn) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const cotizacionId = btn.getAttribute('data-cotizacion-id') || '';
+        const idResultado = btn.getAttribute('data-id-resultado') || '';
+
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Actualizando...';
+
+        try {
+            submitSnapshotUpdate(cotizacionId, idResultado);
+        } finally {
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }, 1200);
+        }
+    });
+
+    document.querySelectorAll('input[data-decimales], textarea[data-decimales]').forEach((field) => {
+        applyDecimalConstraint(field, false);
+    });
+
+    recalcularProgresoFormulario(false);
 
     if (actionsDock) {
         let ticking = false;
@@ -829,6 +1136,40 @@ document.addEventListener('DOMContentLoaded', function () {
                 return false;
             }
 
+            if (forceIncompleteInput && forceIncompleteInput.value !== '1') {
+                const progresoActual = recalcularProgresoFormulario(true);
+                if (progresoActual.total > 0 && progresoActual.porcentaje < 100) {
+                    const faltan = Math.max(0, progresoActual.total - progresoActual.llenos);
+                    const htmlMsg = `
+                        <div style="text-align:left;line-height:1.45;">
+                            <div><strong>Progreso actual:</strong> ${progresoActual.porcentaje}%</div>
+                            <div><strong>Campos faltantes:</strong> ${faltan}</div>
+                            <div><strong>Examenes completos:</strong> ${progresoActual.cardsCompletas}/${progresoActual.cardsTotal}</div>
+                            <div class="mt-2">Puedes volver al formulario para completar o guardar como pendiente.</div>
+                        </div>`;
+                    let continuar = false;
+                    if (window.Swal && typeof window.Swal.fire === 'function') {
+                        const resp = await window.Swal.fire({
+                            icon: 'warning',
+                            title: 'Resultados incompletos',
+                            html: htmlMsg,
+                            showCancelButton: true,
+                            confirmButtonText: 'Guardar como pendiente',
+                            cancelButtonText: 'Revisar formulario',
+                            reverseButtons: true,
+                        });
+                        continuar = !!(resp && resp.isConfirmed);
+                    } else {
+                        continuar = window.confirm(`El formulario está al ${progresoActual.porcentaje}% y faltan ${faltan} campos. ¿Deseas guardar como pendiente?`);
+                    }
+
+                    if (!continuar) {
+                        return false;
+                    }
+                    forceIncompleteInput.value = '1';
+                }
+            }
+
             const submitButtons = Array.from(document.querySelectorAll('.js-save-submit'));
 
             const setSavingState = () => {
@@ -886,6 +1227,37 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!payload || payload.success !== true) {
                     restoreButtons();
                     form.dataset.submitting = '0';
+                    if (forceIncompleteInput) {
+                        forceIncompleteInput.value = '0';
+                    }
+                    if (payload && payload.require_confirmation === true) {
+                        const pct = Number(payload.progress_percent || 0);
+                        const total = Number(payload.progress_total || 0);
+                        const filled = Number(payload.progress_filled || 0);
+                        const faltan = Math.max(0, total - filled);
+                        const mensaje = payload.message || `El formulario está al ${pct}% y faltan ${faltan} campos.`;
+                        let confirmarForzado = false;
+                        if (window.Swal && typeof window.Swal.fire === 'function') {
+                            const resp2 = await window.Swal.fire({
+                                icon: 'warning',
+                                title: 'Confirmar guardado incompleto',
+                                text: mensaje,
+                                showCancelButton: true,
+                                confirmButtonText: 'Guardar como pendiente',
+                                cancelButtonText: 'Revisar',
+                                reverseButtons: true,
+                            });
+                            confirmarForzado = !!(resp2 && resp2.isConfirmed);
+                        } else {
+                            confirmarForzado = window.confirm(mensaje + ' ¿Guardar como pendiente?');
+                        }
+
+                        if (confirmarForzado && forceIncompleteInput) {
+                            forceIncompleteInput.value = '1';
+                            form.requestSubmit();
+                        }
+                        return false;
+                    }
                     const msgError = payload && payload.message ? payload.message : 'No se pudo guardar resultados.';
                     alert(msgError);
                     return false;
@@ -908,6 +1280,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 restoreButtons();
                 form.dataset.submitting = '0';
+                if (forceIncompleteInput) {
+                    forceIncompleteInput.value = '0';
+                }
+                recalcularProgresoFormulario(false);
             } catch (error) {
                 submitNativeFallback();
             }

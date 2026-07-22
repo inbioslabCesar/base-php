@@ -140,6 +140,14 @@ foreach ($rows as $row) {
                 'id' => $rowId,
                 'type' => $rowType,
                 'label' => (string)($rowV2['label'] ?? ''),
+                'template_text' => (string)($rowV2['template_text'] ?? ''),
+                'template_visible_pdf' => !array_key_exists('template_visible_pdf', $rowV2) || (bool)$rowV2['template_visible_pdf'],
+                'template_align' => (string)($rowV2['template_align'] ?? 'left'),
+                'color_texto' => (string)($rowV2['color_texto'] ?? ''),
+                'color_fondo' => (string)($rowV2['color_fondo'] ?? ''),
+                'negrita' => !empty($rowV2['negrita']) ? 1 : 0,
+                'cursiva' => !empty($rowV2['cursiva']) ? 1 : 0,
+                'alineacion' => (string)($rowV2['alineacion'] ?? ''),
                 'cells' => $cellsOut,
             ];
         }

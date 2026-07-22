@@ -13,7 +13,32 @@ class ExamCardView {
                 if ($trimmed === '') {
                     return null;
                 }
-                $normalized = str_replace(',', '', $trimmed);
+                $normalized = preg_replace('/\s+/', '', $trimmed);
+                if ($normalized === null) {
+                    $normalized = $trimmed;
+                }
+
+                $hasComma = strpos($normalized, ',') !== false;
+                $hasDot = strpos($normalized, '.') !== false;
+
+                if ($hasComma && $hasDot) {
+                    $lastComma = strrpos($normalized, ',');
+                    $lastDot = strrpos($normalized, '.');
+                    if ($lastComma !== false && $lastDot !== false && $lastComma > $lastDot) {
+                        // Formato tipo 1.234,56
+                        $normalized = str_replace('.', '', $normalized);
+                        $normalized = str_replace(',', '.', $normalized);
+                    } else {
+                        // Formato tipo 1,234.56
+                        $normalized = str_replace(',', '', $normalized);
+                    }
+                } elseif ($hasComma && !$hasDot) {
+                    // Formato tipo 123,45
+                    $normalized = str_replace(',', '.', $normalized);
+                } else {
+                    // Formato tipo 1,234 o 1234.56
+                    $normalized = str_replace(',', '', $normalized);
+                }
                 return is_numeric($normalized) ? floatval($normalized) : null;
             }
             return is_numeric($value) ? floatval($value) : null;
@@ -262,8 +287,17 @@ class ExamCardView {
                 <div class="d-flex align-items-center">
                     <i class="bi bi-clipboard-pulse me-2"></i>
                     <span><?= htmlspecialchars($examen['nombre_examen']) ?></span>
+                    <span class="badge bg-danger ms-2 js-exam-progress-badge">0%</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-light js-update-snapshot-exam"
+                        data-cotizacion-id="<?= htmlspecialchars((string)($examen['id_cotizacion'] ?? $_GET['cotizacion_id'] ?? '')) ?>"
+                        data-id-resultado="<?= htmlspecialchars((string)$examen['id_resultado']) ?>"
+                        title="Actualizar solo este examen al formato actual (conservar cabeceras personalizadas)">
+                        <i class="bi bi-arrow-repeat me-1"></i>Actualizar formato
+                    </button>
                     <div class="exam-order-controls d-flex align-items-center gap-1">
                         <button type="button" class="btn btn-sm btn-light js-exam-drag-handle" title="Arrastrar para reordenar">
                             <i class="bi bi-grip-vertical"></i>
@@ -432,6 +466,12 @@ class ExamCardView {
                                         <?php
                                             $rowBg = trim((string)($rowV2['color_fondo'] ?? ''));
                                             $rowText = trim((string)($rowV2['color_texto'] ?? ''));
+                                            $rowBold = !array_key_exists('negrita', $rowV2) || !empty($rowV2['negrita']);
+                                            $rowItalic = !empty($rowV2['cursiva']);
+                                            $rowAlign = strtolower(trim((string)($rowV2['alineacion'] ?? '')));
+                                            if (!in_array($rowAlign, ['left', 'center', 'right'], true)) {
+                                                $rowAlign = $rowType === 'title' ? 'center' : 'left';
+                                            }
                                             if ($rowBg === '') {
                                                 $rowBg = $rowType === 'title' ? '#eef4ff' : '#f4f7fb';
                                             }
@@ -440,8 +480,48 @@ class ExamCardView {
                                             }
                                         ?>
                                         <tr>
-                                            <td colspan="<?= $visibleCount ?>" class="fw-bold" style="background: <?= htmlspecialchars($rowBg) ?>; color: <?= htmlspecialchars($rowText) ?>; border-radius: 6px; padding: 6px 8px;">
+                                            <td colspan="<?= $visibleCount ?>" style="background: <?= htmlspecialchars($rowBg) ?>; color: <?= htmlspecialchars($rowText) ?>; border-radius: 6px; padding: 6px 8px; font-weight: <?= $rowBold ? '700' : '400' ?>; font-style: <?= $rowItalic ? 'italic' : 'normal' ?>; text-align: <?= htmlspecialchars($rowAlign) ?>;">
                                                 <?= htmlspecialchars((string)($rowV2['label'] ?? '')) ?>
+                                            </td>
+                                        </tr>
+                                    <?php elseif ($rowType === 'long_text'): ?>
+                                        <?php
+                                            $templateEditable = !array_key_exists('template_editable', $rowV2) || (bool)$rowV2['template_editable'];
+                                            $templateText = (string)($rowV2['template_text'] ?? '');
+                                            $templateLabel = trim((string)($rowV2['label'] ?? ''));
+                                            $templateKey = ($rowId !== '') ? lab_format_v2_cell_key($rowId, lab_format_v2_long_text_col_id()) : '';
+                                            $templateAlign = strtolower(trim((string)($rowV2['template_align'] ?? 'left')));
+                                            $templateTextColor = trim((string)($rowV2['color_texto'] ?? ''));
+                                            $templateBgColor = trim((string)($rowV2['color_fondo'] ?? ''));
+                                            $templateBold = !empty($rowV2['negrita']);
+                                            $templateItalic = !empty($rowV2['cursiva']);
+                                            if (!in_array($templateAlign, ['left', 'center', 'right'], true)) {
+                                                $templateAlign = 'left';
+                                            }
+                                            if ($templateTextColor === '') {
+                                                $templateTextColor = '#1f2d5c';
+                                            }
+                                            if ($templateBgColor === '') {
+                                                $templateBgColor = '#fafcff';
+                                            }
+                                        ?>
+                                        <tr>
+                                            <td colspan="<?= $visibleCount ?>" style="padding: 8px; background: <?= htmlspecialchars($templateBgColor) ?>; color: <?= htmlspecialchars($templateTextColor) ?>;">
+                                                <?php if ($templateLabel !== ''): ?>
+                                                    <div class="mb-1" style="text-align: <?= htmlspecialchars($templateAlign) ?>; font-weight: <?= $templateBold ? '700' : '400' ?>; font-style: <?= $templateItalic ? 'italic' : 'normal' ?>;"><?= htmlspecialchars($templateLabel) ?></div>
+                                                <?php endif; ?>
+                                                <?php if ($templateEditable && $templateKey !== ''): ?>
+                                                    <textarea class="form-control form-control-sm"
+                                                        rows="5"
+                                                        name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($templateKey) ?>]"
+                                                        data-progress-track="1"
+                                                        data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
+                                                        data-v2-col-id="<?= htmlspecialchars(lab_format_v2_long_text_col_id()) ?>"
+                                                        data-initial-value="<?= htmlspecialchars($templateText) ?>"
+                                                        style="text-align: <?= htmlspecialchars($templateAlign) ?>; color: <?= htmlspecialchars($templateTextColor) ?>; background: <?= htmlspecialchars($templateBgColor) ?>; font-weight: 400; font-style: normal;"><?= htmlspecialchars($templateText) ?></textarea>
+                                                <?php else: ?>
+                                                    <div style="white-space: pre-wrap; text-align: <?= htmlspecialchars($templateAlign) ?>; color: <?= htmlspecialchars($templateTextColor) ?>; font-weight: 400; font-style: normal;"><?= nl2br(htmlspecialchars($templateText)) ?></div>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                     <?php else: ?>
@@ -483,6 +563,34 @@ class ExamCardView {
                                                     if (isset($rowReferenceRanges[$colId]) && is_array($rowReferenceRanges[$colId])) {
                                                         $currentReferences = $rowReferenceRanges[$colId];
                                                     }
+
+                                                    // Para columnas de resultado sin rango propio, priorizar la
+                                                    // primera columna tipo "reference" de la fila (paridad con v2).
+                                                    if (empty($currentReferences)) {
+                                                        $referenceColIds = [];
+                                                        foreach ($formatColumns as $tmpColDef) {
+                                                            if (!is_array($tmpColDef)) {
+                                                                continue;
+                                                            }
+                                                            $tmpKind = strtolower(trim((string)($tmpColDef['kind'] ?? 'text')));
+                                                            if ($tmpKind !== 'reference') {
+                                                                continue;
+                                                            }
+                                                            $tmpColId = trim((string)($tmpColDef['id'] ?? ''));
+                                                            if ($tmpColId !== '') {
+                                                                $referenceColIds[] = $tmpColId;
+                                                            }
+                                                        }
+
+                                                        foreach ($referenceColIds as $refColId) {
+                                                            if (!empty($rowReferenceRanges[$refColId]) && is_array($rowReferenceRanges[$refColId])) {
+                                                                $currentReferences = $rowReferenceRanges[$refColId];
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Fallback final para compatibilidad con estructuras antiguas.
                                                     if (empty($currentReferences)) {
                                                         foreach ($rowReferenceRanges as $tmpRanges) {
                                                             if (is_array($tmpRanges) && !empty($tmpRanges)) {
@@ -498,18 +606,19 @@ class ExamCardView {
                                                             $currentDecimals = (string)$decRaw;
                                                         }
                                                     }
+                                                    $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
                                                     $referencesAttr = htmlspecialchars(json_encode($currentReferences, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
                                                 ?>
                                                 <td>
                                                     <?php if ($editable): ?>
                                                         <?php
                                                             $fieldKey = lab_format_v2_cell_key($rowId, $colId);
-                                                            $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
                                                         ?>
                                                         <?php if ($kind === 'long_text'): ?>
                                                             <textarea class="form-control form-control-sm"
                                                                 rows="3"
                                                                 name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                data-progress-track="1"
                                                                 data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
                                                                 data-v2-col-id="<?= htmlspecialchars($colId) ?>"
                                                                 data-referencias='<?= $referencesAttr ?>'
@@ -520,6 +629,7 @@ class ExamCardView {
                                                         <?php elseif (!$isFormulaCell && !empty($cellOptions)): ?>
                                                             <select class="form-select form-select-sm"
                                                                 name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                data-progress-track="1"
                                                                 data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
                                                                 data-v2-col-id="<?= htmlspecialchars($colId) ?>"
                                                                 data-referencias='<?= $referencesAttr ?>'
@@ -537,6 +647,7 @@ class ExamCardView {
                                                             <input type="text"
                                                                 class="form-control form-control-sm<?= $isFormulaCell ? ' campo-calculado calculated-field' : '' ?>"
                                                                 name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                data-progress-track="1"
                                                                 value="<?= htmlspecialchars((string)$value) ?>"
                                                                 data-initial-value="<?= htmlspecialchars((string)$value) ?>"
                                                                 data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
@@ -548,7 +659,34 @@ class ExamCardView {
                                                                 <?= $isFormulaCell ? 'data-formula-v2="' . htmlspecialchars($formulaExpr) . '" readonly' : '' ?>>
                                                         <?php endif; ?>
                                                     <?php else: ?>
-                                                        <?= nl2br(htmlspecialchars((string)$value)) ?>
+                                                        <?php
+                                                            $displayValue = (string)$value;
+                                                            if ($kind === 'reference' && !empty($currentReferences) && is_array($currentReferences)) {
+                                                                $refLines = [];
+                                                                foreach ($currentReferences as $refItem) {
+                                                                    if (!is_array($refItem)) {
+                                                                        continue;
+                                                                    }
+                                                                    $descRef = trim((string)($refItem['desc'] ?? ''));
+                                                                    $valorRef = trim((string)($refItem['valor'] ?? ''));
+                                                                    $minRef = trim((string)($refItem['valor_min'] ?? ''));
+                                                                    $maxRef = trim((string)($refItem['valor_max'] ?? ''));
+                                                                    $rangoRef = ($minRef !== '' || $maxRef !== '') ? trim(($minRef !== '' ? $minRef : '') . ' - ' . ($maxRef !== '' ? $maxRef : '')) : '';
+                                                                    $visibleRef = $valorRef !== '' ? $valorRef : $rangoRef;
+                                                                    if ($descRef !== '' && $visibleRef !== '') {
+                                                                        $refLines[] = $descRef . ' (' . $visibleRef . ')';
+                                                                    } elseif ($descRef !== '') {
+                                                                        $refLines[] = $descRef;
+                                                                    } elseif ($visibleRef !== '') {
+                                                                        $refLines[] = $visibleRef;
+                                                                    }
+                                                                }
+                                                                if (!empty($refLines)) {
+                                                                    $displayValue = implode(' | ', $refLines);
+                                                                }
+                                                            }
+                                                        ?>
+                                                        <?= nl2br(htmlspecialchars((string)$displayValue)) ?>
                                                     <?php endif; ?>
                                                 </td>
                                             <?php endforeach; ?>
@@ -587,19 +725,24 @@ class ExamCardView {
                             <input type="text"
                                 class="form-control"
                                 name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']"
+                                data-progress-track="1"
                                 value="' . htmlspecialchars($valorCampo) . '"
                                 data-initial-value="' . htmlspecialchars((string)$valorCampo) . '"
                                 placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">
                         </div>';
                     } elseif ($tipoItem === 'Texto Largo') {
                         $rows = isset($item['rows']) && is_numeric($item['rows']) ? intval($item['rows']) : 4;
-                        $valorTexto = $getResultado($item['nombre'], '', $item);
+                        $plantillaTexto = isset($item['template_text']) ? (string)$item['template_text'] : '';
+                        if ($plantillaTexto === '' && isset($item['valor']) && is_string($item['valor'])) {
+                            $plantillaTexto = (string)$item['valor'];
+                        }
+                        $valorTexto = $getResultado($item['nombre'], $plantillaTexto, $item);
                         echo '<div class="mb-4">
                             <label class="form-label">
                                 <i class="bi bi-textarea-t me-2"></i>
                                 ' . htmlspecialchars($item['nombre']) . '
                             </label>
-                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" data-initial-value="' . htmlspecialchars((string)$valorTexto) . '" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($valorTexto) . '</textarea>
+                            <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" data-progress-track="1" data-initial-value="' . htmlspecialchars((string)$valorTexto) . '" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($valorTexto) . '</textarea>
                         </div>';
                     } elseif ($tipoItem === 'Parámetro') {
                         $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
@@ -668,7 +811,7 @@ class ExamCardView {
                                     }
                                 }
                             }
-                                echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control" data-initial-value="' . htmlspecialchars((string)$valorSelect) . '">
+                                echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control" data-progress-track="1" data-initial-value="' . htmlspecialchars((string)$valorSelect) . '" data-referencias=\'' . json_encode($item['referencias'] ?? []) . '\' data-edad="' . htmlspecialchars($edad_paciente ?? '') . '" data-sexo="' . htmlspecialchars($sexo_paciente ?? '') . '">
                                     <option value="">Seleccione una opción...</option>';
                             foreach ($item['opciones'] as $opcion) {
                                 echo '<option value="' . htmlspecialchars($opcion) . '"' . (($valorSelect !== '' && $valorSelect == $opcion) ? ' selected' : '') . '>' . htmlspecialchars($opcion) . '</option>';
@@ -689,6 +832,7 @@ class ExamCardView {
                             echo '<input type="text"
                                 name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']"
                                 class="form-control' . (!empty($item['formula']) ? ' campo-calculado calculated-field' : '') . ($fuera_rango ? ' is-invalid' : '') . '"
+                                data-progress-track="1"
                                 value="' . htmlspecialchars($value) . '"
                                 data-initial-value="' . htmlspecialchars((string)$value) . '"
                                 placeholder="' . (!empty($item['formula']) ? 'Valor calculado automáticamente' : 'Ingrese el valor') . '"' .

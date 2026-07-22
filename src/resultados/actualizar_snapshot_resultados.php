@@ -6,6 +6,8 @@ require_once __DIR__ . '/../conexion/conexion.php';
 
 $cotizacion_id = $_POST['cotizacion_id'] ?? ($_GET['cotizacion_id'] ?? null);
 $cotizacion_id = is_numeric($cotizacion_id) ? intval($cotizacion_id) : 0;
+$id_resultado = $_POST['id_resultado'] ?? ($_GET['id_resultado'] ?? null);
+$id_resultado = is_numeric($id_resultado) ? intval($id_resultado) : 0;
 $preserve_headers = $_POST['preserve_headers'] ?? ($_GET['preserve_headers'] ?? null);
 $preserve_headers = ($preserve_headers === null) ? 1 : intval($preserve_headers);
 
@@ -30,14 +32,27 @@ if (!$hasSnapshotCol) {
     exit;
 }
 
+// Standby de seguridad: por ahora se desactiva el reseteo total (preserve_headers=0)
+// para evitar pérdida accidental de cabeceras/estructura histórica personalizadas.
+if ($preserve_headers !== 1) {
+    $_SESSION['mensaje'] = 'La opción de reseteo total está temporalmente deshabilitada por seguridad. Usa "Actualizar formato" (conserva cabeceras).';
+    header('Location: dashboard.php?vista=formulario&cotizacion_id=' . $cotizacion_id);
+    exit;
+}
+
 try {
     if ($preserve_headers === 1) {
         $sql = "SELECT re.id, re.adicional_snapshot, re.resultados, e.adicional
                 FROM resultados_examenes re
                 JOIN examenes e ON e.id = re.id_examen
                 WHERE re.id_cotizacion = :cotizacion_id";
+        $params = ['cotizacion_id' => $cotizacion_id];
+        if ($id_resultado > 0) {
+            $sql .= " AND re.id = :id_resultado";
+            $params['id_resultado'] = $id_resultado;
+        }
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(['cotizacion_id' => $cotizacion_id]);
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $detectBefore = function (array $arr, int $idx): string {
@@ -105,6 +120,7 @@ try {
 
         $upd = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
 
+        $updatedCount = 0;
         foreach ($rows as $r) {
             $old = $r['adicional_snapshot'] ?? '';
             $base = $r['adicional'] ?? '';
@@ -252,18 +268,14 @@ try {
                 'snap' => json_encode($baseArr, JSON_UNESCAPED_UNICODE),
                 'id' => $r['id']
             ]);
+            $updatedCount++;
         }
 
-        $_SESSION['mensaje'] = 'Formato actualizado (conservando cabeceras) para la cotización #' . $cotizacion_id . '.';
-    } else {
-        $sql = "UPDATE resultados_examenes re
-                JOIN examenes e ON e.id = re.id_examen
-                SET re.adicional_snapshot = e.adicional
-                WHERE re.id_cotizacion = :cotizacion_id";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(['cotizacion_id' => $cotizacion_id]);
-
-        $_SESSION['mensaje'] = 'Formato reemplazado para la cotización #' . $cotizacion_id . '.';
+        if ($id_resultado > 0) {
+            $_SESSION['mensaje'] = 'Formato actualizado (conservando cabeceras) para el examen seleccionado.';
+        } else {
+            $_SESSION['mensaje'] = 'Formato actualizado (conservando cabeceras) para la cotización #' . $cotizacion_id . '.';
+        }
     }
 } catch (Exception $e) {
     $_SESSION['mensaje'] = 'Error al actualizar formato: ' . $e->getMessage();

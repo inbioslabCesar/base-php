@@ -14,7 +14,7 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
     }
 
     if ($hasSnapshotCol) {
-        $stmt = $pdo->prepare("SELECT re.resultados, COALESCE(re.adicional_snapshot, e.adicional) AS adicional
+        $stmt = $pdo->prepare("SELECT re.resultados, re.adicional_snapshot, e.adicional AS adicional_examen
             FROM resultados_examenes re
             JOIN examenes e ON re.id_examen = e.id
             WHERE re.id_cotizacion = ?");
@@ -46,7 +46,14 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
     };
 
     foreach ($examenes as $examen) {
-        $formatDef = lab_format_decode_definition($examen['adicional'] ?? []);
+        $adicionalRaw = $examen['adicional'] ?? [];
+        if ($hasSnapshotCol) {
+            $snapshotRaw = $examen['adicional_snapshot'] ?? null;
+            $examenRaw = $examen['adicional_examen'] ?? null;
+            $adicionalRaw = ($snapshotRaw !== null && $snapshotRaw !== '') ? $snapshotRaw : $examenRaw;
+        }
+
+        $formatDef = lab_format_decode_definition($adicionalRaw ?? []);
         $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
         $adicional = $formatDef['legacy_items'];
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
@@ -83,6 +90,23 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
                     continue;
                 }
                 $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+                if ($rowType === 'long_text') {
+                    $rowId = trim((string)($row['id'] ?? ''));
+                    if ($rowId === '') {
+                        continue;
+                    }
+                    $isEditableTemplate = !array_key_exists('template_editable', $row) || (bool)$row['template_editable'];
+                    if (!$isEditableTemplate) {
+                        continue;
+                    }
+                    $total_parametros++;
+                    $defaultTemplate = (string)($row['template_text'] ?? '');
+                    $valorTemplate = lab_format_v2_get_result_value(is_array($resultados) ? $resultados : [], $rowId, lab_format_v2_long_text_col_id(), $defaultTemplate);
+                    if ($valorLleno($valorTemplate)) {
+                        $parametros_llenados++;
+                    }
+                    continue;
+                }
                 if ($rowType !== 'data') {
                     continue;
                 }
@@ -157,6 +181,27 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
             $resultados = [];
         }
 
+        $resultadosNorm = [];
+        foreach ($resultados as $k => $v) {
+            if ($k === 'imprimir_examen') {
+                continue;
+            }
+            $nk = trim((string)$k);
+            if ($nk === '') {
+                continue;
+            }
+            $nk = preg_replace('/\s+/u', ' ', $nk);
+            $nk = mb_strtolower($nk, 'UTF-8');
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nk);
+            if ($ascii !== false && $ascii !== null) {
+                $nk = $ascii;
+            }
+            $nk = preg_replace('/[^a-z0-9 ._-]/', '', $nk);
+            if ($nk !== '' && !array_key_exists($nk, $resultadosNorm)) {
+                $resultadosNorm[$nk] = $v;
+            }
+        }
+
         foreach ($adicional as $item) {
             // Contabilizar parámetros ingresables: Parámetro, Campo y Texto Largo
             $tipo = (string)($item['tipo'] ?? '');
@@ -172,6 +217,20 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
                     $valor = $resultados[$stableKey];
                 } elseif (array_key_exists($nombre, $resultados)) {
                     $valor = $resultados[$nombre];
+                } else {
+                    $nombreNorm = trim((string)$nombre);
+                    if ($nombreNorm !== '') {
+                        $nombreNorm = preg_replace('/\s+/u', ' ', $nombreNorm);
+                        $nombreNorm = mb_strtolower($nombreNorm, 'UTF-8');
+                        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nombreNorm);
+                        if ($ascii !== false && $ascii !== null) {
+                            $nombreNorm = $ascii;
+                        }
+                        $nombreNorm = preg_replace('/[^a-z0-9 ._-]/', '', $nombreNorm);
+                        if ($nombreNorm !== '' && array_key_exists($nombreNorm, $resultadosNorm)) {
+                            $valor = $resultadosNorm[$nombreNorm];
+                        }
+                    }
                 }
                 if (
                     ($valor !== null || $valor === 0 || $valor === '0') && (
