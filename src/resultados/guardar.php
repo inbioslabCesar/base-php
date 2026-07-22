@@ -196,7 +196,7 @@ $normalizarResultadosPorSnapshot = function (array $resultados, $snapshotSrc) us
             continue;
         }
 
-        if (strpos($key, 'id_parametro_') === 0) {
+        if (strpos($key, 'id_parametro_') === 0 || strpos($key, 'v2__') === 0) {
             // Respetar claves estables ya normalizadas.
             $salida[$key] = $v;
             continue;
@@ -695,153 +695,427 @@ if (!empty($examenes) && is_array($examenes)) {
                     $adicional_arr = [];
                 }
 
-                // Editar/eliminar cabeceras existentes por índice
-                if (is_array($cabeceras_editar)) {
-                    // Procesar eliminaciones primero (índices altos -> bajos)
-                    $toDelete = [];
-                    foreach ($cabeceras_editar as $idx => $data) {
-                        if (!is_array($data)) continue;
-                        if (!empty($data['eliminar'])) {
-                            $toDelete[] = intval($idx);
-                        }
-                    }
-                    rsort($toDelete);
-                    foreach ($toDelete as $idx) {
-                        if (isset($adicional_arr[$idx]) && in_array(($adicional_arr[$idx]['tipo'] ?? ''), ['Título', 'Subtítulo'], true)) {
-                            unset($adicional_arr[$idx]);
-                        }
-                    }
-                    if (!empty($toDelete)) {
-                        $adicional_arr = array_values($adicional_arr);
+                $isSnapshotV2 = isset($adicional_arr['schema_version'])
+                    && intval($adicional_arr['schema_version'] ?? 0) >= 2
+                    && isset($adicional_arr['layout'])
+                    && is_array($adicional_arr['layout']);
+
+                if ($isSnapshotV2) {
+                    $layoutRows = $adicional_arr['layout']['rows'] ?? [];
+                    if (!is_array($layoutRows)) {
+                        $layoutRows = [];
                     }
 
-                    // Aplicar cambios de nombre/color
-                    foreach ($cabeceras_editar as $idx => $data) {
-                        if (!is_array($data)) continue;
-                        if (!empty($data['eliminar'])) continue;
-                        $idxInt = intval($idx);
-                        if (!isset($adicional_arr[$idxInt])) continue;
-                        $tipo = $adicional_arr[$idxInt]['tipo'] ?? '';
-                        if (!in_array($tipo, ['Título', 'Subtítulo'], true)) continue;
-                        $nombre = trim((string)($data['nombre'] ?? ''));
-                        $color = trim((string)($data['color'] ?? ''));
+                    $getRowLabel = static function ($row) {
+                        return trim((string)($row['label'] ?? ''));
+                    };
+
+                    $findInsertIndex = static function (array $rows, string $before) use ($getRowLabel) {
+                        $before = trim($before);
+                        if ($before === '__FIRST__') {
+                            return 0;
+                        }
+                        if ($before === '' || $before === '__END__') {
+                            return null;
+                        }
+                        foreach ($rows as $idx => $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+                            if (!in_array($rowType, ['data', 'title', 'subtitle'], true)) {
+                                continue;
+                            }
+                            if ($getRowLabel($row) === $before) {
+                                return $idx;
+                            }
+                        }
+                        return null;
+                    };
+
+                    $collectTitleRows = static function (array $rows): array {
+                        $items = [];
+                        foreach ($rows as $idx => $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $type = strtolower(trim((string)($row['type'] ?? 'data')));
+                            if (!in_array($type, ['title', 'subtitle'], true)) {
+                                continue;
+                            }
+                            $label = trim((string)($row['label'] ?? ''));
+                            if ($label === '') {
+                                continue;
+                            }
+                            $items[] = [
+                                'idx' => (int)$idx,
+                                'item' => $row,
+                                'label' => $label,
+                            ];
+                        }
+                        return $items;
+                    };
+
+                    $replaceTitleRow = static function (array &$rows, int $idx, string $nombre, string $color, callable $isHexColor): void {
+                        if (!isset($rows[$idx]) || !is_array($rows[$idx])) {
+                            return;
+                        }
+                        $tipoFila = strtolower(trim((string)($rows[$idx]['type'] ?? 'data')));
+                        if (!in_array($tipoFila, ['title', 'subtitle'], true)) {
+                            return;
+                        }
                         if ($nombre !== '') {
-                            $adicional_arr[$idxInt]['nombre'] = $nombre;
+                            $rows[$idx]['label'] = $nombre;
                         }
                         if ($color !== '' && $isHexColor($color)) {
-                            // Para asemejar el PDF (texto en color), mantener fondo blanco
-                            $adicional_arr[$idxInt]['color_texto'] = $color;
-                            if (!isset($adicional_arr[$idxInt]['color_fondo']) || $adicional_arr[$idxInt]['color_fondo'] === '') {
-                                $adicional_arr[$idxInt]['color_fondo'] = '#ffffff';
+                            $rows[$idx]['color_texto'] = $color;
+                            if (!isset($rows[$idx]['color_fondo']) || $rows[$idx]['color_fondo'] === '') {
+                                $rows[$idx]['color_fondo'] = '#ffffff';
+                            }
+                        }
+                    };
+
+                    $moveTitleRow = static function (array &$rows, int $idx, string $before, callable $findInsertIndex): void {
+                        if (!isset($rows[$idx])) {
+                            return;
+                        }
+                        $item = $rows[$idx];
+                        unset($rows[$idx]);
+                        $rows = array_values($rows);
+                        $insertAt = $findInsertIndex($rows, $before);
+                        if ($insertAt === null) {
+                            $rows[] = $item;
+                        } else {
+                            array_splice($rows, $insertAt, 0, [$item]);
+                        }
+                    };
+
+                    if (is_array($cabeceras_editar)) {
+                        $toDelete = [];
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data)) continue;
+                            if (!empty($data['eliminar'])) {
+                                $toDelete[] = intval($idx);
+                            }
+                        }
+                        rsort($toDelete);
+                        foreach ($toDelete as $idx) {
+                            if (isset($layoutRows[$idx])) {
+                                $tipoFila = strtolower(trim((string)($layoutRows[$idx]['type'] ?? 'data')));
+                                if (in_array($tipoFila, ['title', 'subtitle'], true)) {
+                                    unset($layoutRows[$idx]);
+                                }
+                            }
+                        }
+                        if (!empty($toDelete)) {
+                            $layoutRows = array_values($layoutRows);
+                        }
+
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data) || !empty($data['eliminar'])) continue;
+                            $idxInt = intval($idx);
+                            $nombre = trim((string)($data['nombre'] ?? ''));
+                            $color = trim((string)($data['color'] ?? ''));
+                            $replaceTitleRow($layoutRows, $idxInt, $nombre, $color, $isHexColor);
+                        }
+
+                        $moves = [];
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data) || !empty($data['eliminar']) || !isset($data['before'])) continue;
+                            $idxInt = intval($idx);
+                            if (!isset($layoutRows[$idxInt])) continue;
+                            $tipoFila = strtolower(trim((string)($layoutRows[$idxInt]['type'] ?? 'data')));
+                            if (!in_array($tipoFila, ['title', 'subtitle'], true)) continue;
+                            $moves[] = ['idx' => $idxInt, 'before' => (string)$data['before']];
+                        }
+
+                        if (!empty($moves)) {
+                            usort($moves, function ($a, $b) { return $b['idx'] <=> $a['idx']; });
+                            $extracted = [];
+                            foreach ($moves as $m) {
+                                $i = $m['idx'];
+                                if (!isset($layoutRows[$i])) continue;
+                                $extracted[] = ['orig' => $i, 'before' => $m['before'], 'item' => $layoutRows[$i]];
+                                unset($layoutRows[$i]);
+                            }
+                            $layoutRows = array_values($layoutRows);
+                            usort($extracted, function ($a, $b) { return $a['orig'] <=> $b['orig']; });
+                            foreach ($extracted as $ex) {
+                                $insertAt = $findInsertIndex($layoutRows, (string)$ex['before']);
+                                if ($insertAt === null) {
+                                    $layoutRows[] = $ex['item'];
+                                } else {
+                                    array_splice($layoutRows, $insertAt, 0, [$ex['item']]);
+                                }
                             }
                         }
                     }
 
-                    // Reordenar (mover) cabeceras existentes según ubicación seleccionada
-                    $moves = [];
-                    foreach ($cabeceras_editar as $idx => $data) {
-                        if (!is_array($data)) continue;
-                        if (!empty($data['eliminar'])) continue;
-                        if (!isset($data['before'])) continue;
-                        $idxInt = intval($idx);
-                        if (!isset($adicional_arr[$idxInt])) continue;
-                        $tipo = $adicional_arr[$idxInt]['tipo'] ?? '';
-                        if (!in_array($tipo, ['Título', 'Subtítulo'], true)) continue;
-                        $before = (string)$data['before'];
-                        $moves[] = ['idx' => $idxInt, 'before' => $before];
+                    if (is_array($cabeceras_nuevas)) {
+                        foreach ($cabeceras_nuevas as $data) {
+                            if (!is_array($data)) continue;
+                            $titulo = trim((string)($data['titulo'] ?? ''));
+                            if ($titulo === '') continue;
+                            $color = trim((string)($data['color'] ?? ''));
+                            if (!$isHexColor($color)) {
+                                $color = '#0923E1';
+                            }
+                            $before = (string)($data['before'] ?? '__END__');
+                            $nuevo = [
+                                'id' => 'hdr_' . uniqid(),
+                                'type' => 'title',
+                                'label' => $titulo,
+                                'color_fondo' => '#ffffff',
+                                'color_texto' => $color,
+                                'negrita' => 1,
+                                'alineacion' => 'left',
+                                'origen' => 'paciente',
+                                'custom_paciente' => 1,
+                            ];
+                            $insertAt = $findInsertIndex($layoutRows, $before);
+                            if ($insertAt === null) {
+                                $layoutRows[] = $nuevo;
+                            } else {
+                                array_splice($layoutRows, $insertAt, 0, [$nuevo]);
+                            }
+                        }
                     }
 
-                    if (!empty($moves)) {
-                        // Extraer ítems a mover (de atrás hacia adelante para no romper índices)
-                        usort($moves, function ($a, $b) { return $b['idx'] <=> $a['idx']; });
-                        $extracted = [];
-                        foreach ($moves as $m) {
-                            $i = $m['idx'];
-                            if (!isset($adicional_arr[$i])) continue;
-                            $extracted[] = ['orig' => $i, 'before' => $m['before'], 'item' => $adicional_arr[$i]];
-                            unset($adicional_arr[$i]);
+                    $dedupeKeys = [];
+                    foreach ($layoutRows as $idx => $row) {
+                        if (!is_array($row)) {
+                            continue;
                         }
-                        $adicional_arr = array_values($adicional_arr);
+                        $type = strtolower(trim((string)($row['type'] ?? 'data')));
+                        if (!in_array($type, ['title', 'subtitle'], true)) {
+                            continue;
+                        }
+                        $isCustom = (!empty($row['custom_paciente']) && (int)$row['custom_paciente'] === 1)
+                            || ((string)($row['origen'] ?? '') === 'paciente');
+                        if (!$isCustom) {
+                            continue;
+                        }
+                        $label = trim((string)($row['label'] ?? ''));
+                        $key = $type . '|' . $normKey($label);
+                        if ($key === $type . '|') {
+                            continue;
+                        }
+                        if (isset($dedupeKeys[$key])) {
+                            unset($layoutRows[$idx]);
+                            continue;
+                        }
+                        $dedupeKeys[$key] = true;
+                    }
+                    $layoutRows = array_values($layoutRows);
 
-                        // Insertar en orden original (arriba hacia abajo)
-                        usort($extracted, function ($a, $b) { return $a['orig'] <=> $b['orig']; });
-                        foreach ($extracted as $ex) {
-                            $before = (string)$ex['before'];
+                    // Mantener coherencia con legacy: si el snapshot v2 ya trae cabeceras personalizadas,
+                    // conservarlas y solo aplicar los cambios de este submit.
+                    $existingTitles = $collectTitleRows($layoutRows);
+                    if (!empty($existingTitles)) {
+                        foreach ($existingTitles as $titleMeta) {
+                            $idxTitle = (int)$titleMeta['idx'];
+                            if (!isset($layoutRows[$idxTitle])) {
+                                continue;
+                            }
+                            if (!isset($layoutRows[$idxTitle]['custom_paciente']) || (int)$layoutRows[$idxTitle]['custom_paciente'] !== 1) {
+                                continue;
+                            }
+                            if (empty($layoutRows[$idxTitle]['label'])) {
+                                $layoutRows[$idxTitle]['label'] = $titleMeta['label'];
+                            }
+                            if (empty($layoutRows[$idxTitle]['color_fondo'])) {
+                                $layoutRows[$idxTitle]['color_fondo'] = '#ffffff';
+                            }
+                        }
+                    }
+
+                    $adicional_arr['layout']['rows'] = array_values($layoutRows);
+
+                    $stmtUpdFmt = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
+                    $stmtUpdFmt->execute([
+                        'snap' => json_encode($adicional_arr, JSON_UNESCAPED_UNICODE),
+                        'id' => $id_resultado
+                    ]);
+                } else {
+                    $dedupeLegacyTitles = static function (array &$rows) use ($normKey): void {
+                        $seen = [];
+                        foreach ($rows as $idx => $row) {
+                            if (!is_array($row)) {
+                                continue;
+                            }
+                            $tipo = (string)($row['tipo'] ?? '');
+                            if (!in_array($tipo, ['Título', 'Subtítulo'], true)) {
+                                continue;
+                            }
+                            $isCustom = (!empty($row['custom_paciente']) && (int)$row['custom_paciente'] === 1)
+                                || ((string)($row['origen'] ?? '') === 'paciente');
+                            if (!$isCustom) {
+                                continue;
+                            }
+                            $nombre = trim((string)($row['nombre'] ?? ''));
+                            $key = $tipo . '|' . $normKey($nombre);
+                            if ($key === $tipo . '|') {
+                                continue;
+                            }
+                            if (isset($seen[$key])) {
+                                unset($rows[$idx]);
+                                continue;
+                            }
+                            $seen[$key] = true;
+                        }
+                        $rows = array_values($rows);
+                    };
+
+                    // Editar/eliminar cabeceras existentes por índice
+                    if (is_array($cabeceras_editar)) {
+                        // Procesar eliminaciones primero (índices altos -> bajos)
+                        $toDelete = [];
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data)) continue;
+                            if (!empty($data['eliminar'])) {
+                                $toDelete[] = intval($idx);
+                            }
+                        }
+                        rsort($toDelete);
+                        foreach ($toDelete as $idx) {
+                            if (isset($adicional_arr[$idx]) && in_array(($adicional_arr[$idx]['tipo'] ?? ''), ['Título', 'Subtítulo'], true)) {
+                                unset($adicional_arr[$idx]);
+                            }
+                        }
+                        if (!empty($toDelete)) {
+                            $adicional_arr = array_values($adicional_arr);
+                        }
+
+                        // Aplicar cambios de nombre/color
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data)) continue;
+                            if (!empty($data['eliminar'])) continue;
+                            $idxInt = intval($idx);
+                            if (!isset($adicional_arr[$idxInt])) continue;
+                            $tipo = $adicional_arr[$idxInt]['tipo'] ?? '';
+                            if (!in_array($tipo, ['Título', 'Subtítulo'], true)) continue;
+                            $nombre = trim((string)($data['nombre'] ?? ''));
+                            $color = trim((string)($data['color'] ?? ''));
+                            if ($nombre !== '') {
+                                $adicional_arr[$idxInt]['nombre'] = $nombre;
+                            }
+                            if ($color !== '' && $isHexColor($color)) {
+                                // Para asemejar el PDF (texto en color), mantener fondo blanco
+                                $adicional_arr[$idxInt]['color_texto'] = $color;
+                                if (!isset($adicional_arr[$idxInt]['color_fondo']) || $adicional_arr[$idxInt]['color_fondo'] === '') {
+                                    $adicional_arr[$idxInt]['color_fondo'] = '#ffffff';
+                                }
+                            }
+                        }
+
+                        // Reordenar (mover) cabeceras existentes según ubicación seleccionada
+                        $moves = [];
+                        foreach ($cabeceras_editar as $idx => $data) {
+                            if (!is_array($data)) continue;
+                            if (!empty($data['eliminar'])) continue;
+                            if (!isset($data['before'])) continue;
+                            $idxInt = intval($idx);
+                            if (!isset($adicional_arr[$idxInt])) continue;
+                            $tipo = $adicional_arr[$idxInt]['tipo'] ?? '';
+                            if (!in_array($tipo, ['Título', 'Subtítulo'], true)) continue;
+                            $before = (string)$data['before'];
+                            $moves[] = ['idx' => $idxInt, 'before' => $before];
+                        }
+
+                        if (!empty($moves)) {
+                            // Extraer ítems a mover (de atrás hacia adelante para no romper índices)
+                            usort($moves, function ($a, $b) { return $b['idx'] <=> $a['idx']; });
+                            $extracted = [];
+                            foreach ($moves as $m) {
+                                $i = $m['idx'];
+                                if (!isset($adicional_arr[$i])) continue;
+                                $extracted[] = ['orig' => $i, 'before' => $m['before'], 'item' => $adicional_arr[$i]];
+                                unset($adicional_arr[$i]);
+                            }
+                            $adicional_arr = array_values($adicional_arr);
+
+                            // Insertar en orden original (arriba hacia abajo)
+                            usort($extracted, function ($a, $b) { return $a['orig'] <=> $b['orig']; });
+                            foreach ($extracted as $ex) {
+                                $before = (string)$ex['before'];
+                                $insertAt = null;
+                                if ($before === '__FIRST__') {
+                                    $insertAt = 0;
+                                } elseif ($before === '__END__' || $before === '') {
+                                    $insertAt = null;
+                                } else {
+                                    foreach ($adicional_arr as $k => $it) {
+                                        $t = $it['tipo'] ?? '';
+                                        $n = $it['nombre'] ?? '';
+                                        if (in_array($t, ['Parámetro', 'Campo', 'Texto Largo'], true) && $n === $before) {
+                                            $insertAt = $k;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if ($insertAt === null) {
+                                    $adicional_arr[] = $ex['item'];
+                                } else {
+                                    array_splice($adicional_arr, $insertAt, 0, [$ex['item']]);
+                                }
+                            }
+                        }
+                    }
+
+                    // Insertar nuevas cabeceras
+                    if (is_array($cabeceras_nuevas)) {
+                        foreach ($cabeceras_nuevas as $data) {
+                            if (!is_array($data)) continue;
+                            $titulo = trim((string)($data['titulo'] ?? ''));
+                            if ($titulo === '') continue;
+                            $color = trim((string)($data['color'] ?? ''));
+                            if (!$isHexColor($color)) {
+                                $color = '#0923E1';
+                            }
+                            $before = (string)($data['before'] ?? '__END__');
+
+                            $nuevo = [
+                                'tipo' => 'Título',
+                                'nombre' => $titulo,
+                                'color_fondo' => '#ffffff',
+                                'color_texto' => $color,
+                                'negrita' => 1,
+                                'alineacion' => 'left',
+                                'origen' => 'paciente',
+                                'custom_paciente' => 1,
+                            ];
+
                             $insertAt = null;
                             if ($before === '__FIRST__') {
                                 $insertAt = 0;
                             } elseif ($before === '__END__' || $before === '') {
                                 $insertAt = null;
                             } else {
-                                foreach ($adicional_arr as $k => $it) {
-                                    $t = $it['tipo'] ?? '';
-                                    $n = $it['nombre'] ?? '';
-                                    if (in_array($t, ['Parámetro', 'Campo', 'Texto Largo'], true) && $n === $before) {
-                                        $insertAt = $k;
+                                foreach ($adicional_arr as $i => $it) {
+                                    if (($it['nombre'] ?? '') === $before) {
+                                        $insertAt = $i;
                                         break;
                                     }
                                 }
                             }
 
                             if ($insertAt === null) {
-                                $adicional_arr[] = $ex['item'];
+                                $adicional_arr[] = $nuevo;
                             } else {
-                                array_splice($adicional_arr, $insertAt, 0, [$ex['item']]);
+                                array_splice($adicional_arr, $insertAt, 0, [$nuevo]);
                             }
                         }
                     }
+
+                    $dedupeLegacyTitles($adicional_arr);
+
+                    $stmtUpdFmt = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
+                    $stmtUpdFmt->execute([
+                        'snap' => json_encode($adicional_arr, JSON_UNESCAPED_UNICODE),
+                        'id' => $id_resultado
+                    ]);
                 }
-
-                // Insertar nuevas cabeceras
-                if (is_array($cabeceras_nuevas)) {
-                    foreach ($cabeceras_nuevas as $data) {
-                        if (!is_array($data)) continue;
-                        $titulo = trim((string)($data['titulo'] ?? ''));
-                        if ($titulo === '') continue;
-                        $color = trim((string)($data['color'] ?? ''));
-                        if (!$isHexColor($color)) {
-                            $color = '#0923E1';
-                        }
-                        $before = (string)($data['before'] ?? '__END__');
-
-                        $nuevo = [
-                            'tipo' => 'Título',
-                            'nombre' => $titulo,
-                            'color_fondo' => '#ffffff',
-                            'color_texto' => $color,
-                            'negrita' => 1,
-                            'alineacion' => 'left',
-                            'origen' => 'paciente',
-                            'custom_paciente' => 1,
-                        ];
-
-                        $insertAt = null;
-                        if ($before === '__FIRST__') {
-                            $insertAt = 0;
-                        } elseif ($before === '__END__' || $before === '') {
-                            $insertAt = null;
-                        } else {
-                            foreach ($adicional_arr as $i => $it) {
-                                if (($it['nombre'] ?? '') === $before) {
-                                    $insertAt = $i;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if ($insertAt === null) {
-                            $adicional_arr[] = $nuevo;
-                        } else {
-                            array_splice($adicional_arr, $insertAt, 0, [$nuevo]);
-                        }
-                    }
-                }
-
-                $stmtUpdFmt = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
-                $stmtUpdFmt->execute([
-                    'snap' => json_encode($adicional_arr, JSON_UNESCAPED_UNICODE),
-                    'id' => $id_resultado
-                ]);
             }
 
             // Traer resultados existentes para no perder data al cambiar parámetros/metodología.
@@ -1015,12 +1289,18 @@ if (!empty($examenes) && is_array($examenes)) {
             }
         }
         $_SESSION['mensaje'] = $mensaje;
+        $_SESSION['mensaje_tipo'] = 'success';
+    }
+
+    if (empty($_SESSION['mensaje'])) {
+        $_SESSION['mensaje'] = 'Resultados guardados correctamente.';
+        $_SESSION['mensaje_tipo'] = 'success';
     }
 
     if ($stayOnForm && $cotizacion_id) {
         header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
     } else {
-        header("Location: dashboard.php?vista=cotizaciones&mensaje=Resultados guardados correctamente");
+        header("Location: dashboard.php?vista=cotizaciones");
     }
     exit;
 } else {

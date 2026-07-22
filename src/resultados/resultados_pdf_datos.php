@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
+
 // Funciones para obtener datos de cotización, paciente, empresa y resultados
 function obtenerDatosCotizacion($pdo, $cotizacion_id) {
     $sqlCot = "SELECT c.id_empresa, c.id_convenio, c.referencia_personalizada, e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
@@ -71,12 +73,94 @@ function obtenerItemsResultados($pdo, $rows) {
         $stmt2->execute(['id_examen' => $row['id_examen']]);
         $examen = $stmt2->fetch(PDO::FETCH_ASSOC);
 
-        $adicional_src = $row['adicional_snapshot'] ?? null;
+        $snapshot_src = $row['adicional_snapshot'] ?? null;
+        $examen_src = $examen['adicional'] ?? null;
+
+        $snapshotDef = lab_format_decode_definition($snapshot_src);
+        $examenDef = lab_format_decode_definition($examen_src);
+
+        $adicional_src = $snapshot_src;
         if ($adicional_src === null || $adicional_src === '') {
-            $adicional_src = $examen['adicional'] ?? null;
+            $adicional_src = $examen_src;
+        } else {
+            $snapshotIsV2 = !empty($snapshotDef['is_v2']);
+            $examenIsV2 = !empty($examenDef['is_v2']);
+            // Si snapshot quedó en legacy pero el examen actual ya es v2,
+            // usar formato vigente para evitar PDF vacío o desalineado.
+            if ($examenIsV2 && !$snapshotIsV2) {
+                $adicional_src = $examen_src;
+            }
         }
-        $adicional = $adicional_src ? json_decode($adicional_src, true) : [];
+
+        $formatDef = lab_format_decode_definition($adicional_src);
+        $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+        $adicional = $formatDef['legacy_items'];
         $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
+
+        if ($isFormatV2) {
+            $allCols = lab_format_v2_columns($formatDef);
+            $resolvedRows = lab_format_v2_resolve_rows($allCols, lab_format_v2_rows($formatDef), is_array($resultados_json) ? $resultados_json : []);
+            $cols = [];
+            foreach ($allCols as $col) {
+                if (!lab_format_v2_col_visible($col, 'pdf')) {
+                    continue;
+                }
+                $cols[] = [
+                    'id' => (string)($col['id'] ?? ''),
+                    'label' => (string)($col['label'] ?? ($col['id'] ?? '')),
+                    'width' => (string)($col['width'] ?? ''),
+                    'editable' => lab_format_v2_col_editable($col),
+                    'kind' => (string)($col['kind'] ?? 'text'),
+                ];
+            }
+
+            $rowsV2 = [];
+            foreach ($resolvedRows as $rowV2) {
+                if (!is_array($rowV2)) {
+                    continue;
+                }
+                $rowId = trim((string)($rowV2['id'] ?? ''));
+                $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
+                $cells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
+                $rowDecimals = is_array($rowV2['decimales'] ?? null) ? $rowV2['decimales'] : [];
+                $cellsOut = [];
+                foreach ($cols as $col) {
+                    $colId = $col['id'];
+                    $rawValue = $cells[$colId] ?? '';
+                    $colDec = null;
+                    if (array_key_exists($colId, $rowDecimals) && $rowDecimals[$colId] !== '' && $rowDecimals[$colId] !== null && is_numeric($rowDecimals[$colId])) {
+                        $tmpDec = intval($rowDecimals[$colId]);
+                        if ($tmpDec >= 0 && $tmpDec <= 6) {
+                            $colDec = $tmpDec;
+                        }
+                    }
+                    if ($colDec !== null && is_numeric($rawValue)) {
+                        $cellsOut[$colId] = number_format((float)$rawValue, $colDec, '.', '');
+                    } else {
+                        $cellsOut[$colId] = $rawValue;
+                    }
+                }
+                $rowsV2[] = [
+                    'id' => $rowId,
+                    'type' => $rowType,
+                    'label' => (string)($rowV2['label'] ?? ''),
+                    'color_texto' => (string)($rowV2['color_texto'] ?? ''),
+                    'color_fondo' => (string)($rowV2['color_fondo'] ?? ''),
+                    'negrita' => !empty($rowV2['negrita']) ? 1 : 0,
+                    'cursiva' => !empty($rowV2['cursiva']) ? 1 : 0,
+                    'alineacion' => (string)($rowV2['alineacion'] ?? ''),
+                    'cells' => $cellsOut,
+                ];
+            }
+
+            $items[] = [
+                'tipo' => 'TablaV2',
+                'titulo' => (string)($examen['nombre_examen'] ?? ''),
+                'columnas' => $cols,
+                'filas' => $rowsV2,
+            ];
+            continue;
+        }
 
         // Respetar el flag de "Imprimir" por examen: si está deshabilitado, omitir todo el examen del PDF
         $imprimir_examen = isset($resultados_json['imprimir_examen']) ? intval($resultados_json['imprimir_examen']) : 1;
@@ -214,13 +298,21 @@ function obtenerItemsResultados($pdo, $rows) {
         $formulaItems = [];
 
         foreach ($adicional as $item) {
-            if (!in_array($item['tipo'], ['Parámetro', 'Título', 'Subtítulo', 'Texto Largo'])) {
+            if (!is_array($item)) {
                 continue;
             }
 
-            $nombre = $item['nombre'];
+            $tipoItem = (string)($item['tipo'] ?? '');
+            $nombre = (string)($item['nombre'] ?? '');
+            if ($tipoItem === '' || $nombre === '') {
+                continue;
+            }
 
-            if ($item['tipo'] === 'Parámetro') {
+            if (!in_array($tipoItem, ['Parámetro', 'Título', 'Subtítulo', 'Texto Largo'], true)) {
+                continue;
+            }
+
+            if ($tipoItem === 'Parámetro') {
                 $valor = $getResultado($nombre, $item, '');
                 $valores[$nombre] = $valor;
                 $valoresNorm[$normKey($nombre)] = $valor;
@@ -231,7 +323,7 @@ function obtenerItemsResultados($pdo, $rows) {
                     $valores[$nombre] = $formatValor($valor, $item);
                     $valoresNorm[$normKey($nombre)] = $valores[$nombre];
                 }
-            } elseif ($item['tipo'] === 'Texto Largo') {
+            } elseif ($tipoItem === 'Texto Largo') {
                 $ordered[] = ['kind' => 'texto', 'item' => $item, 'nombre' => $nombre];
             } else {
                 $ordered[] = ['kind' => 'otro', 'item' => $item, 'nombre' => $nombre];

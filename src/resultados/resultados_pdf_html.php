@@ -75,28 +75,163 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     // Inicializar $html para el contenido principal (sin cabecera)
     $html = '';
 
-    // El título debe ir fuera de la tabla para que se centre correctamente
+    // El título principal va fuera de cualquier tabla para evitar duplicados visuales.
     $html .= '<div style="height:32px;"></div>';
-    $html .= '<table class="tabla-resultados"><thead>';
-    $html .= '<tr><th colspan="5" style="text-align:center;" class="titulo-reporte">Reporte de Resultados</th></tr>';
-    $html .= '<tr>';
-    $html .= '<th class="prueba">Prueba</th>';
-    $html .= '<th class="metodologia">Metodología</th>';
-    $html .= '<th class="resultado">Resultado</th>';
-    $html .= '<th class="unidades">Unidades</th>';
-    $html .= '<th class="referencia">Valores de Referencia</th>';
-    $html .= '</tr></thead><tbody>';
+    $html .= '<div class="titulo-reporte">Reporte de Resultados</div>';
+
+    $legacyTableOpen = false;
+    $openLegacyTable = function () use (&$html, &$legacyTableOpen) {
+        if ($legacyTableOpen) {
+            return;
+        }
+        $html .= '<table class="tabla-resultados"><thead><tr>';
+        $html .= '<th class="prueba">Prueba</th>';
+        $html .= '<th class="metodologia">Metodología</th>';
+        $html .= '<th class="resultado">Resultado</th>';
+        $html .= '<th class="unidades">Unidades</th>';
+        $html .= '<th class="referencia">Valores de Referencia</th>';
+        $html .= '</tr></thead><tbody>';
+        $legacyTableOpen = true;
+    };
+    $closeLegacyTable = function () use (&$html, &$legacyTableOpen) {
+        if (!$legacyTableOpen) {
+            return;
+        }
+        $html .= '</tbody></table>';
+        $legacyTableOpen = false;
+    };
 
     $sinDecimales = ['R_GLOBULOS_BLANCOS', 'PLAQUETAS'];
+    $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
+        if (empty($referencias)) {
+            return null;
+        }
+        foreach ($referencias as $ref) {
+            if (!is_array($ref)) {
+                continue;
+            }
+            $refSexo = strtolower(trim((string)($ref['sexo'] ?? '')));
+            $refEdadMin = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
+            $refEdadMax = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
+            $sexoOk = ($refSexo === '' || $refSexo === 'cualquiera' || $refSexo === $sexo);
+            $edadOk = true;
+            if ($edad !== null) {
+                $edadOk = ($refEdadMin === null || $edad >= $refEdadMin) && ($refEdadMax === null || $edad <= $refEdadMax);
+            }
+            if ($sexoOk && $edadOk) {
+                return $ref;
+            }
+        }
+        return is_array($referencias[0] ?? null) ? $referencias[0] : null;
+    };
+
+    $renderReferenciaV2 = static function ($value): string {
+        $raw = trim((string)$value);
+        if ($raw === '') {
+            return '';
+        }
+
+        $parts = preg_split('/\s*\|\s*|\r\n|\r|\n|\s*;\s*/u', $raw);
+        $items = [];
+        foreach ((array)$parts as $part) {
+            $part = trim((string)$part);
+            if ($part !== '') {
+                $items[] = $part;
+            }
+        }
+
+        if (count($items) <= 1) {
+            return htmlspecialchars($raw);
+        }
+
+        $htmlList = '<table style="width:100%; border-collapse:collapse; font-size:10px;">';
+        foreach ($items as $itemText) {
+            $htmlList .= '<tr><td style="padding:2px 0; border-bottom:0.4px solid #d9e3f5;">' . htmlspecialchars($itemText) . '</td></tr>';
+        }
+        $htmlList .= '</table>';
+        return $htmlList;
+    };
+
     foreach ($items as $item) {
-        if ($item['tipo'] === "Título" || $item['tipo'] === "Subtítulo") {
+        if (($item['tipo'] ?? '') === 'TablaV2') {
+            $closeLegacyTable();
+
+            $cols = is_array($item['columnas'] ?? null) ? $item['columnas'] : [];
+            $rowsV2 = is_array($item['filas'] ?? null) ? $item['filas'] : [];
+            $colCount = max(1, count($cols));
+
+            $html .= '<table style="width:100%; table-layout:fixed; border-collapse:collapse; font-size:10px; margin-top:4px; margin-bottom:8px;">';
+            $html .= '<thead><tr>';
+            foreach ($cols as $col) {
+                $w = trim((string)($col['width'] ?? ''));
+                $style = 'padding:4px; background:#d7e3fcff; color:#1a237e; font-weight:bold; text-align:left; vertical-align:middle; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;';
+                if ($w !== '') {
+                    $style .= ' width:' . htmlspecialchars($w) . ';';
+                }
+                $html .= '<th style="' . $style . '">' . htmlspecialchars((string)($col['label'] ?? $col['id'] ?? '')) . '</th>';
+            }
+            $html .= '</tr></thead><tbody>';
+
+            foreach ($rowsV2 as $rowV2) {
+                if (!is_array($rowV2)) {
+                    continue;
+                }
+                $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
+                if ($rowType === 'title' || $rowType === 'subtitle') {
+                    $colorFondo = trim((string)($rowV2['color_fondo'] ?? ''));
+                    $colorTexto = trim((string)($rowV2['color_texto'] ?? ''));
+                    $fontWeight = !empty($rowV2['negrita']) ? 'bold' : 'normal';
+                    $fontStyle = !empty($rowV2['cursiva']) ? 'italic' : 'normal';
+                    $textAlign = trim((string)($rowV2['alineacion'] ?? ''));
+                    if ($textAlign === '') {
+                        $textAlign = ($rowType === 'title') ? 'center' : 'left';
+                    }
+                    $style = 'padding:4px 6px; font-weight:' . $fontWeight . '; font-style:' . $fontStyle . '; text-align:' . htmlspecialchars($textAlign) . ';';
+                    if ($colorFondo !== '') {
+                        $style .= ' background:' . htmlspecialchars($colorFondo) . ';';
+                    }
+                    if ($colorTexto !== '') {
+                        $style .= ' color:' . htmlspecialchars($colorTexto) . ';';
+                    } else {
+                        $style .= ' color:#1a237e;';
+                    }
+                    $html .= '<tr><td colspan="' . $colCount . '" style="' . $style . '">'
+                        . htmlspecialchars((string)($rowV2['label'] ?? '')) . '</td></tr>';
+                    continue;
+                }
+
+                $cells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
+                $html .= '<tr>';
+                foreach ($cols as $col) {
+                    $colId = (string)($col['id'] ?? '');
+                    $val = $cells[$colId] ?? '';
+                    $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
+                    $w = trim((string)($col['width'] ?? ''));
+                    $style = 'padding:4px; vertical-align:top; overflow:hidden; word-wrap:break-word; word-break:break-word;';
+                    if ($w !== '') {
+                        $style .= ' width:' . htmlspecialchars($w) . ';';
+                    }
+                    $cellHtml = nl2br(htmlspecialchars((string)$val));
+                    if ($kind === 'reference') {
+                        $cellHtml = $renderReferenciaV2($val);
+                    }
+                    $html .= '<td style="' . $style . '">' . $cellHtml . '</td>';
+                }
+                $html .= '</tr>';
+            }
+
+            $html .= '</tbody></table>';
+        } elseif ($item['tipo'] === "Título" || $item['tipo'] === "Subtítulo") {
+            $openLegacyTable();
             $color_fondo = $item['color_fondo'] ?? "#e3e8f5";
             $color_texto = $item['color_texto'] ?? "#1a237e";
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
             $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
             $text_align = isset($item['alineacion']) ? $item['alineacion'] : ($item['tipo'] === "Título" ? 'center' : 'left');
-            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';border-radius:6px;text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($item['prueba']) . '</td></tr>';
+            $textoCabecera = trim((string)($item['nombre'] ?? $item['prueba'] ?? ''));
+            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';border-radius:6px;text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($textoCabecera) . '</td></tr>';
         } elseif ($item['tipo'] === "Parámetro") {
+            $openLegacyTable();
             $referencias = isset($item['referencias']) && is_array($item['referencias'])
                 ? $item['referencias']
                 : (isset($item['referencia']) ? $item['referencia'] : []);
@@ -118,24 +253,13 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
             $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
             $text_align = isset($item['alineacion']) ? $item['alineacion'] : 'left';
-            // Discriminación de referencia por sexo y edad igual que en el formulario web
+            // Discriminación de referencia por sexo y edad con fallback al primer rango disponible
             $fuera_rango = false;
             $referencia_aplicada = null;
             $edad_paciente = isset($paciente['edad']) ? floatval($paciente['edad']) : null;
             $sexo_paciente = isset($paciente['sexo']) ? strtolower(trim($paciente['sexo'])) : '';
             if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "" && $toNullableFloat($valorOriginal) !== null) {
-                // Seleccionar la referencia correcta
-                foreach ($item['referencias'] as $ref) {
-                    $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
-                    $ref_edad_min = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
-                    $ref_edad_max = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
-                    $sexo_match = ($ref_sexo === 'cualquiera' || $ref_sexo === $sexo_paciente);
-                    $edad_match = ($ref_edad_min === null || $edad_paciente >= $ref_edad_min) && ($ref_edad_max === null || $edad_paciente <= $ref_edad_max);
-                    if ($sexo_match && $edad_match) {
-                        $referencia_aplicada = $ref;
-                        break;
-                    }
-                }
+                $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente);
                 $valor_num = $toNullableFloat($valorOriginal);
                 if ($referencia_aplicada) {
                     $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
@@ -189,6 +313,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 $html .= '</tr>';
             }
         } elseif ($item['tipo'] === "Texto Largo") {
+            $openLegacyTable();
             $font_weight = !empty($item['negrita']) ? 'bold' : 'normal';
             $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
             $text_align = isset($item['alineacion']) ? $item['alineacion'] : 'left';
@@ -203,6 +328,6 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             $html .= '</tr>';
         }
     }
-    $html .= '</tbody></table>';
+    $closeLegacyTable();
     return [ 'css' => $css, 'html' => $html ];
 }

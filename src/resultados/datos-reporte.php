@@ -5,6 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 if (!$cotizacion_id) {
@@ -87,8 +88,70 @@ foreach ($rows as $row) {
     if ($adicional_src === null || $adicional_src === '') {
         $adicional_src = $examen['adicional'] ?? null;
     }
-    $adicional = $adicional_src ? json_decode($adicional_src, true) : [];
+    $formatDef = lab_format_decode_definition($adicional_src);
+    $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+    $adicional = $formatDef['legacy_items'];
     $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
+
+    if ($isFormatV2) {
+        $allCols = lab_format_v2_columns($formatDef);
+        $resolvedRows = lab_format_v2_resolve_rows($allCols, lab_format_v2_rows($formatDef), is_array($resultados_json) ? $resultados_json : []);
+        $cols = [];
+        foreach ($allCols as $col) {
+            if (!lab_format_v2_col_visible($col, 'pdf')) {
+                continue;
+            }
+            $cols[] = [
+                'id' => (string)($col['id'] ?? ''),
+                'label' => (string)($col['label'] ?? ($col['id'] ?? '')),
+                'width' => (string)($col['width'] ?? ''),
+                'editable' => lab_format_v2_col_editable($col),
+                'kind' => (string)($col['kind'] ?? 'text'),
+            ];
+        }
+
+        $rowsV2 = [];
+        foreach ($resolvedRows as $rowV2) {
+            if (!is_array($rowV2)) {
+                continue;
+            }
+            $rowId = trim((string)($rowV2['id'] ?? ''));
+            $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
+            $cells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
+            $rowDecimals = is_array($rowV2['decimales'] ?? null) ? $rowV2['decimales'] : [];
+            $cellsOut = [];
+            foreach ($cols as $col) {
+                $colId = $col['id'];
+                $rawValue = $cells[$colId] ?? '';
+                $colDec = null;
+                if (array_key_exists($colId, $rowDecimals) && $rowDecimals[$colId] !== '' && $rowDecimals[$colId] !== null && is_numeric($rowDecimals[$colId])) {
+                    $tmpDec = intval($rowDecimals[$colId]);
+                    if ($tmpDec >= 0 && $tmpDec <= 6) {
+                        $colDec = $tmpDec;
+                    }
+                }
+                if ($colDec !== null && is_numeric($rawValue)) {
+                    $cellsOut[$colId] = number_format((float)$rawValue, $colDec, '.', '');
+                } else {
+                    $cellsOut[$colId] = $rawValue;
+                }
+            }
+            $rowsV2[] = [
+                'id' => $rowId,
+                'type' => $rowType,
+                'label' => (string)($rowV2['label'] ?? ''),
+                'cells' => $cellsOut,
+            ];
+        }
+
+        $items[] = [
+            'tipo' => 'TablaV2',
+            'titulo' => (string)($examen['nombre_examen'] ?? ''),
+            'columnas' => $cols,
+            'filas' => $rowsV2,
+        ];
+        continue;
+    }
 
     usort($adicional, function ($a, $b) {
         return ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0);

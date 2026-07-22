@@ -74,6 +74,35 @@ try {
             return in_array((string)$tipo, ['Parámetro', 'Campo', 'Texto Largo'], true);
         };
 
+        $dedupeLegacyTitles = function (array &$rows) use ($normKey) {
+            $seen = [];
+            foreach ($rows as $idx => $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $tipo = (string)($row['tipo'] ?? '');
+                if (!in_array($tipo, ['Título', 'Subtítulo'], true)) {
+                    continue;
+                }
+                $isCustom = (!empty($row['custom_paciente']) && (int)$row['custom_paciente'] === 1)
+                    || ((string)($row['origen'] ?? '') === 'paciente');
+                if (!$isCustom) {
+                    continue;
+                }
+                $nombre = trim((string)($row['nombre'] ?? ''));
+                $key = $tipo . '|' . $normKey($nombre);
+                if ($key === $tipo . '|') {
+                    continue;
+                }
+                if (isset($seen[$key])) {
+                    unset($rows[$idx]);
+                    continue;
+                }
+                $seen[$key] = true;
+            }
+            $rows = array_values($rows);
+        };
+
         $upd = $pdo->prepare("UPDATE resultados_examenes SET adicional_snapshot = :snap WHERE id = :id");
 
         foreach ($rows as $r) {
@@ -140,6 +169,8 @@ try {
                     array_splice($baseArr, $insertAt, 0, [$c['item']]);
                 }
             }
+
+            $dedupeLegacyTitles($baseArr);
 
             $oldIdCounts = [];
             foreach ($oldArr as $itOld) {
@@ -214,6 +245,8 @@ try {
                     $usedChosenIds[$idElegido] = $idxBase;
                 }
             }
+
+            $dedupeLegacyTitles($baseArr);
 
             $upd->execute([
                 'snap' => json_encode($baseArr, JSON_UNESCAPED_UNICODE),

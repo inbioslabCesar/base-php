@@ -112,6 +112,64 @@ if ($esEdicion) {
         <!-- Builder visual para parámetros adicionales -->
         <h4>Parámetros del Examen</h4>
         <link rel="stylesheet" href="<?= BASE_URL ?>examenes/format-builder.css?v=<?= time() ?>">
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="formatModeV2">
+            <label class="form-check-label" for="formatModeV2">
+                Usar formato dinámico de columnas (v2)
+            </label>
+        </div>
+        <small class="text-muted d-block mb-3">Modo v2: permite renombrar, agregar y ordenar columnas sin depender del formato estándar de 5 columnas.</small>
+
+        <div id="v2BuilderSection" style="display:none;">
+            <div id="v2ValidationAlert" class="alert alert-danger" style="display:none;"></div>
+            <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-outline-warning btn-sm" id="v2MigrateLegacy">
+                    Migrar formato legacy a v2
+                </button>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">Columnas dinámicas</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" id="v2ColumnsTable">
+                            <thead>
+                                <tr>
+                                    <th>Etiqueta</th>
+                                    <th>ID</th>
+                                    <th>Tipo</th>
+                                    <th>Editable</th>
+                                    <th>Captura</th>
+                                    <th>PDF</th>
+                                    <th>Ancho</th>
+                                    <th>Orden</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-success btn-sm" id="v2AddColumn">Agregar columna</button>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Filas del formato</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" id="v2RowsTable">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" id="v2AddRow">Agregar fila</button>
+                </div>
+            </div>
+
+            <h5>Vista previa dinámica</h5>
+            <div id="previewV2" class="border p-3 mb-3"></div>
+        </div>
+
+        <div id="legacyBuilderSection">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <small class="text-muted">Ajusta los campos según tu formato. Activa la vista compacta si ves demasiadas columnas.</small>
             <div class="form-check form-switch">
@@ -152,6 +210,7 @@ if ($esEdicion) {
         <button id="addRow" class="btn btn-success mb-2" type="button">Agregar Fila</button>
         <h4>Vista Previa en Tiempo Real</h4>
         <div id="preview" class="border p-3"></div>
+        </div>
 
         <!-- Acciones -->
         <button class="btn btn-primary mt-3" type="submit" id="saveFormat"><?= $esEdicion ? 'Actualizar' : 'Agregar' ?></button>
@@ -174,12 +233,10 @@ if ($esEdicion) {
 <script src="<?= BASE_URL ?>examenes/format-builder.js?v=<?= time() ?>"></script>
 <script>
     // Cargar datos al editar
-    var datosAdicionales = <?php echo json_encode($adicional_array, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    window.datosAdicionales = <?php echo json_encode($adicional_array, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     document.addEventListener("DOMContentLoaded", function() {
-        if (typeof datosAdicionales !== "undefined" && Array.isArray(datosAdicionales) && datosAdicionales.length > 0) {
-            datosAdicionales.forEach(function(parametro) {
-                addRow(parametro);
-            });
+        if (typeof window.initExamFormatBuilder === "function") {
+            window.initExamFormatBuilder(window.datosAdicionales);
         }
         // Toggle vista compacta para ocultar columnas avanzadas
         const wrapper = document.getElementById('builderWrapper');

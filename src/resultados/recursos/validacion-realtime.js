@@ -1,47 +1,62 @@
 // resultados/recursos/validacion-realtime.js
-// Validación en tiempo real de resultados vs valores de referencia
+// Validacion en tiempo real de resultados vs valores de referencia
+
+function validarCampoConReferencias(target) {
+  if (!target || !target.getAttribute) return;
+  const rawRefs = target.getAttribute('data-referencias');
+  if (!rawRefs) return;
+
+  const parseNullableFloat = (value) => {
+    if (value === null || value === undefined) return null;
+    const normalized = String(value).trim().replace(/,/g, '');
+    if (normalized === '') return null;
+    const parsed = parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  let referencias = [];
+  try {
+    const parsed = JSON.parse(rawRefs || '[]');
+    if (Array.isArray(parsed)) referencias = parsed;
+  } catch (err) {
+    referencias = [];
+  }
+  const edad = parseNullableFloat(document.getElementById('edad-paciente')?.value ?? target.getAttribute('data-edad'));
+  const sexo = (document.getElementById('sexo-paciente')?.value ?? target.getAttribute('data-sexo') ?? '').toLowerCase();
+  let referencia_aplicada = null;
+
+  if (referencias.length > 0) {
+    referencias.forEach(ref => {
+      const ref_sexo = (ref.sexo || '').toLowerCase();
+      const ref_edad_min = parseNullableFloat(ref.edad_min);
+      const ref_edad_max = parseNullableFloat(ref.edad_max);
+      const sexo_match = (ref_sexo === '' || ref_sexo === 'cualquiera' || ref_sexo === sexo);
+      const edad_match = (edad === null) || ((ref_edad_min === null || edad >= ref_edad_min) && (ref_edad_max === null || edad <= ref_edad_max));
+      if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
+    });
+    if (!referencia_aplicada && referencias.length > 0) {
+      referencia_aplicada = referencias[0];
+    }
+  }
+
+  let fuera_rango = false;
+  const valor = parseNullableFloat(target.value);
+  if (referencia_aplicada && valor !== null && target.value !== '') {
+    const min = parseNullableFloat(referencia_aplicada.valor_min);
+    const max = parseNullableFloat(referencia_aplicada.valor_max);
+    if (min !== null && valor < min) fuera_rango = true;
+    if (max !== null && valor > max) fuera_rango = true;
+  }
+  target.classList.toggle('is-invalid', fuera_rango);
+  target.classList.toggle('is-valid', !fuera_rango && target.value !== '' && valor !== null);
+}
 
 document.addEventListener('input', function(e) {
-  if (e.target.classList.contains('form-control') && e.target.closest('.parameter-section')) {
-    const input = e.target;
-    const section = input.closest('.parameter-section');
+  validarCampoConReferencias(e.target);
+});
 
-    const parseNullableFloat = (value) => {
-      if (value === null || value === undefined) return null;
-      const normalized = String(value).trim().replace(/,/g, '');
-      if (normalized === '') return null;
-      const parsed = parseFloat(normalized);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-
-    // Obtener referencias y datos del paciente desde atributos data
-    const referencias = JSON.parse(input.getAttribute('data-referencias') || '[]');
-    const edad = parseNullableFloat(document.getElementById('edad-paciente')?.value ?? input.getAttribute('data-edad'));
-    const sexo = (document.getElementById('sexo-paciente')?.value ?? input.getAttribute('data-sexo') ?? '').toLowerCase();
-    let referencia_aplicada = null;
-
-    if (edad !== null && sexo !== '') {
-      referencias.forEach(ref => {
-        const ref_sexo = (ref.sexo || '').toLowerCase();
-        const ref_edad_min = parseNullableFloat(ref.edad_min);
-        const ref_edad_max = parseNullableFloat(ref.edad_max);
-        const sexo_match = (ref_sexo === 'cualquiera' || ref_sexo === sexo);
-        const edad_match = (ref_edad_min === null || edad >= ref_edad_min) && (ref_edad_max === null || edad <= ref_edad_max);
-        if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
-      });
-    }
-
-    let fuera_rango = false;
-    const valor = parseNullableFloat(input.value);
-    if (referencia_aplicada && valor !== null && input.value !== '') {
-      const min = parseNullableFloat(referencia_aplicada.valor_min);
-      const max = parseNullableFloat(referencia_aplicada.valor_max);
-      if (min !== null && valor < min) fuera_rango = true;
-      if (max !== null && valor > max) fuera_rango = true;
-    }
-    input.classList.toggle('is-invalid', fuera_rango);
-    input.classList.toggle('is-valid', !fuera_rango && input.value !== '');
-  }
+document.addEventListener('change', function(e) {
+  validarCampoConReferencias(e.target);
 });
 
 // Puedes agregar los inputs ocultos en el formulario para edad y sexo:

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../examenes/formato_dinamico_helper.php';
+
 // Calcula el porcentaje de parámetros llenados para una cotización
 function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
     static $hasSnapshotCol = null;
@@ -26,14 +28,141 @@ function obtenerPorcentajeResultadosCotizacion($pdo, $idCotizacion) {
     $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $total_parametros = 0;
     $parametros_llenados = 0;
+
+    $valorLleno = function ($valor) {
+        if ($valor === 0 || $valor === '0') {
+            return true;
+        }
+        if ($valor === null) {
+            return false;
+        }
+        if (is_string($valor)) {
+            return trim($valor) !== '';
+        }
+        if (is_array($valor)) {
+            return count($valor) > 0;
+        }
+        return $valor !== '';
+    };
+
     foreach ($examenes as $examen) {
-        $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
+        $formatDef = lab_format_decode_definition($examen['adicional'] ?? []);
+        $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+        $adicional = $formatDef['legacy_items'];
         $resultados = $examen['resultados'] ? json_decode($examen['resultados'], true) : [];
+
+        if ($isFormatV2) {
+            $cols = lab_format_v2_columns($formatDef);
+            $rows = lab_format_v2_rows($formatDef);
+            $rowsResolved = lab_format_v2_resolve_rows($cols, $rows, is_array($resultados) ? $resultados : []);
+
+            $colIdSet = [];
+            foreach ($cols as $colDef) {
+                if (!is_array($colDef)) {
+                    continue;
+                }
+                $cid = trim((string)($colDef['id'] ?? ''));
+                if ($cid !== '') {
+                    $colIdSet[$cid] = true;
+                }
+            }
+
+            $rowIdSet = [];
+            foreach ($rowsResolved as $rowDef) {
+                if (!is_array($rowDef)) {
+                    continue;
+                }
+                $rid = trim((string)($rowDef['id'] ?? ''));
+                if ($rid !== '') {
+                    $rowIdSet[$rid] = true;
+                }
+            }
+
+            foreach ($rowsResolved as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+                if ($rowType !== 'data') {
+                    continue;
+                }
+                $rowId = trim((string)($row['id'] ?? ''));
+                if ($rowId === '') {
+                    continue;
+                }
+                $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
+                $formulas = is_array($row['formulas'] ?? null) ? $row['formulas'] : [];
+
+                foreach ($cols as $col) {
+                    if (!is_array($col)) {
+                        continue;
+                    }
+                    if (!lab_format_v2_col_visible($col, 'capture')) {
+                        continue;
+                    }
+                    if (!lab_format_v2_col_editable($col)) {
+                        continue;
+                    }
+
+                    $colId = trim((string)($col['id'] ?? ''));
+                    if ($colId === '') {
+                        continue;
+                    }
+
+                    $formulaExpr = trim((string)($formulas[$colId] ?? ''));
+                    if ($formulaExpr !== '') {
+                        // Fórmulas incompletas o mal definidas no deben penalizar el progreso.
+                        $tokens = lab_format_v2_parse_tokens($formulaExpr);
+                        if (count($tokens) === 0) {
+                            continue;
+                        }
+
+                        $depsDefined = true;
+                        foreach ($tokens as $token) {
+                            [$refRow, $refCol] = lab_format_v2_resolve_token_target($token, $rowId);
+                            if ($refRow === null || $refCol === null) {
+                                $depsDefined = false;
+                                break;
+                            }
+                            if (!isset($rowIdSet[$refRow]) || !isset($colIdSet[$refCol])) {
+                                $depsDefined = false;
+                                break;
+                            }
+                        }
+
+                        if (!$depsDefined) {
+                            continue;
+                        }
+                    }
+
+                    $total_parametros++;
+                    $defaultVal = $cells[$colId] ?? '';
+                    $valor = lab_format_v2_get_result_value(is_array($resultados) ? $resultados : [], $rowId, $colId, $defaultVal);
+                    if ($formulaExpr !== '' && !$valorLleno($valor)) {
+                        // Fallback: usar el valor ya resuelto de la fila en memoria (sin depender de guardado explícito).
+                        $valor = $cells[$colId] ?? $valor;
+                    }
+                    if ($valorLleno($valor)) {
+                        $parametros_llenados++;
+                    }
+                }
+            }
+            continue;
+        }
+
+        if (!is_array($adicional)) {
+            $adicional = [];
+        }
+        if (!is_array($resultados)) {
+            $resultados = [];
+        }
+
         foreach ($adicional as $item) {
             // Contabilizar parámetros ingresables: Parámetro, Campo y Texto Largo
-            if ($item['tipo'] === 'Parámetro' || $item['tipo'] === 'Campo' || $item['tipo'] === 'Texto Largo') {
+            $tipo = (string)($item['tipo'] ?? '');
+            if ($tipo === 'Parámetro' || $tipo === 'Campo' || $tipo === 'Texto Largo') {
                 $total_parametros++;
-                $nombre = $item['nombre'];
+                $nombre = (string)($item['nombre'] ?? '');
                 $stableKey = '';
                 if (is_array($item) && !empty($item['id_parametro'])) {
                     $stableKey = 'id_parametro_' . trim((string)$item['id_parametro']);

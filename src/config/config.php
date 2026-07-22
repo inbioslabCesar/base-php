@@ -115,3 +115,12 @@ if (!defined('BASE_URL')) {
         define('BASE_URL', '/src/');
     }
 }
+
+if (!defined('LAB_FORMAT_V2_ENABLED')) {
+    $labFormatV2Raw = getenv('LAB_FORMAT_V2_ENABLED');
+    if ($labFormatV2Raw === false || trim((string)$labFormatV2Raw) === '') {
+        $labFormatV2Raw = '1';
+    }
+    $labFormatV2Raw = strtolower(trim((string)$labFormatV2Raw));
+    define('LAB_FORMAT_V2_ENABLED', in_array($labFormatV2Raw, ['1', 'true', 'yes', 'on'], true));
+}

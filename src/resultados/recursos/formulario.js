@@ -393,6 +393,130 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // Calculos para formato dinamico v2: tokens [rowId:colId] o [colId] (misma fila).
+    const v2Cards = document.querySelectorAll('.exam-card');
+    v2Cards.forEach((card) => {
+        const v2FormulaFields = Array.from(card.querySelectorAll('input[data-formula-v2]'));
+        if (v2FormulaFields.length === 0) {
+            return;
+        }
+
+        const normalizeNum = (raw) => {
+            const s = String(raw ?? '').trim().replace(/,/g, '');
+            if (s === '') return null;
+            const n = parseFloat(s);
+            return Number.isFinite(n) ? n : null;
+        };
+
+        const getFieldMap = () => {
+            const map = new Map();
+            const fields = card.querySelectorAll('[data-v2-row-id][data-v2-col-id]');
+            fields.forEach((f) => {
+                const rowId = String(f.getAttribute('data-v2-row-id') || '').trim();
+                const colId = String(f.getAttribute('data-v2-col-id') || '').trim();
+                if (!rowId || !colId) return;
+                map.set(`${rowId}:${colId}`, f);
+            });
+            return map;
+        };
+
+        const evalV2Field = (field, map) => {
+            const formula = String(field.getAttribute('data-formula-v2') || '').trim();
+            if (!formula) return false;
+
+            const currentRow = String(field.getAttribute('data-v2-row-id') || '').trim();
+            let canEval = true;
+            let expr = formula.replace(/\[([^\]]+)\]/g, (_, tokenRaw) => {
+                const token = String(tokenRaw || '').trim();
+                if (!token) {
+                    canEval = false;
+                    return '0';
+                }
+
+                let refRow = currentRow;
+                let refCol = token;
+                if (token.includes(':')) {
+                    const parts = token.split(':');
+                    refRow = String(parts[0] || '').trim();
+                    refCol = String(parts[1] || '').trim();
+                }
+
+                if (!refRow || !refCol) {
+                    canEval = false;
+                    return '0';
+                }
+
+                const refField = map.get(`${refRow}:${refCol}`);
+                if (!refField) {
+                    canEval = false;
+                    return '0';
+                }
+
+                const n = normalizeNum(refField.value);
+                if (n === null) {
+                    canEval = false;
+                    return '0';
+                }
+                return String(n);
+            });
+
+            if (!canEval) {
+                const before = field.value;
+                field.value = '';
+                return before !== field.value;
+            }
+
+            expr = expr.replace(/([0-9\.]|\))\s*\(/g, '$1*(');
+            expr = expr.replace(/\)\s*([0-9\.-])/g, ')*$1');
+            if (expr.indexOf('^') !== -1) {
+                expr = expr.replace(/\^/g, '**');
+            }
+
+            let res = null;
+            try {
+                res = eval(expr);
+            } catch (e) {
+                res = null;
+            }
+
+            const before = String(field.value ?? '');
+            if (!Number.isFinite(res)) {
+                field.value = '';
+            } else {
+                const decAttr = field.getAttribute('data-decimales');
+                const dec = (decAttr !== null && decAttr !== '') ? parseInt(decAttr, 10) : null;
+                if (dec !== null && !isNaN(dec) && dec >= 0 && dec <= 6) {
+                    field.value = Number(res).toFixed(dec);
+                } else if (Math.floor(res) === res) {
+                    field.value = String(Math.trunc(res));
+                } else {
+                    field.value = String(res);
+                }
+            }
+            return before !== String(field.value ?? '');
+        };
+
+        const recalcV2 = () => {
+            const map = getFieldMap();
+            const maxPasses = Math.max(1, v2FormulaFields.length + 1);
+            for (let p = 0; p < maxPasses; p++) {
+                let changed = false;
+                v2FormulaFields.forEach((f) => {
+                    if (evalV2Field(f, map)) changed = true;
+                });
+                if (!changed) break;
+            }
+        };
+
+        const sourceInputs = card.querySelectorAll('[data-v2-row-id][data-v2-col-id]:not([data-formula-v2])');
+        sourceInputs.forEach((src) => {
+            src.addEventListener('input', recalcV2);
+            src.addEventListener('change', recalcV2);
+        });
+
+        recalcV2();
+    });
+
     // Cabeceras por paciente (se insertan en el snapshot al guardar)
     document.querySelectorAll('.header-builder').forEach((builder) => {
         const titleSelect = builder.querySelector('.header-title-select');
@@ -463,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function () {
             row.dataset.hdrIdx = String(idx);
             row.innerHTML = `
                 <span class="header-preview-dot" style="background:${color}"></span>
-                <span class="header-preview-text">${titulo}</span>
+                <span class="header-preview-text" style="color:${color}; font-weight:600;">${titulo}</span>
                 <button type="button" class="btn btn-sm btn-link header-preview-remove">Quitar</button>
             `;
             row.querySelector('.header-preview-remove').addEventListener('click', () => {

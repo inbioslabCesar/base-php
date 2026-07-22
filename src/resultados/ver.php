@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
 
 // Mostrar mensaje de éxito si existe
 if (isset($_SESSION['mensaje'])) {
@@ -44,7 +45,9 @@ if ($id_resultado && $id_examen) {
         $adicional_json = $stmt2->fetchColumn();
     }
 
-    $parametros = $adicional_json ? json_decode($adicional_json, true) : [];
+    $formatDef = lab_format_decode_definition($adicional_json);
+    $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+    $parametros = $formatDef['legacy_items'];
     $resultados = $resultados_json ? json_decode($resultados_json, true) : [];
 
     $normKey = function ($s) {
@@ -108,20 +111,60 @@ if ($id_resultado && $id_examen) {
     };
 
     echo "<h4>Resultados guardados</h4>";
-    echo "<table class='table table-bordered'>";
-    echo "<thead><tr><th>Parámetro</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody>";
-    foreach ($parametros as $param) {
-        if ($param['tipo'] === 'Parámetro') {
-            $nombre_raw = $param['nombre'] ?? '';
-            $unidad = htmlspecialchars($param['unidad'] ?? '');
-            $referencia = isset($param['referencias'][0]['valor']) ? htmlspecialchars($param['referencias'][0]['valor']) : '';
-            $valor_raw = $getResultado($nombre_raw, $param, '-');
-            $nombre = htmlspecialchars($nombre_raw);
-            $valor = htmlspecialchars($valor_raw);
-            echo "<tr><td>$nombre</td><td>$valor</td><td>$unidad</td><td>$referencia</td></tr>";
+    if ($isFormatV2) {
+        $allCols = lab_format_v2_columns($formatDef);
+        $resolvedRows = lab_format_v2_resolve_rows($allCols, lab_format_v2_rows($formatDef), is_array($resultados) ? $resultados : []);
+        $cols = array_values(array_filter($allCols, static function ($col) {
+            return lab_format_v2_col_visible($col, 'capture');
+        }));
+        $rowsV2 = $resolvedRows;
+
+        echo "<table class='table table-bordered'>";
+        echo "<thead><tr>";
+        foreach ($cols as $col) {
+            echo "<th>" . htmlspecialchars((string)($col['label'] ?? $col['id'] ?? '')) . "</th>";
         }
+        echo "</tr></thead><tbody>";
+
+        foreach ($rowsV2 as $rowV2) {
+            if (!is_array($rowV2)) {
+                continue;
+            }
+            $rowId = trim((string)($rowV2['id'] ?? ''));
+            $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
+            $rowCells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
+
+            if ($rowType === 'title' || $rowType === 'subtitle') {
+                echo "<tr><td colspan='" . max(1, count($cols)) . "'><strong>" . htmlspecialchars((string)($rowV2['label'] ?? '')) . "</strong></td></tr>";
+                continue;
+            }
+
+            echo "<tr>";
+            foreach ($cols as $col) {
+                $colId = trim((string)($col['id'] ?? ''));
+                $val = $rowCells[$colId] ?? '';
+                echo "<td>" . nl2br(htmlspecialchars((string)$val)) . "</td>";
+            }
+            echo "</tr>";
+        }
+
+        echo "</tbody></table>";
+    } else {
+        echo "<table class='table table-bordered'>";
+        echo "<thead><tr><th>Parámetro</th><th>Valor</th><th>Unidad</th><th>Referencia</th></tr></thead><tbody>";
+        foreach ($parametros as $param) {
+            if ($param['tipo'] === 'Parámetro') {
+                $nombre_raw = $param['nombre'] ?? '';
+                $unidad = htmlspecialchars($param['unidad'] ?? '');
+                $referencia = isset($param['referencias'][0]['valor']) ? htmlspecialchars($param['referencias'][0]['valor']) : '';
+                $valor_raw = $getResultado($nombre_raw, $param, '-');
+                $nombre = htmlspecialchars($nombre_raw);
+                $valor = htmlspecialchars($valor_raw);
+                echo "<tr><td>$nombre</td><td>$valor</td><td>$unidad</td><td>$referencia</td></tr>";
+            }
+        }
+        echo "</tbody></table>";
     }
-    echo "</tbody></table>";
 } else {
     echo '<div class="alert alert-warning">No se encontraron resultados para mostrar.</div>';
 }

@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../../examenes/formato_dinamico_helper.php';
+
 class ExamenesService {
     private $pdo;
     private $hasSnapshotCol = null;
@@ -79,6 +81,8 @@ class ExamenesService {
 
         if ($this->hasSnapshotColumn()) {
             $sql = "SELECT re.id as id_resultado, re.id_examen, re.resultados,
+                           re.adicional_snapshot,
+                           e.adicional AS adicional_examen,
                            COALESCE(re.adicional_snapshot, e.adicional) AS adicional,
                            CASE WHEN EXISTS (
                                SELECT 1 FROM inventario_examen_recetas r
@@ -112,7 +116,33 @@ class ExamenesService {
         }
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['cotizacion_id' => $cotizacion_id]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        if (!$this->hasSnapshotColumn()) {
+            return $rows;
+        }
+
+        foreach ($rows as &$row) {
+            $snapshotRaw = $row['adicional_snapshot'] ?? null;
+            $examenRaw = $row['adicional_examen'] ?? null;
+
+            $snapshotDef = lab_format_decode_definition($snapshotRaw);
+            $examenDef = lab_format_decode_definition($examenRaw);
+
+            $snapshotIsV2 = !empty($snapshotDef['is_v2']);
+            $examenIsV2 = !empty($examenDef['is_v2']);
+
+            // Si el examen ya está en v2 pero el snapshot quedó en legacy,
+            // reflejar automáticamente el formato v2 vigente en captura.
+            if ($examenIsV2 && !$snapshotIsV2) {
+                $row['adicional'] = $examenRaw;
+            }
+
+            unset($row['adicional_snapshot'], $row['adicional_examen']);
+        }
+        unset($row);
+
+        return $rows;
     }
 
     public function obtenerAreasDisponibles() {

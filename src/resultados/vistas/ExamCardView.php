@@ -1,5 +1,7 @@
 
 <?php
+require_once __DIR__ . '/../../examenes/formato_dinamico_helper.php';
+
 class ExamCardView {
     public static function render($examen, $index, $datos_paciente = [], $areas_disponibles = []) {
         $toNullableFloat = function ($value) {
@@ -121,7 +123,13 @@ class ExamCardView {
             return $default;
         };
 
-        $adicional = $examen['adicional'] ? json_decode($examen['adicional'], true) : [];
+        $formatDef = lab_format_decode_definition($examen['adicional'] ?? []);
+        $isFormatV2 = lab_format_v2_enabled() && !empty($formatDef['is_v2']);
+        $formatColumns = $isFormatV2 ? lab_format_v2_columns($formatDef) : [];
+        $formatRows = $isFormatV2 ? lab_format_v2_rows($formatDef) : [];
+        $formatRowsResolved = $isFormatV2 ? lab_format_v2_resolve_rows($formatColumns, $formatRows, is_array($resultados) ? $resultados : []) : [];
+
+        $adicional = $formatDef['legacy_items'];
         if (!is_array($adicional)) {
             $adicional = [];
         }
@@ -156,35 +164,77 @@ class ExamCardView {
 
         $cabecerasExistentes = [];
         $posiciones = [];
-        foreach ($adicional as $idx => $it) {
-            $tipo = $it['tipo'] ?? '';
-            $nombre = $it['nombre'] ?? '';
-            if (($tipo === 'Título' || $tipo === 'Subtítulo') && $nombre !== '') {
-                $before = '__END__';
-                if ($idx === 0) {
-                    $before = '__FIRST__';
+        if ($isFormatV2) {
+            foreach ($formatRows as $idx => $it) {
+                if (!is_array($it)) {
+                    continue;
                 }
-                // Detectar posición actual: "antes de" el siguiente parámetro/campo/texto
-                for ($j = $idx + 1; $j < count($adicional); $j++) {
-                    $t2 = $adicional[$j]['tipo'] ?? '';
-                    if (in_array($t2, ['Parámetro', 'Campo', 'Texto Largo'], true)) {
-                        $n2 = $adicional[$j]['nombre'] ?? '';
-                        if ($n2 !== '') {
-                            $before = $n2;
-                        }
-                        break;
+                $tipo = strtolower(trim((string)($it['type'] ?? 'data')));
+                $nombre = trim((string)($it['label'] ?? ''));
+                if (($tipo === 'title' || $tipo === 'subtitle') && $nombre !== '') {
+                    $before = '__END__';
+                    if ($idx === 0) {
+                        $before = '__FIRST__';
                     }
+                    for ($j = $idx + 1; $j < count($formatRows); $j++) {
+                        $t2 = strtolower(trim((string)($formatRows[$j]['type'] ?? 'data')));
+                        if (in_array($t2, ['data', 'title', 'subtitle'], true)) {
+                            $n2 = trim((string)($formatRows[$j]['label'] ?? ''));
+                            if ($n2 !== '') {
+                                $before = $n2;
+                            }
+                            break;
+                        }
+                    }
+                    $cabecerasExistentes[] = [
+                        'idx' => $idx,
+                        'tipo' => $tipo === 'subtitle' ? 'Subtítulo' : 'Título',
+                        'nombre' => $nombre,
+                        'color_texto' => $it['color_texto'] ?? '#dc2626',
+                        'before' => $before,
+                    ];
                 }
-                $cabecerasExistentes[] = [
-                    'idx' => $idx,
-                    'tipo' => $tipo,
-                    'nombre' => $nombre,
-                    'color_texto' => $it['color_texto'] ?? '#dc2626',
-                    'before' => $before,
-                ];
+                if ($tipo === 'data' && $nombre !== '') {
+                    $posiciones[] = $nombre;
+                }
             }
-            if (in_array($tipo, ['Parámetro', 'Campo', 'Texto Largo'], true) && $nombre !== '') {
-                $posiciones[] = $nombre;
+        } else {
+            foreach ($adicional as $idx => $it) {
+                if (!is_array($it)) {
+                    continue;
+                }
+                $tipo = $it['tipo'] ?? '';
+                $nombre = $it['nombre'] ?? '';
+                if (($tipo === 'Título' || $tipo === 'Subtítulo') && $nombre !== '') {
+                    $before = '__END__';
+                    if ($idx === 0) {
+                        $before = '__FIRST__';
+                    }
+                    // Detectar posición actual: "antes de" el siguiente parámetro/campo/texto
+                    for ($j = $idx + 1; $j < count($adicional); $j++) {
+                        if (!is_array($adicional[$j] ?? null)) {
+                            continue;
+                        }
+                        $t2 = $adicional[$j]['tipo'] ?? '';
+                        if (in_array($t2, ['Parámetro', 'Campo', 'Texto Largo'], true)) {
+                            $n2 = $adicional[$j]['nombre'] ?? '';
+                            if ($n2 !== '') {
+                                $before = $n2;
+                            }
+                            break;
+                        }
+                    }
+                    $cabecerasExistentes[] = [
+                        'idx' => $idx,
+                        'tipo' => $tipo,
+                        'nombre' => $nombre,
+                        'color_texto' => $it['color_texto'] ?? '#dc2626',
+                        'before' => $before,
+                    ];
+                }
+                if (in_array($tipo, ['Parámetro', 'Campo', 'Texto Largo'], true) && $nombre !== '') {
+                    $posiciones[] = $nombre;
+                }
             }
         }
         // Si el examen tiene datos de paciente propios, usarlos; si no, usar los globales
@@ -277,7 +327,8 @@ class ExamCardView {
                         <div class="header-existing">
                             <?php foreach ($cabecerasExistentes as $h): ?>
                                 <div class="header-existing-row">
-                                    <input type="text" class="form-control form-control-sm" 
+                                     <input type="text" class="form-control form-control-sm" 
+                                         style="color: <?= htmlspecialchars($h['color_texto'] ?: '#0923E1') ?>; font-weight: 600;"
                                            name="examenes[<?= $examen['id_resultado'] ?>][cabeceras_editar][<?= $h['idx'] ?>][nombre]"
                                            value="<?= htmlspecialchars($h['nombre']) ?>"
                                            placeholder="Título">
@@ -341,18 +392,192 @@ class ExamCardView {
                     </div>
                 </div>
 
+                <?php if ($isFormatV2): ?>
+                    <div class="alert alert-primary py-2 mb-3">
+                        Formato dinamico activo para este examen.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <?php foreach ($formatColumns as $col): ?>
+                                        <?php if (!lab_format_v2_col_visible($col, 'capture')) continue; ?>
+                                        <th style="<?= !empty($col['width']) ? 'width:' . htmlspecialchars((string)$col['width']) . ';' : '' ?>">
+                                            <?= htmlspecialchars((string)($col['label'] ?? $col['id'])) ?>
+                                        </th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($formatRowsResolved as $rowV2): ?>
+                                    <?php
+                                        if (!is_array($rowV2)) {
+                                            continue;
+                                        }
+                                        $rowType = strtolower(trim((string)($rowV2['type'] ?? 'data')));
+                                        $rowId = trim((string)($rowV2['id'] ?? ''));
+                                        $rowCells = is_array($rowV2['cells'] ?? null) ? $rowV2['cells'] : [];
+                                        $rowFormulas = is_array($rowV2['formulas'] ?? null) ? $rowV2['formulas'] : [];
+                                        $visibleCount = 0;
+                                        foreach ($formatColumns as $tmpCol) {
+                                            if (lab_format_v2_col_visible($tmpCol, 'capture')) {
+                                                $visibleCount++;
+                                            }
+                                        }
+                                        if ($visibleCount <= 0) {
+                                            $visibleCount = 1;
+                                        }
+                                    ?>
+                                    <?php if ($rowType === 'title' || $rowType === 'subtitle'): ?>
+                                        <?php
+                                            $rowBg = trim((string)($rowV2['color_fondo'] ?? ''));
+                                            $rowText = trim((string)($rowV2['color_texto'] ?? ''));
+                                            if ($rowBg === '') {
+                                                $rowBg = $rowType === 'title' ? '#eef4ff' : '#f4f7fb';
+                                            }
+                                            if ($rowText === '') {
+                                                $rowText = '#1f2d5c';
+                                            }
+                                        ?>
+                                        <tr>
+                                            <td colspan="<?= $visibleCount ?>" class="fw-bold" style="background: <?= htmlspecialchars($rowBg) ?>; color: <?= htmlspecialchars($rowText) ?>; border-radius: 6px; padding: 6px 8px;">
+                                                <?= htmlspecialchars((string)($rowV2['label'] ?? '')) ?>
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <tr>
+                                            <?php $rowSelectOptions = (isset($rowV2['select_options']) && is_array($rowV2['select_options'])) ? $rowV2['select_options'] : []; ?>
+                                            <?php $rowReferenceRanges = (isset($rowV2['reference_ranges']) && is_array($rowV2['reference_ranges'])) ? $rowV2['reference_ranges'] : []; ?>
+                                            <?php $rowDecimals = (isset($rowV2['decimales']) && is_array($rowV2['decimales'])) ? $rowV2['decimales'] : []; ?>
+                                            <?php foreach ($formatColumns as $col): ?>
+                                                <?php if (!lab_format_v2_col_visible($col, 'capture')) continue; ?>
+                                                <?php
+                                                    $colId = trim((string)($col['id'] ?? ''));
+                                                    $defaultCell = $rowCells[$colId] ?? '';
+                                                    $formulaExpr = isset($rowFormulas[$colId]) ? trim((string)$rowFormulas[$colId]) : '';
+                                                    $isFormulaCell = ($formulaExpr !== '');
+                                                    $editable = lab_format_v2_col_editable($col) && $rowId !== '';
+                                                    $value = $editable
+                                                        ? lab_format_v2_get_result_value($resultados, $rowId, $colId, $defaultCell)
+                                                        : $defaultCell;
+                                                    if ($isFormulaCell && ($value === '' || $value === null)) {
+                                                        $value = $defaultCell;
+                                                    }
+                                                    $cellOptions = [];
+                                                    if (isset($rowSelectOptions[$colId])) {
+                                                        $rawOptions = $rowSelectOptions[$colId];
+                                                        if (is_array($rawOptions)) {
+                                                            foreach ($rawOptions as $optionValue) {
+                                                                $opt = trim((string)$optionValue);
+                                                                if ($opt !== '') {
+                                                                    $cellOptions[] = $opt;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    if ($editable && !$isFormulaCell && empty($value) && !empty($cellOptions)) {
+                                                        $value = $cellOptions[0];
+                                                    }
+
+                                                    $currentReferences = [];
+                                                    if (isset($rowReferenceRanges[$colId]) && is_array($rowReferenceRanges[$colId])) {
+                                                        $currentReferences = $rowReferenceRanges[$colId];
+                                                    }
+                                                    if (empty($currentReferences)) {
+                                                        foreach ($rowReferenceRanges as $tmpRanges) {
+                                                            if (is_array($tmpRanges) && !empty($tmpRanges)) {
+                                                                $currentReferences = $tmpRanges;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                    $currentDecimals = '';
+                                                    if (array_key_exists($colId, $rowDecimals) && $rowDecimals[$colId] !== '' && $rowDecimals[$colId] !== null) {
+                                                        $decRaw = intval($rowDecimals[$colId]);
+                                                        if ($decRaw >= 0 && $decRaw <= 6) {
+                                                            $currentDecimals = (string)$decRaw;
+                                                        }
+                                                    }
+                                                    $referencesAttr = htmlspecialchars(json_encode($currentReferences, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
+                                                ?>
+                                                <td>
+                                                    <?php if ($editable): ?>
+                                                        <?php
+                                                            $fieldKey = lab_format_v2_cell_key($rowId, $colId);
+                                                            $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
+                                                        ?>
+                                                        <?php if ($kind === 'long_text'): ?>
+                                                            <textarea class="form-control form-control-sm"
+                                                                rows="3"
+                                                                name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
+                                                                data-v2-col-id="<?= htmlspecialchars($colId) ?>"
+                                                                data-referencias='<?= $referencesAttr ?>'
+                                                                data-edad="<?= htmlspecialchars((string)($edad_paciente ?? '')) ?>"
+                                                                data-decimales="<?= htmlspecialchars($currentDecimals) ?>"
+                                                                data-sexo="<?= htmlspecialchars((string)($sexo_paciente ?? '')) ?>"
+                                                                data-initial-value="<?= htmlspecialchars((string)$value) ?>"><?= htmlspecialchars((string)$value) ?></textarea>
+                                                        <?php elseif (!$isFormulaCell && !empty($cellOptions)): ?>
+                                                            <select class="form-select form-select-sm"
+                                                                name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
+                                                                data-v2-col-id="<?= htmlspecialchars($colId) ?>"
+                                                                data-referencias='<?= $referencesAttr ?>'
+                                                                data-edad="<?= htmlspecialchars((string)($edad_paciente ?? '')) ?>"
+                                                                data-decimales="<?= htmlspecialchars($currentDecimals) ?>"
+                                                                data-sexo="<?= htmlspecialchars((string)($sexo_paciente ?? '')) ?>"
+                                                                data-initial-value="<?= htmlspecialchars((string)$value) ?>">
+                                                                <?php foreach ($cellOptions as $optionValue): ?>
+                                                                    <option value="<?= htmlspecialchars($optionValue) ?>" <?= ((string)$value === (string)$optionValue) ? 'selected' : '' ?>>
+                                                                        <?= htmlspecialchars($optionValue) ?>
+                                                                    </option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        <?php else: ?>
+                                                            <input type="text"
+                                                                class="form-control form-control-sm<?= $isFormulaCell ? ' campo-calculado calculated-field' : '' ?>"
+                                                                name="examenes[<?= $examen['id_resultado'] ?>][resultados][<?= htmlspecialchars($fieldKey) ?>]"
+                                                                value="<?= htmlspecialchars((string)$value) ?>"
+                                                                data-initial-value="<?= htmlspecialchars((string)$value) ?>"
+                                                                data-v2-row-id="<?= htmlspecialchars($rowId) ?>"
+                                                                data-v2-col-id="<?= htmlspecialchars($colId) ?>"
+                                                                data-referencias='<?= $referencesAttr ?>'
+                                                                data-edad="<?= htmlspecialchars((string)($edad_paciente ?? '')) ?>"
+                                                                data-sexo="<?= htmlspecialchars((string)$sexo_paciente ?? '') ?>"
+                                                                data-decimales="<?= htmlspecialchars($currentDecimals) ?>"
+                                                                <?= $isFormulaCell ? 'data-formula-v2="' . htmlspecialchars($formulaExpr) . '" readonly' : '' ?>>
+                                                        <?php endif; ?>
+                                                    <?php else: ?>
+                                                        <?= nl2br(htmlspecialchars((string)$value)) ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
                 <?php foreach ($adicional as $item) {
-                    if ($item['tipo'] === 'Título') {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $tipoItem = (string)($item['tipo'] ?? '');
+                    if ($tipoItem === '') {
+                        continue;
+                    }
+                    if ($tipoItem === 'Título') {
                         echo '<div class="title-section" style="background: ' . (isset($item['color_fondo']) ? $item['color_fondo'] : 'var(--primary-gradient)') . '; color: ' . (isset($item['color_texto']) ? $item['color_texto'] : 'white') . ';">
                             <i class="bi bi-bookmark-star me-2"></i>
                             ' . htmlspecialchars($item['nombre']) . '
                         </div>';
-                    } elseif ($item['tipo'] === 'Subtítulo') {
+                    } elseif ($tipoItem === 'Subtítulo') {
                         echo '<div class="subtitle-section" style="background: ' . (isset($item['color_fondo']) ? $item['color_fondo'] : 'var(--success-gradient)') . '; color: ' . (isset($item['color_texto']) ? $item['color_texto'] : 'white') . ';">
                             <i class="bi bi-bookmark me-2"></i>
                             ' . htmlspecialchars($item['nombre']) . '
                         </div>';
-                    } elseif ($item['tipo'] === 'Campo') {
+                    } elseif ($tipoItem === 'Campo') {
                         $valorCampo = $getResultado($item['nombre'], '', $item);
                         echo '<div class="mb-4">
                             <label class="form-label">
@@ -366,7 +591,7 @@ class ExamCardView {
                                 data-initial-value="' . htmlspecialchars((string)$valorCampo) . '"
                                 placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">
                         </div>';
-                    } elseif ($item['tipo'] === 'Texto Largo') {
+                    } elseif ($tipoItem === 'Texto Largo') {
                         $rows = isset($item['rows']) && is_numeric($item['rows']) ? intval($item['rows']) : 4;
                         $valorTexto = $getResultado($item['nombre'], '', $item);
                         echo '<div class="mb-4">
@@ -376,21 +601,40 @@ class ExamCardView {
                             </label>
                             <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" data-initial-value="' . htmlspecialchars((string)$valorTexto) . '" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($valorTexto) . '</textarea>
                         </div>';
-                    } elseif ($item['tipo'] === 'Parámetro') {
-                        // Refuerza la lógica: si no hay edad o sexo, nunca aplica
+                    } elseif ($tipoItem === 'Parámetro') {
+                        $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
+                            if (empty($referencias)) {
+                                return null;
+                            }
+                            foreach ($referencias as $ref) {
+                                if (!is_array($ref)) {
+                                    continue;
+                                }
+                                $refSexo = strtolower(trim((string)($ref['sexo'] ?? '')));
+                                $refEdadMin = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
+                                $refEdadMax = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
+                                $sexoOk = ($refSexo === '' || $refSexo === 'cualquiera' || $refSexo === $sexo);
+                                $edadOk = true;
+                                if ($edad !== null) {
+                                    $edadOk = ($refEdadMin === null || $edad >= $refEdadMin) && ($refEdadMax === null || $edad <= $refEdadMax);
+                                }
+                                if ($sexoOk && $edadOk) {
+                                    return $ref;
+                                }
+                            }
+                            return is_array($referencias[0] ?? null) ? $referencias[0] : null;
+                        };
+
                         $referencia_aplicada = null;
                         $aplicada_idx = null;
-                        if (!empty($item['referencias']) && $edad_paciente !== null && $sexo_paciente !== '') {
-                            foreach ($item['referencias'] as $idx => $ref) {
-                                $ref_sexo = isset($ref['sexo']) ? strtolower(trim($ref['sexo'])) : '';
-                                $ref_edad_min = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
-                                $ref_edad_max = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
-                                $sexo_match = ($ref_sexo === 'cualquiera' || $ref_sexo === $sexo_paciente);
-                                $edad_match = ($ref_edad_min === null || $edad_paciente >= $ref_edad_min) && ($ref_edad_max === null || $edad_paciente <= $ref_edad_max);
-                                if ($sexo_match && $edad_match) {
-                                    $referencia_aplicada = $ref;
-                                    $aplicada_idx = $idx;
-                                    break;
+                        if (!empty($item['referencias'])) {
+                            $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente);
+                            if ($referencia_aplicada !== null) {
+                                foreach ($item['referencias'] as $idx => $ref) {
+                                    if ($ref === $referencia_aplicada) {
+                                        $aplicada_idx = $idx;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -415,6 +659,15 @@ class ExamCardView {
                         echo '</label>';
                         if (!empty($item['opciones'])) {
                             $valorSelect = $getResultado($item['nombre'], '', $item);
+                            if ($valorSelect === '' || $valorSelect === null) {
+                                foreach ($item['opciones'] as $opcionInicial) {
+                                    $opcionInicial = trim((string)$opcionInicial);
+                                    if ($opcionInicial !== '') {
+                                        $valorSelect = $opcionInicial;
+                                        break;
+                                    }
+                                }
+                            }
                                 echo '<select name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" class="form-control" data-initial-value="' . htmlspecialchars((string)$valorSelect) . '">
                                     <option value="">Seleccione una opción...</option>';
                             foreach ($item['opciones'] as $opcion) {
@@ -469,6 +722,7 @@ class ExamCardView {
                         echo '</div>';
                     }
                 }
+                endif;
             echo '</div></div>';
             return ob_get_clean();
     }
