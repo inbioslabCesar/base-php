@@ -1,7 +1,7 @@
 <?php
 // Función para armar el HTML y CSS del reporte de resultados
 function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
-    // Conversión robusta de números con separadores locales (coma/punto)
+    // Regla unificada del sistema: coma como miles y punto como decimal.
     $toNullableFloat = function ($value) {
         if ($value === null) {
             return null;
@@ -11,30 +11,92 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             if ($s === '') {
                 return null;
             }
-            // Quitar espacios no separadores
+
+            // Quitar espacios y mantener separadores numericos validos.
             $s = str_replace([' ', '\u00A0'], '', $s);
-            $hasComma = strpos($s, ',') !== false;
-            $hasDot = strpos($s, '.') !== false;
-            if ($hasComma && $hasDot) {
-                $posComma = strrpos($s, ',');
-                $posDot = strrpos($s, '.');
-                if ($posComma > $posDot) {
-                    // Formato tipo "1.234,56" → '.' miles, ',' decimal
-                    $s = str_replace('.', '', $s);
-                    $s = str_replace(',', '.', $s);
-                } else {
-                    // Formato tipo "1,234.56" → ',' miles, '.' decimal
-                    $s = str_replace(',', '', $s);
-                }
-            } elseif ($hasComma && !$hasDot) {
-                // Solo coma: asumir coma decimal
-                $s = str_replace(',', '.', $s);
-            } else {
-                // Solo punto o sin separadores: dejar como está
+
+            $s = str_replace(',', '', $s);
+            if (!preg_match('/^[-+]?\d+(?:\.\d+)?$/', $s)) {
+                return null;
             }
             return is_numeric($s) ? floatval($s) : null;
         }
         return is_numeric($value) ? floatval($value) : null;
+    };
+
+    $parseNumericExpression = function ($raw) {
+        $src = trim((string)$raw);
+        if ($src === '') {
+            return null;
+        }
+        if (!preg_match('/^(<=|>=|<|>|=)?\s*([-+]?\d[\d,]*(?:\.\d+)?)$/', $src, $m)) {
+            return null;
+        }
+
+        $op = isset($m[1]) && $m[1] !== '' ? $m[1] : '=';
+        $numRaw = str_replace(',', '', (string)($m[2] ?? ''));
+        if (!preg_match('/^[-+]?\d+(?:\.\d+)?$/', $numRaw)) {
+            return null;
+        }
+        if (!is_numeric($numRaw)) {
+            return null;
+        }
+
+        return [
+            'op' => $op,
+            'num' => floatval($numRaw),
+        ];
+    };
+
+    $evaluateNumericExpressionAgainstRange = function ($raw, $min, $max) use ($parseNumericExpression) {
+        $parsed = $parseNumericExpression($raw);
+        if ($parsed === null) {
+            return null;
+        }
+
+        $op = (string)($parsed['op'] ?? '=');
+        $num = isset($parsed['num']) ? floatval($parsed['num']) : null;
+        if ($num === null) {
+            return null;
+        }
+
+        $hasMin = ($min !== null && is_numeric($min));
+        $hasMax = ($max !== null && is_numeric($max));
+        if (!$hasMin && !$hasMax) {
+            return 'in';
+        }
+
+        if ($op === '=') {
+            if ($hasMin && $num < $min) return 'out';
+            if ($hasMax && $num > $max) return 'out';
+            return 'in';
+        }
+
+        if ($op === '>') {
+            if ($hasMax && $num >= $max) return 'out';
+            if ($hasMin && !$hasMax && $num >= $min) return 'in';
+            return 'indeterminate';
+        }
+
+        if ($op === '>=') {
+            if ($hasMax && $num > $max) return 'out';
+            if ($hasMin && !$hasMax && $num >= $min) return 'in';
+            return 'indeterminate';
+        }
+
+        if ($op === '<') {
+            if ($hasMin && $num <= $min) return 'out';
+            if ($hasMax && !$hasMin && $num <= $max) return 'in';
+            return 'indeterminate';
+        }
+
+        if ($op === '<=') {
+            if ($hasMin && $num < $min) return 'out';
+            if ($hasMax && !$hasMin && $num <= $max) return 'in';
+            return 'indeterminate';
+        }
+
+        return null;
     };
 
     $css = 'body, table, td, th { font-family: "DejaVu Sans Mono", "Consolas", "Lucida Console", "Courier New", monospace; }'
@@ -513,9 +575,14 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                                 $min = array_key_exists('valor_min', $refAplicada) ? $toNullableFloat($refAplicada['valor_min']) : null;
                                 $max = array_key_exists('valor_max', $refAplicada) ? $toNullableFloat($refAplicada['valor_max']) : null;
                                 $hasNumericRule = ($min !== null || $max !== null);
-                                if ($hasNumericRule && $valorNum !== null) {
-                                    if (($min !== null && $valorNum < $min) || ($max !== null && $valorNum > $max)) {
+                                if ($hasNumericRule) {
+                                    $numericStatus = $evaluateNumericExpressionAgainstRange((string)$val, $min, $max);
+                                    if ($numericStatus === 'out') {
                                         $fueraRango = true;
+                                    } elseif ($numericStatus === null && $valorNum !== null) {
+                                        if (($min !== null && $valorNum < $min) || ($max !== null && $valorNum > $max)) {
+                                            $fueraRango = true;
+                                        }
                                     }
                                 } else {
                                     $colorOverride = $resolveExplicitAlertColorRule((string)$val, $refAplicada);
@@ -596,9 +663,14 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                     $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
                     $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
                     $hasNumericRule = ($min !== null || $max !== null);
-                    if ($hasNumericRule && $valor_num !== null) {
-                        if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
+                    if ($hasNumericRule) {
+                        $numericStatus = $evaluateNumericExpressionAgainstRange((string)$valorOriginal, $min, $max);
+                        if ($numericStatus === 'out') {
                             $fuera_rango = true;
+                        } elseif ($numericStatus === null && $valor_num !== null) {
+                            if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
+                                $fuera_rango = true;
+                            }
                         }
                     } else {
                         $colorOverride = $resolveExplicitAlertColorRule($valorOriginal, (array)$referencia_aplicada);

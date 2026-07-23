@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultsProgressBadge = document.getElementById('resultsProgressBadge');
     const resultsProgressHint = document.getElementById('resultsProgressHint');
     const resultsProgressWrap = document.querySelector('#resultsProgressCard .results-progress-card__bar-wrap');
-    const actionProgressCircles = Array.from(document.querySelectorAll('.js-results-progress-circle'));
+    const getActionProgressCircles = () => Array.from(document.querySelectorAll('.js-results-progress-circle'));
 
     const submitSnapshotUpdate = (cotizacionId, idResultado) => {
         const cid = String(cotizacionId || '').trim();
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const updateActionProgressCircles = (porcentaje) => {
         const pctSafe = Math.max(0, Math.min(100, Number(porcentaje || 0)));
         const angle = Math.round((pctSafe / 100) * 360);
-        actionProgressCircles.forEach((circle) => {
+        getActionProgressCircles().forEach((circle) => {
             circle.style.setProperty('--progress-angle', `${angle}deg`);
             circle.textContent = `${pctSafe}%`;
             circle.classList.toggle('is-empty', pctSafe <= 0);
@@ -110,20 +110,10 @@ document.addEventListener('DOMContentLoaded', function () {
         let normalized = String(rawValue).trim().replace(/\s+/g, '');
         if (normalized === '') return null;
 
-        const hasComma = normalized.indexOf(',') !== -1;
-        const hasDot = normalized.indexOf('.') !== -1;
-        if (hasComma && hasDot) {
-            const lastComma = normalized.lastIndexOf(',');
-            const lastDot = normalized.lastIndexOf('.');
-            if (lastComma > lastDot) {
-                normalized = normalized.replace(/\./g, '').replace(',', '.');
-            } else {
-                normalized = normalized.replace(/,/g, '');
-            }
-        } else if (hasComma && !hasDot) {
-            normalized = normalized.replace(',', '.');
-        } else {
-            normalized = normalized.replace(/,/g, '');
+        // Regla unificada del sistema: coma solo miles, punto solo decimales.
+        normalized = normalized.replace(/,/g, '');
+        if (!/^[-+]?\d+(?:\.\d+)?$/.test(normalized)) {
+            return null;
         }
 
         const num = Number(normalized);
@@ -133,12 +123,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const countFractionDigitsRaw = (rawValue) => {
         const src = String(rawValue ?? '').trim();
         if (!src) return 0;
-        const cleaned = src.replace(/\s+/g, '');
+        const cleaned = src.replace(/\s+/g, '').replace(/,/g, '');
         const lastDot = cleaned.lastIndexOf('.');
-        const lastComma = cleaned.lastIndexOf(',');
-        const sep = Math.max(lastDot, lastComma);
-        if (sep < 0) return 0;
-        return Math.max(0, cleaned.length - sep - 1);
+        if (lastDot < 0) return 0;
+        return Math.max(0, cleaned.length - lastDot - 1);
     };
 
     const trimTrailingZeros = (numStr) => {
@@ -148,10 +136,62 @@ document.addEventListener('DOMContentLoaded', function () {
             .replace(/\.$/g, '');
     };
 
+    const formatThousandsInt = (num) => {
+        const rounded = Math.round(Number(num) || 0);
+        const sign = rounded < 0 ? '-' : '';
+        const abs = String(Math.abs(rounded));
+        return sign + abs.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    const formatNumberWithThousands = (rawNumStr) => {
+        const src = String(rawNumStr ?? '').trim();
+        if (!src) return src;
+
+        const sign = src.startsWith('-') ? '-' : '';
+        const unsigned = sign ? src.slice(1) : src;
+        const parts = unsigned.split('.');
+        const intPart = (parts[0] || '0').replace(/^0+(\d)/, '$1');
+        const intFormatted = String(intPart || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (parts.length <= 1 || parts[1] === '') {
+            return sign + intFormatted;
+        }
+        return `${sign}${intFormatted}.${parts[1]}`;
+    };
+
+    const tryFormatNumericResultField = (field) => {
+        if (!field || !field.matches) return false;
+        if (!field.matches('input[name*="[resultados]"]')) return false;
+        if (field.readOnly) return false;
+
+        const rawVal = String(field.value ?? '').trim();
+        if (rawVal === '') return false;
+
+        const normalized = rawVal.replace(/\s+/g, '').replace(/,/g, '');
+        if (!/^[-+]?\d+(?:\.\d+)?$/.test(normalized)) {
+            return false;
+        }
+
+        const formatted = formatNumberWithThousands(normalized);
+        if (formatted !== rawVal) {
+            field.value = formatted;
+            return true;
+        }
+        return false;
+    };
+
+    const applyVisualThousandsFormatting = () => {
+        document.querySelectorAll('.parameter-section input.form-control[name*="[resultados]"]:not([readonly])').forEach((field) => {
+            tryFormatNumericResultField(field);
+        });
+    };
+
     const applyDecimalConstraint = (field, finalize = false) => {
         if (!field || !field.getAttribute) return;
         const rawDec = String(field.getAttribute('data-decimales') || '').trim();
         if (rawDec === '') {
+            if (finalize) {
+                tryFormatNumericResultField(field);
+            }
             field.classList.remove('is-invalid');
             field.removeAttribute('title');
             return;
@@ -184,12 +224,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (parsed === null) return;
         if (maxDec === 0) {
             field.value = String(Math.round(parsed));
+            field.value = formatThousandsInt(field.value);
             field.classList.remove('is-invalid');
             field.removeAttribute('title');
             return;
         }
         const fixed = parsed.toFixed(maxDec);
-        field.value = trimTrailingZeros(fixed);
+        const normalized = trimTrailingZeros(fixed);
+        field.value = formatNumberWithThousands(normalized);
         field.classList.remove('is-invalid');
         field.removeAttribute('title');
     };
@@ -299,6 +341,58 @@ document.addEventListener('DOMContentLoaded', function () {
         updateActionProgressCircles(porcentaje);
 
         return { porcentaje, total, llenos, cardsTotal: cards.length, cardsCompletas };
+    };
+
+    const aplicarProgresoServidor = (payload) => {
+        if (!payload || typeof payload !== 'object') return;
+
+        const percent = Number(payload.progress_percent);
+        const total = Number(payload.progress_total);
+        const filled = Number(payload.progress_filled);
+        if (!Number.isFinite(percent)) return;
+
+        const pctSafe = Math.max(0, Math.min(100, Math.round(percent)));
+
+        if (resultsProgressBar) {
+            resultsProgressBar.style.width = `${pctSafe}%`;
+            resultsProgressBar.textContent = `${pctSafe}%`;
+            resultsProgressBar.classList.remove('bg-danger', 'bg-warning', 'bg-success');
+            if (pctSafe >= 100) {
+                resultsProgressBar.classList.add('bg-success');
+            } else if (pctSafe <= 0) {
+                resultsProgressBar.classList.add('bg-danger');
+            } else {
+                resultsProgressBar.classList.add('bg-warning');
+            }
+        }
+
+        if (resultsProgressBadge) {
+            resultsProgressBadge.classList.remove('bg-danger', 'bg-warning', 'bg-success', 'text-dark');
+            if (pctSafe >= 100) {
+                resultsProgressBadge.classList.add('bg-success');
+                resultsProgressBadge.textContent = 'Completado 100%';
+            } else if (pctSafe <= 0) {
+                resultsProgressBadge.classList.add('bg-danger');
+                resultsProgressBadge.textContent = 'Pendiente 0%';
+            } else {
+                resultsProgressBadge.classList.add('bg-warning', 'text-dark');
+                resultsProgressBadge.textContent = `Pendiente ${pctSafe}%`;
+            }
+        }
+
+        if (resultsProgressHint && Number.isFinite(total) && Number.isFinite(filled)) {
+            const cards = getExamCards();
+            const cardsCompletas = cards.filter((card) => {
+                const p = calcularProgresoCard(card, false);
+                return p.total > 0 && p.porcentaje === 100;
+            }).length;
+            resultsProgressHint.textContent = `Examenes completos: ${cardsCompletas}/${cards.length}. Campos llenos: ${filled}/${total}.`;
+        }
+
+        if (resultsProgressWrap) {
+            resultsProgressWrap.setAttribute('aria-valuenow', String(pctSafe));
+        }
+        updateActionProgressCircles(pctSafe);
     };
 
     const syncExamOrderInputs = () => {
@@ -476,6 +570,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!(target instanceof HTMLElement)) return;
         if (target.matches('input[data-decimales], textarea[data-decimales]')) {
             applyDecimalConstraint(target, true);
+        } else if (target.matches('input[name*="[resultados]"]')) {
+            tryFormatNumericResultField(target);
         }
         if (target.matches('[data-progress-track="1"]')) {
             recalcularProgresoFormulario(false);
@@ -1283,7 +1379,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (forceIncompleteInput) {
                     forceIncompleteInput.value = '0';
                 }
+                applyVisualThousandsFormatting();
                 recalcularProgresoFormulario(false);
+                aplicarProgresoServidor(payload);
             } catch (error) {
                 submitNativeFallback();
             }

@@ -18,26 +18,10 @@ class ExamCardView {
                     $normalized = $trimmed;
                 }
 
-                $hasComma = strpos($normalized, ',') !== false;
-                $hasDot = strpos($normalized, '.') !== false;
-
-                if ($hasComma && $hasDot) {
-                    $lastComma = strrpos($normalized, ',');
-                    $lastDot = strrpos($normalized, '.');
-                    if ($lastComma !== false && $lastDot !== false && $lastComma > $lastDot) {
-                        // Formato tipo 1.234,56
-                        $normalized = str_replace('.', '', $normalized);
-                        $normalized = str_replace(',', '.', $normalized);
-                    } else {
-                        // Formato tipo 1,234.56
-                        $normalized = str_replace(',', '', $normalized);
-                    }
-                } elseif ($hasComma && !$hasDot) {
-                    // Formato tipo 123,45
-                    $normalized = str_replace(',', '.', $normalized);
-                } else {
-                    // Formato tipo 1,234 o 1234.56
-                    $normalized = str_replace(',', '', $normalized);
+                // Regla unificada del sistema: coma solo miles, punto solo decimales.
+                $normalized = str_replace(',', '', $normalized);
+                if (!preg_match('/^[-+]?\d+(?:\.\d+)?$/', $normalized)) {
+                    return null;
                 }
                 return is_numeric($normalized) ? floatval($normalized) : null;
             }
@@ -745,6 +729,78 @@ class ExamCardView {
                             <textarea class="form-control" rows="' . $rows . '" name="examenes[' . $examen['id_resultado'] . '][resultados][' . htmlspecialchars($item['nombre']) . ']" data-progress-track="1" data-initial-value="' . htmlspecialchars((string)$valorTexto) . '" placeholder="Ingrese ' . htmlspecialchars($item['nombre']) . '">' . htmlspecialchars($valorTexto) . '</textarea>
                         </div>';
                     } elseif ($tipoItem === 'Parámetro') {
+                        $parseNumericExpression = static function ($raw) {
+                            $src = trim((string)$raw);
+                            if ($src === '') {
+                                return null;
+                            }
+                            if (!preg_match('/^(<=|>=|<|>|=)?\s*([-+]?\d[\d,]*(?:\.\d+)?)$/', $src, $m)) {
+                                return null;
+                            }
+
+                            $op = isset($m[1]) && $m[1] !== '' ? $m[1] : '=';
+                            $numRaw = str_replace(',', '', (string)($m[2] ?? ''));
+                            if (!preg_match('/^[-+]?\d+(?:\.\d+)?$/', $numRaw) || !is_numeric($numRaw)) {
+                                return null;
+                            }
+
+                            return [
+                                'op' => $op,
+                                'num' => floatval($numRaw),
+                            ];
+                        };
+
+                        $evaluateNumericExpressionAgainstRange = static function ($raw, $min, $max) use ($parseNumericExpression) {
+                            $parsedExpr = $parseNumericExpression($raw);
+                            if ($parsedExpr === null) {
+                                return null;
+                            }
+
+                            $op = (string)($parsedExpr['op'] ?? '=');
+                            $num = isset($parsedExpr['num']) ? floatval($parsedExpr['num']) : null;
+                            if ($num === null) {
+                                return null;
+                            }
+
+                            $hasMin = ($min !== null && is_numeric($min));
+                            $hasMax = ($max !== null && is_numeric($max));
+                            if (!$hasMin && !$hasMax) {
+                                return 'in';
+                            }
+
+                            if ($op === '=') {
+                                if ($hasMin && $num < $min) return 'out';
+                                if ($hasMax && $num > $max) return 'out';
+                                return 'in';
+                            }
+
+                            if ($op === '>') {
+                                if ($hasMax && $num >= $max) return 'out';
+                                if ($hasMin && !$hasMax && $num >= $min) return 'in';
+                                return 'indeterminate';
+                            }
+
+                            if ($op === '>=') {
+                                if ($hasMax && $num > $max) return 'out';
+                                if ($hasMin && !$hasMax && $num >= $min) return 'in';
+                                return 'indeterminate';
+                            }
+
+                            if ($op === '<') {
+                                if ($hasMin && $num <= $min) return 'out';
+                                if ($hasMax && !$hasMin && $num <= $max) return 'in';
+                                return 'indeterminate';
+                            }
+
+                            if ($op === '<=') {
+                                if ($hasMin && $num < $min) return 'out';
+                                if ($hasMax && !$hasMin && $num <= $max) return 'in';
+                                return 'indeterminate';
+                            }
+
+                            return null;
+                        };
+
                         $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
                             if (empty($referencias)) {
                                 return null;
@@ -782,14 +838,19 @@ class ExamCardView {
                             }
                         }
                         $valor_resultado = $getResultado($item['nombre'], '', $item);
-                        $valor_resultado_num = str_replace(',', '', $valor_resultado);
+                        $valor_resultado_num = str_replace(',', '', (string)$valor_resultado);
                         $fuera_rango = false;
-                        if ($referencia_aplicada && is_numeric($valor_resultado_num)) {
+                        if ($referencia_aplicada) {
                             $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
                             $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
-                            $valor_num = floatval($valor_resultado_num);
-                            if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
+                            $numericStatus = $evaluateNumericExpressionAgainstRange((string)$valor_resultado, $min, $max);
+                            if ($numericStatus === 'out') {
                                 $fuera_rango = true;
+                            } elseif ($numericStatus === null && is_numeric($valor_resultado_num)) {
+                                $valor_num = floatval($valor_resultado_num);
+                                if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
+                                    $fuera_rango = true;
+                                }
                             }
                         }
                         echo '<div class="parameter-section">

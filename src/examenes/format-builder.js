@@ -156,9 +156,9 @@ function syncLegacyAlertVisualEditor(group) {
 
 function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', sexo = 'cualquiera', edad_min = '', edad_max = '', alerta_modo = REF_ALERT_DEFAULT_MODE, alerta_color = REF_ALERT_DEFAULT_COLOR, alerta_textos = '', alerta_colores_texto = '') {
   const div = document.createElement('div');
-  // Normalizar decimales a punto
-  let valorMinStr = valor_min !== '' ? valor_min.toString().replace(',', '.') : '';
-  let valorMaxStr = valor_max !== '' ? valor_max.toString().replace(',', '.') : '';
+  // Regla unificada: coma para miles y punto para decimales.
+  let valorMinStr = valor_min !== '' ? valor_min.toString().replace(/,/g, '') : '';
+  let valorMaxStr = valor_max !== '' ? valor_max.toString().replace(/,/g, '') : '';
   valorMinStr = valorMinStr !== '' ? parseFloat(valorMinStr).toString() : '';
   valorMaxStr = valorMaxStr !== '' ? parseFloat(valorMaxStr).toString() : '';
   const alertModeNorm = normalizeRefAlertMode(alerta_modo);
@@ -2226,9 +2226,9 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
     refGroups.forEach(refDiv => {
       const valor = refDiv.querySelector('.valor').value;
       const desc = refDiv.querySelector('.desc').value;
-      // Normalizar decimales con coma a punto al serializar
-      const valor_min = refDiv.querySelector('.valor-min').value.replace(',', '.');
-      const valor_max = refDiv.querySelector('.valor-max').value.replace(',', '.');
+      // Regla unificada: coma como miles y punto como decimal al serializar.
+      const valor_min = refDiv.querySelector('.valor-min').value.replace(/,/g, '');
+      const valor_max = refDiv.querySelector('.valor-max').value.replace(/,/g, '');
       const sexo = refDiv.querySelector('.sexo-ref').value;
       const edad_min = refDiv.querySelector('.edad-min').value;
       const edad_max = refDiv.querySelector('.edad-max').value;

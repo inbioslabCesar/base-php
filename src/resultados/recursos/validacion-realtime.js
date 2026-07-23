@@ -83,73 +83,82 @@ function validarCampoConReferencias(target) {
 
   const parseNullableFloat = (value, rangeContext) => {
     if (value === null || value === undefined) return null;
-    const normalized = String(value)
+    let normalized = String(value)
       .trim()
       .replace(/\u00A0/g, ' ')
       .replace(/\s+/g, '');
     if (normalized === '') return null;
 
-    const candidates = [];
-    const seen = new Set();
-    const addCandidate = (num, score) => {
-      if (!Number.isFinite(num)) return;
-      const key = String(num);
-      if (seen.has(key)) return;
-      seen.add(key);
-      candidates.push({ num, score });
-    };
-
-    const hasComma = normalized.indexOf(',') !== -1;
-    const hasDot = normalized.indexOf('.') !== -1;
-
-    if (hasComma && hasDot) {
-      const lastComma = normalized.lastIndexOf(',');
-      const lastDot = normalized.lastIndexOf('.');
-      if (lastComma > lastDot) {
-        // Formato tipo 1.234,56
-        const v = parseFloat(normalized.replace(/\./g, '').replace(',', '.'));
-        addCandidate(v, 5);
-      } else {
-        // Formato tipo 1,234.56
-        const v = parseFloat(normalized.replace(/,/g, ''));
-        addCandidate(v, 5);
-      }
-    } else if (hasComma) {
-      // Puede ser miles (150,000) o decimal (150,5).
-      const commaThousandsPattern = /^[-+]?\d{1,3}(,\d{3})+$/;
-      const asThousands = parseFloat(normalized.replace(/,/g, ''));
-      const asDecimal = parseFloat(normalized.replace(',', '.'));
-      addCandidate(asThousands, commaThousandsPattern.test(normalized) ? 5 : 2);
-      addCandidate(asDecimal, commaThousandsPattern.test(normalized) ? 1 : 4);
-    } else if (hasDot) {
-      // Puede ser miles (150.000) o decimal (150.5).
-      const dotThousandsPattern = /^[-+]?\d{1,3}(\.\d{3})+$/;
-      const asThousands = parseFloat(normalized.replace(/\./g, ''));
-      const asDecimal = parseFloat(normalized);
-      addCandidate(asThousands, dotThousandsPattern.test(normalized) ? 5 : 2);
-      addCandidate(asDecimal, dotThousandsPattern.test(normalized) ? 1 : 4);
-    } else {
-      addCandidate(parseFloat(normalized), 4);
+    // Regla unificada del sistema: coma solo miles, punto solo decimales.
+    normalized = normalized.replace(/,/g, '');
+    if (!/^[-+]?\d+(?:\.\d+)?$/.test(normalized)) {
+      return null;
     }
 
-    if (candidates.length === 0) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
-    const minCtx = Number.isFinite(rangeContext?.min) ? Number(rangeContext.min) : null;
-    const maxCtx = Number.isFinite(rangeContext?.max) ? Number(rangeContext.max) : null;
-    if (minCtx !== null || maxCtx !== null) {
-      const inRange = candidates.filter(({ num }) => {
-        if (minCtx !== null && num < minCtx) return false;
-        if (maxCtx !== null && num > maxCtx) return false;
-        return true;
-      });
-      if (inRange.length > 0) {
-        inRange.sort((a, b) => b.score - a.score);
-        return inRange[0].num;
-      }
+  const parseNumericExpression = (raw) => {
+    const src = String(raw ?? '').trim();
+    if (!src) return null;
+    const m = src.match(/^(<=|>=|<|>|=)?\s*([-+]?\d[\d,]*(?:\.\d+)?)$/);
+    if (!m) return null;
+
+    const op = m[1] || '=';
+    const normalizedNum = String(m[2] || '').replace(/,/g, '');
+    if (!/^[-+]?\d+(?:\.\d+)?$/.test(normalizedNum)) {
+      return null;
+    }
+    const num = Number(normalizedNum);
+    if (!Number.isFinite(num)) return null;
+
+    return { op, num };
+  };
+
+  const evaluateNumericExpressionAgainstRange = (raw, min, max) => {
+    const parsed = parseNumericExpression(raw);
+    if (!parsed) return null;
+
+    const { op, num } = parsed;
+    const hasMin = Number.isFinite(min);
+    const hasMax = Number.isFinite(max);
+
+    if (!hasMin && !hasMax) {
+      return 'in';
     }
 
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].num;
+    if (op === '=') {
+      if (hasMin && num < min) return 'out';
+      if (hasMax && num > max) return 'out';
+      return 'in';
+    }
+
+    if (op === '>') {
+      if (hasMax && num >= max) return 'out';
+      if (hasMin && !hasMax && num >= min) return 'in';
+      return 'indeterminate';
+    }
+
+    if (op === '>=') {
+      if (hasMax && num > max) return 'out';
+      if (hasMin && !hasMax && num >= min) return 'in';
+      return 'indeterminate';
+    }
+
+    if (op === '<') {
+      if (hasMin && num <= min) return 'out';
+      if (hasMax && !hasMin && num <= max) return 'in';
+      return 'indeterminate';
+    }
+
+    if (op === '<=') {
+      if (hasMin && num < min) return 'out';
+      if (hasMax && !hasMin && num <= max) return 'in';
+      return 'indeterminate';
+    }
+
+    return null;
   };
 
   const normalizeAlertMode = (mode) => {
@@ -230,6 +239,8 @@ function validarCampoConReferencias(target) {
 
   let fuera_rango = false;
   let textRuleEvaluated = false;
+  let numericRuleEvaluated = false;
+  let numericInRange = false;
   let alertMode = 'both';
   let alertColor = '#c62828';
   let valor = parseNullableFloat(target.value);
@@ -243,10 +254,24 @@ function validarCampoConReferencias(target) {
     const hasNumericRule = (min !== null || max !== null);
 
     if (hasNumericRule) {
-      valor = parseNullableFloat(target.value, { min, max });
-      if (valor !== null) {
-        if (min !== null && valor < min) fuera_rango = true;
-        if (max !== null && valor > max) fuera_rango = true;
+      const numericStatus = evaluateNumericExpressionAgainstRange(target.value, min, max);
+      if (numericStatus !== null) {
+        numericRuleEvaluated = true;
+        if (numericStatus === 'out') {
+          fuera_rango = true;
+        } else if (numericStatus === 'in') {
+          numericInRange = true;
+        }
+      } else {
+        valor = parseNullableFloat(target.value, { min, max });
+        if (valor !== null) {
+          numericRuleEvaluated = true;
+          if (min !== null && valor < min) fuera_rango = true;
+          if (max !== null && valor > max) fuera_rango = true;
+          if (!fuera_rango) {
+            numericInRange = true;
+          }
+        }
       }
     } else {
       const targetToken = normalizeText(targetTextRaw);
@@ -287,7 +312,7 @@ function validarCampoConReferencias(target) {
   const showAsterisk = fuera_rango && (alertMode === 'asterisk' || alertMode === 'both');
 
   target.classList.toggle('is-invalid', showColor);
-  const isValidByNumeric = (targetTextRaw !== '' && valor !== null);
+  const isValidByNumeric = (targetTextRaw !== '' && numericRuleEvaluated && numericInRange);
   const isValidByText = (targetTextRaw !== '' && textRuleEvaluated && !fuera_rango);
   target.classList.toggle('is-valid', !fuera_rango && (isValidByNumeric || isValidByText));
 
