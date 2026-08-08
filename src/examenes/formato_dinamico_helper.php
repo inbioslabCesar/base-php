@@ -9,10 +9,15 @@ if (!function_exists('lab_format_v2_enabled')) {
 
         $raw = getenv('LAB_FORMAT_V2_ENABLED');
         if ($raw === false) {
-            return false;
+            // Compatibilidad operativa: si no hay variable definida,
+            // usar V2 por defecto para no ocultar formatos schema_version=2.
+            return true;
         }
 
         $value = strtolower(trim((string)$raw));
+        if ($value === '') {
+            return true;
+        }
         return in_array($value, ['1', 'true', 'yes', 'on'], true);
     }
 }
