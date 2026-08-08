@@ -296,14 +296,10 @@ function validarCampoConReferencias(target) {
         // Si hay reglas explícitas configuradas, no aplicar mismatch general.
         textRuleEvaluated = true;
       } else {
-      const expectedRaw = String(referencia_aplicada.valor ?? '').trim();
-      const expectedTokens = splitExpectedTextValues(expectedRaw);
-      if (expectedTokens.length > 0 && targetToken !== '') {
-        textRuleEvaluated = true;
-        if (!matchesExpectedText(targetToken, expectedTokens)) {
-          fuera_rango = true;
-        }
-      }
+      // IMPORTANTE: `referencia.valor`/"Texto visible" es informativo.
+      // No debe discriminar por texto salvo que existan reglas explícitas
+      // (alerta_textos o alerta_colores_texto).
+      textRuleEvaluated = false;
       }
       }
     }

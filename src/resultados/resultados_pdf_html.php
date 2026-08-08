@@ -314,29 +314,17 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         return $out;
     };
 
-    $evaluateTextRule = static function ($resultadoRaw, array $referencia) use ($toNullableFloat, $splitExpectedTextValues, $normalizeText, $matchesExpectedText): ?bool {
+    $evaluateTextRule = static function ($resultadoRaw, array $referencia) use ($toNullableFloat): ?bool {
         $min = array_key_exists('valor_min', $referencia) ? $toNullableFloat($referencia['valor_min']) : null;
         $max = array_key_exists('valor_max', $referencia) ? $toNullableFloat($referencia['valor_max']) : null;
         if ($min !== null || $max !== null) {
             return null;
         }
 
-        $expectedRaw = trim((string)($referencia['valor'] ?? ''));
-        if ($expectedRaw === '') {
-            return null;
-        }
-
-        $expectedTokens = $splitExpectedTextValues($expectedRaw);
-        if (empty($expectedTokens)) {
-            return null;
-        }
-
-        $actualToken = $normalizeText($resultadoRaw);
-        if ($actualToken === '') {
-            return null;
-        }
-
-        return $matchesExpectedText($actualToken, $expectedTokens);
+        // `referencia.valor`/"Texto visible" se trata como texto informativo.
+        // La discriminación cualitativa solo se activa por reglas explícitas
+        // (alerta_textos / alerta_colores_texto).
+        return null;
     };
 
     $evaluateExplicitAlertTextRule = static function ($resultadoRaw, array $referencia) use ($splitAlertTextValues, $normalizeText): ?bool {
