@@ -138,6 +138,45 @@ class ExamCardView {
         $formatRows = $isFormatV2 ? lab_format_v2_rows($formatDef) : [];
         $formatRowsResolved = $isFormatV2 ? lab_format_v2_resolve_rows($formatColumns, $formatRows, is_array($resultados) ? $resultados : []) : [];
 
+        $v2RowAnchor = function ($row) use ($formatColumns) {
+            if (!is_array($row)) {
+                return '';
+            }
+            $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+            $label = trim((string)($row['label'] ?? ''));
+            if ($rowType === 'title' || $rowType === 'subtitle') {
+                return $label;
+            }
+
+            $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
+            foreach ($formatColumns as $col) {
+                if (!is_array($col)) {
+                    continue;
+                }
+                $colId = trim((string)($col['id'] ?? ''));
+                if ($colId === '') {
+                    continue;
+                }
+                $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
+                if (!in_array($kind, ['text', 'reference'], true)) {
+                    continue;
+                }
+                $cellValue = trim((string)($cells[$colId] ?? ''));
+                if ($cellValue !== '') {
+                    return $cellValue;
+                }
+            }
+
+            foreach ($cells as $cellValue) {
+                $cellText = trim((string)$cellValue);
+                if ($cellText !== '') {
+                    return $cellText;
+                }
+            }
+
+            return $label;
+        };
+
         $adicional = $formatDef['legacy_items'];
         if (!is_array($adicional)) {
             $adicional = [];
@@ -187,8 +226,8 @@ class ExamCardView {
                     }
                     for ($j = $idx + 1; $j < count($formatRows); $j++) {
                         $t2 = strtolower(trim((string)($formatRows[$j]['type'] ?? 'data')));
-                        if (in_array($t2, ['data', 'title', 'subtitle'], true)) {
-                            $n2 = trim((string)($formatRows[$j]['label'] ?? ''));
+                        if (in_array($t2, ['data', 'long_text'], true)) {
+                            $n2 = trim((string)$v2RowAnchor($formatRows[$j]));
                             if ($n2 !== '') {
                                 $before = $n2;
                             }
@@ -203,9 +242,15 @@ class ExamCardView {
                         'before' => $before,
                     ];
                 }
-                if ($tipo === 'data' && $nombre !== '') {
-                    $posiciones[] = $nombre;
+                if (in_array($tipo, ['data', 'long_text'], true)) {
+                    $anchor = trim((string)$v2RowAnchor($it));
+                    if ($anchor !== '') {
+                        $posiciones[] = $anchor;
+                    }
                 }
+            }
+            if (!empty($posiciones)) {
+                $posiciones = array_values(array_unique($posiciones));
             }
         } else {
             foreach ($adicional as $idx => $it) {

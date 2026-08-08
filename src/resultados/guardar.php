@@ -981,11 +981,58 @@ if (!empty($examenes) && is_array($examenes)) {
                         $layoutRows = [];
                     }
 
+                    $layoutCols = $adicional_arr['layout']['columns'] ?? [];
+                    if (!is_array($layoutCols)) {
+                        $layoutCols = [];
+                    }
+                    usort($layoutCols, static function ($a, $b) {
+                        return intval($a['order'] ?? 0) <=> intval($b['order'] ?? 0);
+                    });
+
                     $getRowLabel = static function ($row) {
                         return trim((string)($row['label'] ?? ''));
                     };
 
-                    $findInsertIndex = static function (array $rows, string $before) use ($getRowLabel) {
+                    $getRowAnchor = static function ($row, array $columns) use ($getRowLabel): string {
+                        if (!is_array($row)) {
+                            return '';
+                        }
+                        $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
+                        $label = $getRowLabel($row);
+                        if ($rowType === 'title' || $rowType === 'subtitle') {
+                            return $label;
+                        }
+
+                        $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
+                        foreach ($columns as $col) {
+                            if (!is_array($col)) {
+                                continue;
+                            }
+                            $colId = trim((string)($col['id'] ?? ''));
+                            if ($colId === '') {
+                                continue;
+                            }
+                            $kind = strtolower(trim((string)($col['kind'] ?? 'text')));
+                            if (!in_array($kind, ['text', 'reference'], true)) {
+                                continue;
+                            }
+                            $cellVal = trim((string)($cells[$colId] ?? ''));
+                            if ($cellVal !== '') {
+                                return $cellVal;
+                            }
+                        }
+
+                        foreach ($cells as $cellVal) {
+                            $txt = trim((string)$cellVal);
+                            if ($txt !== '') {
+                                return $txt;
+                            }
+                        }
+
+                        return $label;
+                    };
+
+                    $findInsertIndex = static function (array $rows, string $before) use ($getRowLabel, $getRowAnchor, $layoutCols, $normKey) {
                         $before = trim($before);
                         if ($before === '__FIRST__') {
                             return 0;
@@ -993,15 +1040,21 @@ if (!empty($examenes) && is_array($examenes)) {
                         if ($before === '' || $before === '__END__') {
                             return null;
                         }
+                        $beforeNorm = $normKey($before);
                         foreach ($rows as $idx => $row) {
                             if (!is_array($row)) {
                                 continue;
                             }
                             $rowType = strtolower(trim((string)($row['type'] ?? 'data')));
-                            if (!in_array($rowType, ['data', 'title', 'subtitle'], true)) {
+                            if (!in_array($rowType, ['data', 'long_text', 'title', 'subtitle'], true)) {
                                 continue;
                             }
-                            if ($getRowLabel($row) === $before) {
+                            $candidateAnchor = trim((string)$getRowAnchor($row, $layoutCols));
+                            $candidateLabel = $getRowLabel($row);
+                            if ($candidateAnchor === $before || $candidateLabel === $before) {
+                                return $idx;
+                            }
+                            if ($beforeNorm !== '' && ($normKey($candidateAnchor) === $beforeNorm || $normKey($candidateLabel) === $beforeNorm)) {
                                 return $idx;
                             }
                         }
