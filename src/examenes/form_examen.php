@@ -42,10 +42,23 @@ if ($esEdicion) {
     $adicional = $examen['adicional'] ?? '';
     $adicional_array = $adicional ? json_decode($adicional, true) : [];
 }
+
+$rolActualExamenForm = strtolower((string)($_SESSION['rol'] ?? ''));
+$volverExamenes = match ($rolActualExamenForm) {
+    'laboratorista' => 'dashboard.php?vista=laboratorista',
+    'admin' => 'dashboard.php?vista=examenes',
+    'recepcionista' => 'dashboard.php?vista=recepcionista',
+    default => 'dashboard.php?vista=examenes',
+};
 ?>
 
 <div class="container-fluid mt-4">
-    <h2><?= $esEdicion ? 'Editar Examen' : 'Agregar Examen' ?></h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h2 class="mb-0"><?= $esEdicion ? 'Editar Examen' : 'Agregar Examen' ?></h2>
+        <a href="<?= htmlspecialchars($volverExamenes, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-secondary">
+            <i class="fa fa-arrow-left me-1"></i> Volver
+        </a>
+    </div>
     <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_examen&id=' . htmlspecialchars($_GET['id']) : 'crear_examen' ?>" id="form-examen">
         <!-- Campos básicos -->
         <div class="mb-3">

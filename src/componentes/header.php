@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../auth/empresa_config.php';
 require_once __DIR__ . '/../config/currency.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 $usuarioSesion = $_SESSION['usuario'] ?? 'Usuario';
 
@@ -25,6 +26,7 @@ if (is_array($usuarioSesion)) {
 // Convierte solo la primera letra en mayúscula, el resto en minúscula
 $nombreFormateado = ucfirst(mb_strtolower($nombreUsuario, 'UTF-8'));
 $appCurrency = currency_get_config($pdo);
+$uiTheme = ui_theme_get_active($pdo);
 
 $logoRaw = isset($config['logo']) ? trim((string)$config['logo']) : '';
 if ($logoRaw === '' || preg_match('/^data:image\//i', $logoRaw)) {
@@ -78,20 +80,44 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
+        :root {
+            --ui-primary: <?= htmlspecialchars($uiTheme['primary'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-secondary: <?= htmlspecialchars($uiTheme['secondary'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-footer: <?= htmlspecialchars($uiTheme['footer'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-button: <?= htmlspecialchars($uiTheme['button_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-text: <?= htmlspecialchars($uiTheme['text'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-navbar-bg: <?= htmlspecialchars($uiTheme['navbar_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-navbar-text: <?= htmlspecialchars($uiTheme['navbar_text'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-navbar-hover-bg: <?= htmlspecialchars($uiTheme['navbar_hover_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-sidebar-bg: <?= htmlspecialchars($uiTheme['sidebar_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-sidebar-text: <?= htmlspecialchars($uiTheme['sidebar_text'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-sidebar-hover-bg: <?= htmlspecialchars($uiTheme['sidebar_hover_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-footer-bg: <?= htmlspecialchars($uiTheme['footer_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-footer-text: <?= htmlspecialchars($uiTheme['footer_text'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-button-text: <?= htmlspecialchars($uiTheme['button_text'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-body-bg: <?= htmlspecialchars($uiTheme['body_bg'], ENT_QUOTES, 'UTF-8') ?>;
+            --ui-card-bg: <?= htmlspecialchars($uiTheme['card_bg'], ENT_QUOTES, 'UTF-8') ?>;
+        }
+
+        body {
+            background: var(--ui-body-bg);
+            color: var(--ui-text);
+        }
+
         .sidebar-custom {
-            background: #143a51;
-            color: #fff;
+            background: var(--ui-sidebar-bg);
+            color: var(--ui-sidebar-text);
         }
 
         .sidebar-custom .nav-link,
         .sidebar-custom .nav-link i {
-            color: #fff;
+            color: var(--ui-sidebar-text);
         }
 
         .sidebar-custom .nav-link.active,
         .sidebar-custom .nav-link:hover {
-            background: #1e5270;
-            color: #fff;
+            background: var(--ui-sidebar-hover-bg);
+            color: var(--ui-sidebar-text);
         }
 
         .sidebar-custom .nav-link {
@@ -229,8 +255,22 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
     </header>
     <style>
         .header-gradient {
-            background: #0d6efd;
+            background: var(--ui-navbar-bg);
             border-radius: 0 0 24px 24px;
+        }
+        .header-gradient .text-white,
+        .header-gradient .fw-bold {
+            color: var(--ui-navbar-text) !important;
+        }
+        .btn-primary,
+        .btn-success {
+            background: var(--ui-button) !important;
+            border-color: var(--ui-button) !important;
+            color: var(--ui-button-text) !important;
+        }
+        .btn-primary:hover,
+        .btn-success:hover {
+            filter: brightness(0.92);
         }
         .header-logo-box {
             background: #fff;

@@ -9,6 +9,17 @@ $currencyCfg = currency_get_config($pdo);
 $currencySymbol = $currencyCfg['symbol'];
 
 $rol = $_SESSION['rol'] ?? null;
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : [
+    'modo_operativo' => 'PARTICULAR',
+    'es_particular' => true,
+    'es_sis' => false,
+    'es_mixto' => false,
+];
+$derivacionServicioHabilitada = !empty($operacionContext['es_sis']);
+$modoOperativoActual = strtoupper((string)($operacionContext['modo_operativo'] ?? 'PARTICULAR'));
+$mostrarCoberturaSis = in_array($modoOperativoActual, ['SIS', 'MIXTO'], true);
+$sisForzado = ($modoOperativoActual === 'SIS');
+$sisCotizacionExistente = false;
 $isEdit = isset($_GET['edit']) && $_GET['edit'] == 1 && isset($_GET['id']);
 $cotizacionData = null;
 $examenesCotizacion = [];
@@ -17,6 +28,10 @@ $tipoComprobanteCliente = 'boleta';
 $receptorRuc = '';
 $receptorRazonSocial = '';
 $receptorDireccion = '';
+$sisNumeroAfiliacionValor = '';
+$sisNumeroAutorizacionValor = '';
+$sisNumeroFuaValor = '';
+$sisObservacionesValor = '';
 $hasDetalleReferenciadoCols = false;
 
 // Exámenes catálogo
@@ -34,6 +49,14 @@ if ($rol === 'admin' || $rol === 'recepcionista') {
     $convenios = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
 }
 
+$servicios = [];
+$servicioSeleccionado = 0;
+$profesionalSolicitanteSeleccionado = 0;
+$profesionalSolicitanteSnapshot = '';
+$profesionalSolicitanteTipoSnapshot = '';
+$profesionalSolicitanteRegistroSnapshot = '';
+$servicioProfesionalesMap = [];
+
 // Si es edición, cargar datos de la cotización y sus exámenes
 if ($isEdit) {
     $id_cotizacion = intval($_GET['id']);
@@ -45,6 +68,10 @@ if ($isEdit) {
         echo "<div class='alert alert-danger mt-4'>No se encontró la cotización a editar.</div>";
         exit;
     }
+    $profesionalSolicitanteSeleccionado = (int)($cotizacionData['profesional_solicitante_id'] ?? 0);
+    $profesionalSolicitanteSnapshot = trim((string)($cotizacionData['profesional_solicitante_nombre'] ?? ''));
+    $profesionalSolicitanteTipoSnapshot = trim((string)($cotizacionData['profesional_solicitante_tipo'] ?? ''));
+    $profesionalSolicitanteRegistroSnapshot = trim((string)($cotizacionData['profesional_solicitante_registro'] ?? ''));
     $emitirComprobante = (int)($cotizacionData['emitir_comprobante'] ?? 1);
 
     // Particular con Factura: precargar si existe en BD
@@ -57,6 +84,39 @@ if ($isEdit) {
     $receptorRuc = (string)($cotizacionData['receptor_numero_documento'] ?? '');
     $receptorRazonSocial = (string)($cotizacionData['receptor_razon_social'] ?? '');
     $receptorDireccion = (string)($cotizacionData['receptor_direccion'] ?? '');
+    $sisCotizacionExistente = ((int)($cotizacionData['es_sis'] ?? 0) === 1);
+    $sisNumeroAfiliacionValor = (string)($cotizacionData['sis_numero_afiliacion'] ?? '');
+    $sisNumeroAutorizacionValor = (string)($cotizacionData['sis_numero_autorizacion'] ?? '');
+    $sisNumeroFuaValor = (string)($cotizacionData['sis_numero_fua'] ?? '');
+    $sisObservacionesValor = (string)($cotizacionData['sis_observaciones'] ?? '');
+
+    if ($sisCotizacionExistente) {
+        try {
+            $tablaSisExiste = (bool)$pdo->query("SHOW TABLES LIKE 'sis_coberturas'")->fetchColumn();
+            if ($tablaSisExiste) {
+                $sisRow = null;
+                $sisCoberturaId = (int)($cotizacionData['sis_cobertura_id'] ?? 0);
+                if ($sisCoberturaId > 0) {
+                    $stmtSis = $pdo->prepare("SELECT numero_afiliacion, numero_autorizacion, numero_fua, observaciones FROM sis_coberturas WHERE id = ? LIMIT 1");
+                    $stmtSis->execute([$sisCoberturaId]);
+                    $sisRow = $stmtSis->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+                if (!$sisRow) {
+                    $stmtSis = $pdo->prepare("SELECT numero_afiliacion, numero_autorizacion, numero_fua, observaciones FROM sis_coberturas WHERE cotizacion_id = ? ORDER BY id DESC LIMIT 1");
+                    $stmtSis->execute([$id_cotizacion]);
+                    $sisRow = $stmtSis->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+                if ($sisRow) {
+                    $sisNumeroAfiliacionValor = (string)($sisRow['numero_afiliacion'] ?? '');
+                    $sisNumeroAutorizacionValor = (string)($sisRow['numero_autorizacion'] ?? '');
+                    $sisNumeroFuaValor = (string)($sisRow['numero_fua'] ?? '');
+                    $sisObservacionesValor = (string)($sisRow['observaciones'] ?? '');
+                }
+            }
+        } catch (Throwable $e) {
+            // Mantener fallback con los datos disponibles en cotizaciones.
+        }
+    }
     // Exámenes de la cotización
     $stmtDet = $pdo->prepare("SELECT * FROM cotizaciones_detalle WHERE id_cotizacion = ?");
     $stmtDet->execute([$id_cotizacion]);
@@ -71,6 +131,8 @@ if ($isEdit) {
         $id_cliente = isset($_GET['id']) ? intval($_GET['id']) : '';
     }
 }
+
+$formMsg = trim((string)($_GET['msg'] ?? ''));
 
 try {
     $stmtColsDet = $pdo->query("SHOW COLUMNS FROM cotizaciones_detalle");
@@ -93,6 +155,57 @@ try {
 if (empty($id_cliente)) {
     echo "<div class='alert alert-danger mt-4'>No se pudo identificar al cliente. Por favor, vuelve al listado de clientes.</div>";
     exit;
+}
+
+try {
+    if ($derivacionServicioHabilitada) {
+        $tablaServiciosExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicios'")->fetchColumn();
+        $tablaServicioClienteExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicio_cliente'")->fetchColumn();
+        $tablaServicioProfesionalExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicio_profesional'")->fetchColumn();
+        $tablaProfesionalesExiste = (bool)$pdo->query("SHOW TABLES LIKE 'profesionales_solicitantes'")->fetchColumn();
+
+        if ($tablaServiciosExiste) {
+            $stmtServicios = $pdo->query("SELECT id, nombre, codigo FROM servicios WHERE estado = 'activo' ORDER BY nombre");
+            $servicios = $stmtServicios ? $stmtServicios->fetchAll(PDO::FETCH_ASSOC) : [];
+        }
+
+        if ($tablaServicioClienteExiste && !empty($id_cliente)) {
+            $stmtServicioSel = $pdo->prepare("SELECT servicio_id FROM servicio_cliente WHERE cliente_id = ? ORDER BY id DESC LIMIT 1");
+            $stmtServicioSel->execute([(int)$id_cliente]);
+            $servicioSeleccionado = (int)($stmtServicioSel->fetchColumn() ?: 0);
+        }
+
+        if ($tablaServicioProfesionalExiste && $tablaProfesionalesExiste) {
+            $stmtServicioProfesionales = $pdo->query("SELECT sp.servicio_id, p.id AS profesional_id, p.nombres, p.apellidos, p.tipo_profesional, p.registro_profesional
+                FROM servicio_profesional sp
+                INNER JOIN profesionales_solicitantes p ON p.id = sp.profesional_id
+                WHERE p.estado = 'activo'
+                ORDER BY p.nombres, p.apellidos");
+            $rowsServicioProfesionales = $stmtServicioProfesionales ? $stmtServicioProfesionales->fetchAll(PDO::FETCH_ASSOC) : [];
+
+            foreach ($rowsServicioProfesionales as $rowProf) {
+                $srvId = (int)($rowProf['servicio_id'] ?? 0);
+                $profId = (int)($rowProf['profesional_id'] ?? 0);
+                if ($srvId <= 0 || $profId <= 0) {
+                    continue;
+                }
+                if (!isset($servicioProfesionalesMap[$srvId])) {
+                    $servicioProfesionalesMap[$srvId] = [];
+                }
+
+                $servicioProfesionalesMap[$srvId][] = [
+                    'id' => $profId,
+                    'nombre' => trim((string)($rowProf['nombres'] ?? '') . ' ' . (string)($rowProf['apellidos'] ?? '')),
+                    'tipo' => trim((string)($rowProf['tipo_profesional'] ?? '')),
+                    'registro' => trim((string)($rowProf['registro_profesional'] ?? '')),
+                ];
+            }
+        }
+    }
+} catch (Throwable $e) {
+    $servicios = [];
+    $servicioSeleccionado = 0;
+    $servicioProfesionalesMap = [];
 }
 
 // Descuentos
@@ -640,6 +753,21 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                 </div>
 
                 <div id="cotizacionFormAlert" class="alert alert-danger d-none" role="alert"></div>
+                <?php if ($formMsg === 'sis_cobertura_requerida'): ?>
+                    <div class="alert alert-warning" role="alert">
+                        Debes ingresar número de afiliación o número de acreditación para registrar una cotización SIS.
+                    </div>
+                <?php endif; ?>
+                <?php if ($formMsg === 'profesional_solicitante_requerido'): ?>
+                    <div class="alert alert-warning" role="alert">
+                        Debes seleccionar el profesional solicitante asociado al servicio para continuar.
+                    </div>
+                <?php endif; ?>
+                <?php if ($formMsg === 'profesional_solicitante_invalido'): ?>
+                    <div class="alert alert-warning" role="alert">
+                        El profesional solicitante seleccionado no está activo o no pertenece al servicio elegido.
+                    </div>
+                <?php endif; ?>
 
                 <form action="<?= BASE_URL ?>dashboard.php?action=<?= $isEdit ? 'editar_cotizacion' : 'crear_cotizacion' ?>" method="POST" id="formCotizacion">
 
@@ -648,6 +776,8 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                     <?php endif; ?>
                     <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
                     <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="<?= $descuento_empresa_convenio ?: $descuento_cliente ?>">
+                    <input type="hidden" name="detalles_json" id="detallesJsonCotizacion" value="[]">
+                    <div id="hiddenPayloadCotizacion"></div>
 
                     <?php if ($rol === 'admin' || $rol === 'recepcionista'): ?>
                         <div class="section-header fade-in-up">
@@ -664,11 +794,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                         <i class="bi bi-tag"></i>
                                         Tipo de cliente
                                     </label>
-                                    <select id="tipoCliente" name="tipo_usuario" class="form-select form-select-modern" required>
+                                    <select id="tipoCliente" name="tipo_usuario" class="form-select form-select-modern" <?= $sisForzado ? 'disabled' : 'required' ?>>
                                         <option value="">Seleccione...</option>
-                                        <option value="cliente" <?= ($isEdit && $cotizacionData['tipo_usuario'] == 'cliente') ? 'selected' : '' ?>>
+                                        <option value="cliente" <?= (($isEdit && $cotizacionData['tipo_usuario'] == 'cliente') || (!$isEdit && $sisForzado)) ? 'selected' : '' ?>>
                                             <i class="bi bi-person"></i>
-                                            Particular
+                                            <?= $sisForzado ? 'SIS' : 'Particular' ?>
                                         </option>
                                         <option value="empresa" <?= ($isEdit && $cotizacionData['tipo_usuario'] == 'empresa') ? 'selected' : '' ?>>
                                             <i class="bi bi-building"></i>
@@ -679,6 +809,10 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                             Convenio
                                         </option>
                                     </select>
+                                    <?php if ($sisForzado): ?>
+                                        <input type="hidden" name="tipo_usuario" value="cliente">
+                                        <small class="text-muted d-block mt-2">Modo SIS activo: el tipo de cliente se fija automaticamente.</small>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             
@@ -724,7 +858,51 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                         </div>
 
                         <div class="row fade-in-up">
-                            <div class="col-md-4">
+                            <?php if ($derivacionServicioHabilitada): ?>
+                                <div class="col-md-4">
+                                    <div class="form-group-modern">
+                                        <label for="servicioAsignado" class="form-label-modern">
+                                            <i class="bi bi-hospital"></i>
+                                            Servicio
+                                        </label>
+                                        <select id="servicioAsignado" name="servicio_id" class="form-select form-select-modern" <?= !empty($servicios) ? 'required' : 'disabled' ?>>
+                                            <option value="">Seleccione servicio...</option>
+                                            <?php foreach ($servicios as $servicioOpt): ?>
+                                                <option value="<?= (int)$servicioOpt['id'] ?>" <?= ((int)$servicioSeleccionado === (int)$servicioOpt['id']) ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars((string)$servicioOpt['nombre']) ?>
+                                                    <?php if (!empty($servicioOpt['codigo'])): ?>
+                                                        (<?= htmlspecialchars((string)$servicioOpt['codigo']) ?>)
+                                                    <?php endif; ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <?php if (empty($servicios)): ?>
+                                            <small class="text-muted d-block mt-2">No hay servicios activos registrados.</small>
+                                        <?php else: ?>
+                                            <small class="text-muted d-block mt-2">Este paciente quedará asociado automáticamente al servicio seleccionado al guardar.</small>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="form-group-modern">
+                                        <label for="profesionalSolicitante" class="form-label-modern">
+                                            <i class="bi bi-person-vcard"></i>
+                                            Profesional solicitante
+                                        </label>
+                                        <select id="profesionalSolicitante" name="profesional_solicitante_id" class="form-select form-select-modern" disabled>
+                                            <option value="">Seleccione profesional...</option>
+                                        </select>
+                                        <div class="invalid-feedback">Selecciona el profesional solicitante para el servicio.</div>
+                                        <small class="text-muted d-block mt-2" id="profesionalSolicitanteHint">Selecciona un servicio para ver los profesionales disponibles.</small>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <input type="hidden" name="servicio_id" value="0">
+                                <input type="hidden" name="profesional_solicitante_id" value="0">
+                            <?php endif; ?>
+
+                            <div class="<?= $derivacionServicioHabilitada ? 'col-md-4' : 'col-md-12' ?>">
                                 <div class="form-group-modern">
                                     <label for="emitirComprobante" class="form-label-modern">
                                         <i class="bi bi-receipt"></i>
@@ -790,6 +968,72 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                 </div>
                             </div>
                         </div>
+
+                        <?php if ($mostrarCoberturaSis): ?>
+                            <div class="section-header fade-in-up mt-4">
+                                <h5>
+                                    <i class="bi bi-shield-check"></i>
+                                    Cobertura SIS
+                                </h5>
+                            </div>
+
+                            <div class="row fade-in-up align-items-start">
+                                <div class="col-md-3 mb-3">
+                                    <div class="form-check form-switch mt-4 pt-2">
+                                        <?php if ($sisForzado): ?>
+                                            <input type="hidden" name="es_sis" value="1">
+                                            <input class="form-check-input" type="checkbox" id="esSis" checked disabled>
+                                        <?php else: ?>
+                                            <input class="form-check-input" type="checkbox" id="esSis" name="es_sis" value="1" <?= $sisCotizacionExistente ? 'checked' : '' ?>>
+                                        <?php endif; ?>
+                                        <label class="form-check-label" for="esSis">Marcar atención como SIS</label>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3 mb-3" id="sisFieldAfiliacionWrap">
+                                    <div class="form-group-modern">
+                                        <label for="sisNumeroAfiliacion" class="form-label-modern">
+                                            <i class="bi bi-person-badge"></i>
+                                            Número de afiliación
+                                        </label>
+                                        <input type="text" id="sisNumeroAfiliacion" name="sis_numero_afiliacion" class="form-control form-control-modern" maxlength="80" value="<?= htmlspecialchars($sisNumeroAfiliacionValor) ?>">
+                                        <div class="invalid-feedback">Ingresa afiliación o autorización para continuar en SIS.</div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3 mb-3" id="sisFieldAutorizacionWrap">
+                                    <div class="form-group-modern">
+                                        <label for="sisNumeroAutorizacion" class="form-label-modern">
+                                            <i class="bi bi-key"></i>
+                                            Número de acreditación
+                                        </label>
+                                        <input type="text" id="sisNumeroAutorizacion" name="sis_numero_autorizacion" class="form-control form-control-modern" maxlength="80" value="<?= htmlspecialchars($sisNumeroAutorizacionValor) ?>">
+                                        <div class="invalid-feedback">Ingresa autorización o afiliación para continuar en SIS.</div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-3 mb-3" id="sisFieldFuaWrap">
+                                    <div class="form-group-modern">
+                                        <label for="sisNumeroFua" class="form-label-modern">
+                                            <i class="bi bi-receipt"></i>
+                                            FUA / referencia
+                                        </label>
+                                        <input type="text" id="sisNumeroFua" name="sis_numero_fua" class="form-control form-control-modern" maxlength="80" value="<?= htmlspecialchars($sisNumeroFuaValor) ?>">
+                                    </div>
+                                </div>
+
+                                <div class="col-12 mb-3" id="sisFieldObsWrap">
+                                    <div class="form-group-modern">
+                                        <label for="sisObservaciones" class="form-label-modern">
+                                            <i class="bi bi-journal-text"></i>
+                                            Observaciones de cobertura
+                                        </label>
+                                        <textarea id="sisObservaciones" name="sis_observaciones" class="form-control form-control-modern" rows="3" maxlength="1000"><?= htmlspecialchars($sisObservacionesValor) ?></textarea>
+                                        <small class="text-muted d-block mt-2">Requiere al menos número de afiliación o autorización. La atención se registrará con monto S/ 0.00.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
 
                     <div class="section-header fade-in-up">
@@ -844,6 +1088,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                 <?php if ($isEdit): ?>
                 <script>
                 const examenesCotizacion = <?php echo json_encode($examenesCotizacion); ?>;
+                const sisActivoEnEdicion = <?= ($sisForzado || $sisCotizacionExistente) ? 'true' : 'false' ?>;
                 $(document).ready(function() {
                     // Esperar a que examenesData esté disponible
                     if (typeof examenesData === 'undefined') {
@@ -858,12 +1103,16 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                             let esReferenciado = parseInt(ex.es_referenciado || 0) === 1;
                             let costoLab = parseFloat(ex.costo_laboratorio_referenciado || 0);
                             let costoLogistica = parseFloat(ex.costo_logistica_extra || 0);
+                            let precioEdicion = parseFloat(ex.precio_unitario);
+                            if (sisActivoEnEdicion) {
+                                precioEdicion = 0;
+                            }
                             return {
                                 id: ex.id_examen,
                                 codigo: info ? info.codigo : '',
                                 nombre: ex.nombre_examen || (info ? info.nombre : ''),
-                                precio_unitario: parseFloat(ex.precio_unitario), // SIEMPRE el precio editado
-                                precio_publico: parseFloat(ex.precio_unitario), // Para edición, igual al editado
+                                precio_unitario: precioEdicion,
+                                precio_publico: precioEdicion,
                                 cantidad: parseInt(ex.cantidad),
                                 descripcion: info ? info.descripcion : '',
                                 tiempo_respuesta: info ? info.tiempo_respuesta : '',
@@ -942,7 +1191,6 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
     </div>
 </div>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -953,7 +1201,14 @@ let descuentoCliente = <?= $descuento_cliente ?>;
 let descuentoActual = <?= $descuento_empresa_convenio ?: $descuento_cliente ?>;
 let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
 let hasDetalleReferenciadoCols = <?= $hasDetalleReferenciadoCols ? 'true' : 'false' ?>;
+const sisForzadoEnSistema = <?= $sisForzado ? 'true' : 'false' ?>;
+const sisCotizacionInicial = <?= $sisCotizacionExistente ? 'true' : 'false' ?>;
 const formCurrencyConfig = <?= json_encode($currencyCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const servicioProfesionalesMap = <?= json_encode($servicioProfesionalesMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const profesionalSolicitanteInicial = <?= (int)$profesionalSolicitanteSeleccionado ?>;
+const profesionalSolicitanteSnapshot = <?= json_encode($profesionalSolicitanteSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const profesionalSolicitanteTipoSnapshot = <?= json_encode($profesionalSolicitanteTipoSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const profesionalSolicitanteRegistroSnapshot = <?= json_encode($profesionalSolicitanteRegistroSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
 function formatMoneySafe(amount) {
     if (typeof window.formatMoney === 'function') {
@@ -976,6 +1231,68 @@ function formatMoneySafe(amount) {
         : `${symbol} ${formattedNumber}`;
 }
 
+function isSisActive() {
+    const sisCheckbox = $('#esSis');
+    if (sisForzadoEnSistema) {
+        return true;
+    }
+    if (sisCheckbox.length > 0) {
+        return sisCheckbox.is(':checked') || sisCheckbox.is(':disabled');
+    }
+    return sisCotizacionInicial;
+}
+
+function escapeHiddenAttr(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function syncHiddenPayloadFromSeleccion() {
+    const sisActive = isSisActive();
+    const payload = [];
+    const jsonPayload = [];
+
+    if (!Array.isArray(examenesSeleccionados) || examenesSeleccionados.length === 0) {
+        $('#hiddenPayloadCotizacion').html('');
+        $('#detallesJsonCotizacion').val('[]');
+        return;
+    }
+
+    examenesSeleccionados.forEach((ex) => {
+        const idExamen = parseInt(ex.id, 10) || 0;
+        const cantidad = Math.max(1, parseInt(ex.cantidad, 10) || 1);
+        const precio = sisActive ? 0 : (parseFloat(ex.precio_unitario) || 0);
+        const esRef = parseInt(ex.es_referenciado || 0, 10) === 1 ? 1 : 0;
+        const laboratorioRef = (ex.laboratorio_referenciado_nombre || '').toString().trim();
+        const costoLab = isNaN(parseFloat(ex.costo_laboratorio_referenciado)) ? 0 : Math.max(0, parseFloat(ex.costo_laboratorio_referenciado));
+        const costoLog = isNaN(parseFloat(ex.costo_logistica_extra)) ? 0 : Math.max(0, parseFloat(ex.costo_logistica_extra));
+
+        payload.push(`<input type="hidden" name="examenes[]" value="${idExamen}">`);
+        payload.push(`<input type="hidden" name="cantidades[]" value="${cantidad}">`);
+        payload.push(`<input type="hidden" name="precios[]" value="${precio.toFixed(2)}">`);
+        payload.push(`<input type="hidden" name="referenciado_flags[]" value="${esRef}">`);
+        payload.push(`<input type="hidden" name="laboratorio_referenciado_nombre[]" value="${escapeHiddenAttr(laboratorioRef)}">`);
+        payload.push(`<input type="hidden" name="costo_laboratorio_referenciado[]" value="${costoLab.toFixed(2)}">`);
+        payload.push(`<input type="hidden" name="costo_logistica_extra[]" value="${costoLog.toFixed(2)}">`);
+
+        jsonPayload.push({
+            id_examen: idExamen,
+            cantidad: cantidad,
+            precio_unitario: Number(precio.toFixed(2)),
+            es_referenciado: esRef,
+            laboratorio_referenciado_nombre: laboratorioRef,
+            costo_laboratorio_referenciado: Number(costoLab.toFixed(2)),
+            costo_logistica_extra: Number(costoLog.toFixed(2))
+        });
+    });
+
+    $('#hiddenPayloadCotizacion').html(payload.join(''));
+    $('#detallesJsonCotizacion').val(JSON.stringify(jsonPayload));
+}
+
 function showCotizacionFormError(message) {
     const $alert = $('#cotizacionFormAlert');
     $alert.text(message || 'Debes seleccionar al menos un examen.');
@@ -987,13 +1304,167 @@ function showCotizacionFormError(message) {
     }
 }
 
+function clearSisCoverageValidation() {
+    $('#sisNumeroAfiliacion, #sisNumeroAutorizacion').removeClass('is-invalid');
+}
+
+function clearProfessionalValidation() {
+    $('#profesionalSolicitante').removeClass('is-invalid');
+}
+
+function buildProfessionalOptionLabel(prof) {
+    const nombre = String(prof?.nombre || '').trim();
+    const tipo = String(prof?.tipo || '').trim();
+    const registro = String(prof?.registro || '').trim();
+    let label = nombre;
+    if (tipo !== '') {
+        label += ' - ' + tipo;
+    }
+    if (registro !== '') {
+        label += ' (' + registro + ')';
+    }
+    return label;
+}
+
+function renderProfesionalesPorServicio() {
+    const servicioId = parseInt($('#servicioAsignado').val() || '0', 10);
+    const $selectProf = $('#profesionalSolicitante');
+    const $hint = $('#profesionalSolicitanteHint');
+    const selectedBefore = parseInt($selectProf.val() || '0', 10);
+    const keyServicio = String(servicioId);
+    const profesionales = servicioId > 0 && Array.isArray(servicioProfesionalesMap[keyServicio])
+        ? servicioProfesionalesMap[keyServicio]
+        : [];
+
+    $selectProf.empty();
+    $selectProf.append('<option value="">Seleccione profesional...</option>');
+
+    const idsDisponibles = [];
+    profesionales.forEach((prof) => {
+        const id = parseInt(prof.id || 0, 10);
+        if (id <= 0) {
+            return;
+        }
+        idsDisponibles.push(id);
+        $selectProf.append(new Option(buildProfessionalOptionLabel(prof), String(id), false, false));
+    });
+
+    const objetivoSeleccion = selectedBefore > 0 ? selectedBefore : profesionalSolicitanteInicial;
+    if (objetivoSeleccion > 0 && idsDisponibles.includes(objetivoSeleccion)) {
+        $selectProf.val(String(objetivoSeleccion));
+    } else if (
+        objetivoSeleccion > 0 &&
+        objetivoSeleccion === profesionalSolicitanteInicial &&
+        profesionalSolicitanteSnapshot !== '' &&
+        !idsDisponibles.includes(objetivoSeleccion)
+    ) {
+        let snapLabel = profesionalSolicitanteSnapshot;
+        if (profesionalSolicitanteTipoSnapshot !== '') {
+            snapLabel += ' - ' + profesionalSolicitanteTipoSnapshot;
+        }
+        if (profesionalSolicitanteRegistroSnapshot !== '') {
+            snapLabel += ' (' + profesionalSolicitanteRegistroSnapshot + ')';
+        }
+        $selectProf.append(new Option(snapLabel + ' [registrado]', String(objetivoSeleccion), true, true));
+        $selectProf.val(String(objetivoSeleccion));
+    } else {
+        $selectProf.val('');
+    }
+
+    if (servicioId <= 0) {
+        $selectProf.prop('disabled', true);
+        $hint.text('Selecciona un servicio para ver los profesionales disponibles.');
+    } else if (profesionales.length === 0) {
+        $selectProf.prop('disabled', true);
+        $hint.text('Este servicio no tiene profesionales solicitantes activos asociados.');
+    } else {
+        $selectProf.prop('disabled', false);
+        $hint.text('Selecciona el profesional que solicita el examen.');
+    }
+
+    clearProfessionalValidation();
+}
+
+function validateProfessionalRequirement() {
+    const servicioId = parseInt($('#servicioAsignado').val() || '0', 10);
+    const $selectProf = $('#profesionalSolicitante');
+    if (servicioId <= 0 || $selectProf.is(':disabled')) {
+        clearProfessionalValidation();
+        return true;
+    }
+
+    const profesionalId = parseInt($selectProf.val() || '0', 10);
+    if (profesionalId <= 0) {
+        $selectProf.addClass('is-invalid');
+        return false;
+    }
+
+    clearProfessionalValidation();
+    return true;
+}
+
+function validateSisCoverageRequirement() {
+    const sisActive = isSisActive();
+    if (!sisActive) {
+        clearSisCoverageValidation();
+        return true;
+    }
+
+    const $afiliacion = $('#sisNumeroAfiliacion');
+    const $autorizacion = $('#sisNumeroAutorizacion');
+    const afiliacion = ($afiliacion.val() || '').toString().trim();
+    const autorizacion = ($autorizacion.val() || '').toString().trim();
+    const ok = afiliacion !== '' || autorizacion !== '';
+
+    if (!ok) {
+        $afiliacion.addClass('is-invalid');
+        $autorizacion.addClass('is-invalid');
+        return false;
+    }
+
+    clearSisCoverageValidation();
+    return true;
+}
+
 $('#formCotizacion').on('submit', function(e) {
+    syncHiddenPayloadFromSeleccion();
     if (!Array.isArray(examenesSeleccionados) || examenesSeleccionados.length === 0) {
         e.preventDefault();
         showCotizacionFormError('Debes seleccionar al menos una prueba/examen antes de guardar la cotización.');
         return false;
     }
+
+    if (!validateSisCoverageRequirement()) {
+        e.preventDefault();
+        showCotizacionFormError('Para registrar o actualizar una cotización SIS debes ingresar número de afiliación o número de acreditación.');
+        try {
+            document.getElementById('sisNumeroAfiliacion')?.focus();
+        } catch (err) {
+            // noop
+        }
+        return false;
+    }
+
+    if (!validateProfessionalRequirement()) {
+        e.preventDefault();
+        showCotizacionFormError('Debes seleccionar el profesional solicitante asociado al servicio antes de guardar.');
+        try {
+            document.getElementById('profesionalSolicitante')?.focus();
+        } catch (err) {
+            // noop
+        }
+        return false;
+    }
+
     $('#cotizacionFormAlert').addClass('d-none').text('');
+});
+
+$('#sisNumeroAfiliacion, #sisNumeroAutorizacion').on('input blur', function() {
+    if (isSisActive()) {
+        validateSisCoverageRequirement();
+    } else {
+        clearSisCoverageValidation();
+    }
 });
 
 // Inicializar descuento y precios al cargar como empresa/convenio
@@ -1075,6 +1546,14 @@ $(document).ready(function() {
         actualizarDescuento();
         renderizarLista();
     }
+
+    $('#servicioAsignado').on('change', function() {
+        renderProfesionalesPorServicio();
+    });
+    $('#profesionalSolicitante').on('change', function() {
+        clearProfessionalValidation();
+    });
+    renderProfesionalesPorServicio();
     
     // Agregar animaciones a elementos
     $('.fade-in-up').each(function(index) {
@@ -1101,7 +1580,7 @@ function formatExamenOption(examen) {
                 '<small class="text-muted">Código: ' + (examenData.codigo || 'N/A') + '</small>' +
             '</div>' +
             '<div class="text-end">' +
-                '<span class="badge bg-success">' + formatMoneySafe(examenData.precio_publico) + '</span>' +
+                '<span class="badge bg-success">' + formatMoneySafe(isSisActive() ? 0 : examenData.precio_publico) + '</span>' +
             '</div>' +
         '</div>'
     );
@@ -1132,6 +1611,7 @@ $('#tipoCliente').on('change', function() {
 
     // Particular: habilitar selector de Boleta/Factura y campos de factura
     syncFacturaFields();
+    syncSisFields();
     actualizarDescuento();
 });
 
@@ -1158,9 +1638,47 @@ function syncFacturaFields() {
 $('#emitirComprobante').on('change', syncFacturaFields);
 $('#tipoComprobanteCliente').on('change', syncFacturaFields);
 
+function syncSisFields() {
+    const sisCheckbox = $('#esSis');
+    const sisEnabled = isSisActive();
+    if (sisCheckbox.length) {
+        $('#sisFieldAfiliacionWrap, #sisFieldAutorizacionWrap, #sisFieldFuaWrap, #sisFieldObsWrap').toggleClass('d-none', !sisEnabled);
+        $('#sisNumeroAfiliacion, #sisNumeroAutorizacion, #sisNumeroFua, #sisObservaciones').prop('disabled', !sisEnabled);
+    }
+
+    // Si la atencion es SIS, no exigir tipo de cliente manual.
+    if (sisEnabled && $('#tipoCliente').length) {
+        $('#tipoCliente').val('cliente').prop('required', false);
+        if (!sisForzadoEnSistema) {
+            $('#tipoCliente').prop('disabled', true);
+        }
+        $('#empresa, #convenio').val('');
+        $('#selectEmpresa, #selectConvenio').addClass('d-none');
+        $('#empresa, #convenio').prop('required', false);
+    } else if (!sisForzadoEnSistema && $('#tipoCliente').length) {
+        $('#tipoCliente').prop('disabled', false).prop('required', true);
+    }
+
+    // En SIS, toda la cotización se registra en S/ 0.00.
+    if (Array.isArray(examenesSeleccionados) && examenesSeleccionados.length > 0) {
+        examenesSeleccionados.forEach((ex) => {
+            if (sisEnabled) {
+                ex.precio_unitario = 0;
+            } else if (!isEdit) {
+                const precioBase = Number(ex.precio_publico ?? ex.precio_unitario ?? 0);
+                ex.precio_unitario = parseFloat(aplicarDescuento(precioBase, descuentoActual));
+            }
+        });
+        renderizarLista();
+    }
+}
+
+$('#esSis').on('change', syncSisFields);
+
 // Inicializar visibilidad al cargar
 $(document).ready(function() {
     syncFacturaFields();
+    syncSisFields();
 });
 
 // Detectar selección de empresa/convenio y actualizar descuento
@@ -1187,12 +1705,18 @@ function actualizarDescuento() {
     $('#descuento_aplicado').val(descuentoActual);
     // Solo aplicar descuento si NO estamos en modo edición
     if (isEdit) {
-        // En edición, los precios ya están descontados, no recalcular
+        if (isSisActive()) {
+            examenesSeleccionados.forEach((ex) => {
+                ex.precio_unitario = 0;
+            });
+        }
+        // En edición, los precios ya están descontados, no recalcular (salvo SIS)
         renderizarLista();
     } else {
-        // En creación, sí aplicar descuento
+        // En creación, sí aplicar descuento o forzar cero en SIS
         examenesSeleccionados.forEach((ex, idx) => {
-            ex.precio_unitario = aplicarDescuento(ex.precio_publico, descuentoActual);
+            const precioBase = Number(ex.precio_publico ?? ex.precio_unitario ?? 0);
+            ex.precio_unitario = isSisActive() ? 0 : parseFloat(aplicarDescuento(precioBase, descuentoActual));
         });
         renderizarLista();
     }
@@ -1222,7 +1746,7 @@ $('#buscadorExamen').on('select2:select', function(e) {
         let precioConDescuento = aplicarDescuento(precioPublico, descuentoActual);
         examenesSeleccionados.push({
             ...examen,
-            precio_unitario: precioConDescuento,
+            precio_unitario: isSisActive() ? 0 : precioConDescuento,
             cantidad: 1,
             es_referenciado: 0,
             laboratorio_referenciado_nombre: '',
@@ -1245,6 +1769,10 @@ $(document).on('input', '.cantidadExamen', function() {
 
 // Cambiar precio manualmente (solo admin/recep) - Optimizado para escritura completa
 $(document).on('keyup blur', '.precioExamen', function(e) {
+    if (isSisActive()) {
+        $(this).val('0.00');
+        return;
+    }
     let idx = $(this).data('idx');
     let inputValue = $(this).val();
     
@@ -1313,6 +1841,10 @@ $(document).on('focus', '.precioExamen', function() {
 // Agregar debounce para actualización con retraso (alternativa más suave)
 let precioTimeout;
 $(document).on('input', '.precioExamen', function() {
+    if (isSisActive()) {
+        $(this).val('0.00');
+        return;
+    }
     let $input = $(this);
     let idx = $input.data('idx');
     
@@ -1474,6 +2006,7 @@ $(document).on('click', '.btn-detalle', function() {
 function renderizarLista() {
     let html = '';
     let total = 0;
+    const sisActive = isSisActive();
     if (examenesSeleccionados.length === 0) {
         html = `
         <div class="sin-examenes">
@@ -1498,7 +2031,10 @@ function renderizarLista() {
                 <tbody>`;
         
         examenesSeleccionados.forEach((ex, idx) => {
-            let precio = parseFloat(ex.precio_unitario);
+            if (sisActive) {
+                ex.precio_unitario = 0;
+            }
+            let precio = sisActive ? 0 : parseFloat(ex.precio_unitario);
             let subtotal = precio * ex.cantidad;
             total += subtotal;
             let esRef = parseInt(ex.es_referenciado || 0) === 1;
@@ -1523,7 +2059,7 @@ function renderizarLista() {
                 </td>
                 <td>
                     ${
-                        (rolUsuario === 'admin' || rolUsuario === 'recepcionista')
+                        (!sisActive && (rolUsuario === 'admin' || rolUsuario === 'recepcionista'))
                             ? `<div class="input-group">
                                 <span class="input-group-text bg-success text-white"><?= htmlspecialchars($currencySymbol) ?></span>
                                 <input type="text" class="form-control form-control-modern precioExamen" 
@@ -1534,9 +2070,6 @@ function renderizarLista() {
                                </div>`
                             : `<div class="form-control-plaintext fw-bold text-success">${formatMoneySafe(precio)}</div>`
                     }
-                    <input type="hidden" name="examenes[]" value="${ex.id}">
-                    <input type="hidden" name="cantidades[]" value="${ex.cantidad}">
-                    <input type="hidden" name="precios[]" value="${precio.toFixed(2)}">
                 </td>
                 <td>
                     ${hasDetalleReferenciadoCols ? `
@@ -1556,16 +2089,8 @@ function renderizarLista() {
                                 <input type="number" step="0.01" min="0" class="form-control form-control-sm costoLogisticaInput" data-idx="${idx}" placeholder="Costo logística" value="${(isNaN(costoLog) ? 0 : costoLog).toFixed(2)}" ${esRef ? '' : 'disabled'}>
                             </div>
                         </div>
-                        <input type="hidden" name="referenciado_flags[]" value="${esRef ? 1 : 0}">
-                        <input type="hidden" name="laboratorio_referenciado_nombre[]" value="${laboratorioRef.replace(/"/g, '&quot;')}">
-                        <input type="hidden" name="costo_laboratorio_referenciado[]" value="${(isNaN(costoLab) ? 0 : costoLab).toFixed(2)}">
-                        <input type="hidden" name="costo_logistica_extra[]" value="${(isNaN(costoLog) ? 0 : costoLog).toFixed(2)}">
                     ` : `
                         <span class="badge bg-secondary">No habilitado</span>
-                        <input type="hidden" name="referenciado_flags[]" value="0">
-                        <input type="hidden" name="laboratorio_referenciado_nombre[]" value="">
-                        <input type="hidden" name="costo_laboratorio_referenciado[]" value="0.00">
-                        <input type="hidden" name="costo_logistica_extra[]" value="0.00">
                     `}
                 </td>
                 <td>
@@ -1598,15 +2123,7 @@ function renderizarLista() {
     } else {
         $('#descuentoInfo').addClass('d-none');
     }
-    
-    // Actualizar los campos hidden con los valores actuales
-    examenesSeleccionados.forEach((ex, idx) => {
-        $(`input[name="cantidades[]"]:eq(${idx})`).val(ex.cantidad);
-        $(`input[name="precios[]"]:eq(${idx})`).val(parseFloat(ex.precio_unitario).toFixed(2));
-        $(`input[name="referenciado_flags[]"]:eq(${idx})`).val(parseInt(ex.es_referenciado || 0) === 1 ? 1 : 0);
-        $(`input[name="laboratorio_referenciado_nombre[]"]:eq(${idx})`).val((ex.laboratorio_referenciado_nombre || '').toString().trim());
-        $(`input[name="costo_laboratorio_referenciado[]"]:eq(${idx})`).val(parseFloat(ex.costo_laboratorio_referenciado || 0).toFixed(2));
-        $(`input[name="costo_logistica_extra[]"]:eq(${idx})`).val(parseFloat(ex.costo_logistica_extra || 0).toFixed(2));
-    });
+
+    syncHiddenPayloadFromSeleccion();
 }
 </script>

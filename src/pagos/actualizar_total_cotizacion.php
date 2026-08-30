@@ -2,7 +2,10 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/../config/operacion_context.php';
 require_once __DIR__ . '/../conexion/conexion.php';
+
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : ['es_sis' => false];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_cotizacion = $_POST['id_cotizacion'] ?? null;
@@ -24,6 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (!$cotizacion) {
             throw new Exception("Cotización no encontrada");
+        }
+
+        if (!empty($operacionContext['es_sis']) || ((int)($cotizacion['es_sis'] ?? 0) === 1)) {
+            header("Location: dashboard.php?vista=pago_cotizacion&id=$id_cotizacion&msg=sis_sin_cobro");
+            exit;
         }
 
         if (isset($cotizacion['estado_pago']) && strtolower((string)$cotizacion['estado_pago']) === 'anulada') {

@@ -23,6 +23,8 @@ $costo_logistica_extra = $_POST['costo_logistica_extra'] ?? [];
 $tipo_usuario = $_POST['tipo_usuario'] ?? 'cliente';
 $id_empresa = $_POST['id_empresa'] ?? null;
 $id_convenio = $_POST['id_convenio'] ?? null;
+$servicio_id = isset($_POST['servicio_id']) ? (int)$_POST['servicio_id'] : 0;
+$profesional_solicitante_id = isset($_POST['profesional_solicitante_id']) ? (int)$_POST['profesional_solicitante_id'] : 0;
 $emitir_comprobante = isset($_POST['emitir_comprobante']) ? (int)$_POST['emitir_comprobante'] : 0;
 $emitir_comprobante = ($emitir_comprobante === 0) ? 0 : 1;
 
@@ -39,6 +41,21 @@ $id_convenio = !empty($id_convenio) ? $id_convenio : null;
 // Validar datos mínimos
 $rol_creador = $_SESSION['rol'] ?? 'cliente';
 $creado_por = null;
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : [
+    'modo_operativo' => 'PARTICULAR',
+    'es_particular' => true,
+    'es_sis' => false,
+    'es_mixto' => false,
+];
+$derivacionServicioHabilitada = !empty($operacionContext['es_sis']);
+$sisActivoEnSistema = !empty($operacionContext['es_sis']);
+$servicio_id = $derivacionServicioHabilitada ? $servicio_id : 0;
+$profesional_solicitante_id = $derivacionServicioHabilitada ? $profesional_solicitante_id : 0;
+$esAtencionSis = $sisActivoEnSistema || !empty($_POST['es_sis']);
+$sisNumeroAfiliacion = trim((string)($_POST['sis_numero_afiliacion'] ?? ''));
+$sisNumeroAutorizacion = trim((string)($_POST['sis_numero_autorizacion'] ?? ''));
+$sisNumeroFua = trim((string)($_POST['sis_numero_fua'] ?? ''));
+$sisObservaciones = trim((string)($_POST['sis_observaciones'] ?? ''));
 
 if ($rol_creador === 'empresa') {
     $id_empresa = $_SESSION['empresa_id'] ?? $id_empresa;
@@ -70,6 +87,34 @@ if (!$id_cliente || !$creado_por) {
     exit;
 }
 
+if ($esAtencionSis && $sisNumeroAfiliacion === '' && $sisNumeroAutorizacion === '') {
+    $base = defined('BASE_URL') ? BASE_URL : '../';
+    $idClienteRedirect = (int)$id_cliente;
+    header("Location: {$base}dashboard.php?vista=form_cotizacion&id={$idClienteRedirect}&msg=sis_cobertura_requerida");
+    exit;
+}
+
+$profesionalSolicitante = null;
+if ($derivacionServicioHabilitada && $servicio_id > 0) {
+    $debeElegirProfesional = servicioTieneProfesionalesActivos($pdo, $servicio_id);
+    if ($debeElegirProfesional && $profesional_solicitante_id <= 0) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        $idClienteRedirect = (int)$id_cliente;
+        header("Location: {$base}dashboard.php?vista=form_cotizacion&id={$idClienteRedirect}&msg=profesional_solicitante_requerido");
+        exit;
+    }
+}
+
+if ($derivacionServicioHabilitada && $profesional_solicitante_id > 0) {
+    $profesionalSolicitante = obtenerProfesionalSolicitanteValido($pdo, $servicio_id, $profesional_solicitante_id);
+    if (!$profesionalSolicitante) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        $idClienteRedirect = (int)$id_cliente;
+        header("Location: {$base}dashboard.php?vista=form_cotizacion&id={$idClienteRedirect}&msg=profesional_solicitante_invalido");
+        exit;
+    }
+}
+
 // Helper: comprobar si una columna existe en la tabla cotizaciones (MySQL/MariaDB)
 function cotizacionesHasColumn(PDO $pdo, string $column): bool {
     try {
@@ -88,6 +133,48 @@ function cotizacionesDetalleHasColumn(PDO $pdo, string $column): bool {
         return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Throwable $e) {
         return false;
+    }
+}
+
+function servicioTieneProfesionalesActivos(PDO $pdo, int $servicioId): bool {
+    if ($servicioId <= 0) {
+        return false;
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*)
+            FROM servicio_profesional sp
+            INNER JOIN profesionales_solicitantes p ON p.id = sp.profesional_id
+            WHERE sp.servicio_id = ? AND p.estado = 'activo'");
+        $stmt->execute([$servicioId]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function obtenerProfesionalSolicitanteValido(PDO $pdo, int $servicioId, int $profesionalId): ?array {
+    if ($profesionalId <= 0) {
+        return null;
+    }
+    try {
+        if ($servicioId > 0) {
+            $stmt = $pdo->prepare("SELECT p.id, p.nombres, p.apellidos, p.tipo_profesional, p.registro_profesional
+                FROM profesionales_solicitantes p
+                INNER JOIN servicio_profesional sp ON sp.profesional_id = p.id
+                WHERE p.id = ? AND sp.servicio_id = ? AND p.estado = 'activo'
+                LIMIT 1");
+            $stmt->execute([$profesionalId, $servicioId]);
+        } else {
+            $stmt = $pdo->prepare("SELECT p.id, p.nombres, p.apellidos, p.tipo_profesional, p.registro_profesional
+                FROM profesionales_solicitantes p
+                WHERE p.id = ? AND p.estado = 'activo'
+                LIMIT 1");
+            $stmt->execute([$profesionalId]);
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    } catch (Throwable $e) {
+        return null;
     }
 }
 
@@ -153,6 +240,10 @@ elseif ($tipo_usuario === 'empresa' && $id_empresa) {
     $descuento = 0;
 }
 
+if ($esAtencionSis) {
+    $descuento = 0;
+}
+
 
 // Procesar cada examen y calcular totales
 $total = 0;
@@ -204,6 +295,17 @@ for ($i = 0; $i < count($examenes); $i++) {
     ];
 }
 
+if ($esAtencionSis) {
+    $emitir_comprobante = 0;
+    $total = 0;
+    $total_bruto = 0;
+    foreach ($detalles as &$detalleSis) {
+        $detalleSis['precio_unitario'] = 0;
+        $detalleSis['subtotal'] = 0;
+    }
+    unset($detalleSis);
+}
+
 // Si no quedó ningún detalle válido, no permitir crear cotización
 if (empty($detalles)) {
     $base = defined('BASE_URL') ? BASE_URL : '../';
@@ -248,6 +350,45 @@ $vals = [
     $descuento,
 ];
 
+if (app_database_has_column($pdo, 'cotizaciones', 'es_sis')) {
+    $cols[] = 'es_sis';
+    $vals[] = $esAtencionSis ? 1 : 0;
+}
+if (app_database_has_column($pdo, 'cotizaciones', 'sis_monto_atencion')) {
+    $cols[] = 'sis_monto_atencion';
+    $vals[] = 0;
+}
+if (app_database_has_column($pdo, 'cotizaciones', 'sis_registrado_en')) {
+    $cols[] = 'sis_registrado_en';
+    $vals[] = $esAtencionSis ? $fecha : null;
+}
+if (app_database_has_column($pdo, 'cotizaciones', 'sis_registrado_por')) {
+    $cols[] = 'sis_registrado_por';
+    $vals[] = $esAtencionSis ? $creado_por : null;
+}
+if (cotizacionesHasColumn($pdo, 'servicio_id')) {
+    $cols[] = 'servicio_id';
+    $vals[] = $derivacionServicioHabilitada && $servicio_id > 0 ? $servicio_id : null;
+}
+if (cotizacionesHasColumn($pdo, 'profesional_solicitante_id')) {
+    $cols[] = 'profesional_solicitante_id';
+    $vals[] = ($profesionalSolicitante && !empty($profesionalSolicitante['id'])) ? (int)$profesionalSolicitante['id'] : null;
+}
+if (cotizacionesHasColumn($pdo, 'profesional_solicitante_nombre')) {
+    $cols[] = 'profesional_solicitante_nombre';
+    $vals[] = $profesionalSolicitante
+        ? trim((string)($profesionalSolicitante['nombres'] ?? '') . ' ' . (string)($profesionalSolicitante['apellidos'] ?? ''))
+        : null;
+}
+if (cotizacionesHasColumn($pdo, 'profesional_solicitante_tipo')) {
+    $cols[] = 'profesional_solicitante_tipo';
+    $vals[] = $profesionalSolicitante ? trim((string)($profesionalSolicitante['tipo_profesional'] ?? '')) : null;
+}
+if (cotizacionesHasColumn($pdo, 'profesional_solicitante_registro')) {
+    $cols[] = 'profesional_solicitante_registro';
+    $vals[] = $profesionalSolicitante ? trim((string)($profesionalSolicitante['registro_profesional'] ?? '')) : null;
+}
+
 // Guardar tipo y receptor solo si existen columnas
 if (cotizacionesHasColumn($pdo, 'comprobante_tipo')) {
     $cols[] = 'comprobante_tipo';
@@ -284,6 +425,31 @@ $sql = 'INSERT INTO cotizaciones (' . implode(',', $cols) . ') VALUES (' . $plac
 $stmt = $pdo->prepare($sql);
 $stmt->execute($vals);
 $id_cotizacion = $pdo->lastInsertId();
+
+if ($esAtencionSis && app_database_has_table($pdo, 'sis_coberturas')) {
+    try {
+        $stmtSis = $pdo->prepare("INSERT INTO sis_coberturas (cotizacion_id, cliente_id, numero_afiliacion, numero_autorizacion, numero_fua, estado_validacion, monto_atencion, observaciones, creado_por, creada_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmtSis->execute([
+            $id_cotizacion,
+            $id_cliente,
+            $sisNumeroAfiliacion !== '' ? $sisNumeroAfiliacion : null,
+            $sisNumeroAutorizacion !== '' ? $sisNumeroAutorizacion : null,
+            $sisNumeroFua !== '' ? $sisNumeroFua : null,
+            'autorizada',
+            0,
+            $sisObservaciones !== '' ? $sisObservaciones : null,
+            $creado_por,
+            $fecha,
+        ]);
+        $sisCoberturaId = (int)$pdo->lastInsertId();
+        if (app_database_has_column($pdo, 'cotizaciones', 'sis_cobertura_id')) {
+            $stmtLink = $pdo->prepare('UPDATE cotizaciones SET sis_cobertura_id = ? WHERE id = ?');
+            $stmtLink->execute([$sisCoberturaId, $id_cotizacion]);
+        }
+    } catch (Throwable $e) {
+        // La cotización ya quedó creada; no interrumpir el flujo por una cobertura no persistida.
+    }
+}
 $hasRefCols = cotizacionesDetalleHasColumn($pdo, 'es_referenciado')
     && cotizacionesDetalleHasColumn($pdo, 'laboratorio_referenciado_nombre')
     && cotizacionesDetalleHasColumn($pdo, 'costo_laboratorio_referenciado')
@@ -325,6 +491,23 @@ foreach ($detalles as $detalle) {
 foreach ($detalles as $detalle) {
     $id_examen = $detalle['id_examen'];
 
+
+if ($servicio_id > 0) {
+    try {
+        $tablaServiciosExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicios'")->fetchColumn();
+        $tablaServicioClienteExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicio_cliente'")->fetchColumn();
+        if ($tablaServiciosExiste && $tablaServicioClienteExiste) {
+            $stmtServVal = $pdo->prepare("SELECT COUNT(*) FROM servicios WHERE id = ? AND estado = 'activo'");
+            $stmtServVal->execute([$servicio_id]);
+            if ((int)$stmtServVal->fetchColumn() > 0) {
+                $stmtAsoc = $pdo->prepare("INSERT IGNORE INTO servicio_cliente (servicio_id, cliente_id) VALUES (?, ?)");
+                $stmtAsoc->execute([$servicio_id, (int)$id_cliente]);
+            }
+        }
+    } catch (Throwable $e) {
+        // No interrumpir la cotizacion por fallo de asociacion a servicio.
+    }
+}
     // Snapshot del formato (adicional) para que el histórico no cambie si se edita el examen luego.
     $hasSnapshotCol = false;
     try {

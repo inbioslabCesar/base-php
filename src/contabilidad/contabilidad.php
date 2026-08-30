@@ -354,6 +354,27 @@ if ($reaperturaTableReady) {
         margin-right: 0 !important;
     }
 }
+
+.caja-offline-panel {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid #dbe7ff;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.caja-offline-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.caja-offline-status {
+    font-size: 0.9rem;
+    color: #334155;
+}
 </style>
 <div class="container mt-4">
     <h3 class="mb-4">Panel de Contabilidad</h3>
@@ -525,7 +546,7 @@ if ($reaperturaTableReady) {
                 <div class="alert alert-info">
                     Turnos registrados hoy: <strong><?= $turnosHoy ?></strong> / <strong><?= $maxTurnosPorDia ?></strong>
                 </div>
-                <form method="post" action="dashboard.php?action=caja_abrir" class="row g-2 align-items-end">
+                <form method="post" action="dashboard.php?action=caja_abrir" class="row g-2 align-items-end" id="formCajaAbrir">
                     <div class="col-md-3">
                         <label class="form-label">Monto inicial (<?= htmlspecialchars($currencySymbol) ?>)</label>
                         <input type="number" step="0.01" min="0" name="monto_inicial" class="form-control" required>
@@ -540,6 +561,18 @@ if ($reaperturaTableReady) {
                         </button>
                     </div>
                 </form>
+                <div class="caja-offline-panel">
+                    <div class="caja-offline-row">
+                        <div class="caja-offline-status" id="cajaOfflineEstado">Sin pendientes offline de caja.</div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="cajaSyncNowBtn">Sincronizar</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="cajaVerColaBtn">Ver cola</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="cajaLimpiarErroresBtn">Limpiar errores</button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" id="cajaIncidenciaBtn">Marcar incidencia</button>
+                        </div>
+                    </div>
+                    <div class="mt-2 small text-muted" id="cajaColaDetalle" style="display:none;"></div>
+                </div>
 
                 <?php if ($turnosHoy >= $maxTurnosPorDia): ?>
                     <hr class="my-3">
@@ -900,5 +933,320 @@ if ($reaperturaTableReady) {
         } catch (error) {
         }
     });
+})();
+
+(function () {
+    var form = document.getElementById('formCajaAbrir');
+    var estadoEl = document.getElementById('cajaOfflineEstado');
+    var syncBtn = document.getElementById('cajaSyncNowBtn');
+    var verColaBtn = document.getElementById('cajaVerColaBtn');
+    var limpiarErroresBtn = document.getElementById('cajaLimpiarErroresBtn');
+    var incidenciaBtn = document.getElementById('cajaIncidenciaBtn');
+    var colaDetalleEl = document.getElementById('cajaColaDetalle');
+    if (!form || !estadoEl || !syncBtn || !window.indexedDB) {
+        return;
+    }
+
+    var DB_NAME = 'caja_offline_db_v1';
+    var STORE_NAME = 'caja_queue';
+    var ACTION_URL = 'dashboard.php?action=caja_abrir';
+    var INCIDENT_KEY = 'offline_sync_incidents_v1';
+
+    function createOperationId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        return 'caja_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+    }
+
+    function openDb() {
+        return new Promise(function(resolve, reject) {
+            var req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = function(event) {
+                var db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    var store = db.createObjectStore(STORE_NAME, { keyPath: 'operation_id' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
+            req.onsuccess = function(event) { resolve(event.target.result); };
+            req.onerror = function(event) { reject(event.target.error || new Error('No se pudo abrir IndexedDB')); };
+        });
+    }
+
+    async function withStore(mode, handler) {
+        var db = await openDb();
+        return new Promise(function(resolve, reject) {
+            var tx = db.transaction(STORE_NAME, mode);
+            var store = tx.objectStore(STORE_NAME);
+            var result;
+            try {
+                result = handler(store, tx);
+            } catch (err) {
+                reject(err);
+                db.close();
+                return;
+            }
+            tx.oncomplete = function() {
+                resolve(result);
+                db.close();
+            };
+            tx.onerror = function(event) {
+                reject(event.target.error || new Error('Error en transaccion IndexedDB'));
+                db.close();
+            };
+        });
+    }
+
+    async function queuePayload(payload) {
+        var record = {
+            operation_id: payload.offline_operation_id,
+            payload: payload,
+            status: 'pending',
+            created_at: Date.now(),
+            retries: 0,
+            last_error: ''
+        };
+        await withStore('readwrite', function(store) {
+            store.put(record);
+        });
+    }
+
+    async function getPending() {
+        return withStore('readonly', function(store) {
+            return new Promise(function(resolve, reject) {
+                var req = store.getAll();
+                req.onsuccess = function() {
+                    var rows = Array.isArray(req.result) ? req.result : [];
+                    resolve(rows.filter(function(r) { return r.status !== 'synced'; }));
+                };
+                req.onerror = function(event) {
+                    reject(event.target.error || new Error('No se pudo leer cola de caja'));
+                };
+            });
+        });
+    }
+
+    function pushIncident(moduleName, detail) {
+        try {
+            var rows = JSON.parse(localStorage.getItem(INCIDENT_KEY) || '[]');
+            var list = Array.isArray(rows) ? rows : [];
+            list.push({
+                module: moduleName,
+                detail: detail,
+                at: new Date().toISOString(),
+                path: location.pathname + location.search
+            });
+            localStorage.setItem(INCIDENT_KEY, JSON.stringify(list.slice(-200)));
+        } catch (error) {
+        }
+    }
+
+    function summarizeQueue(items) {
+        var list = Array.isArray(items) ? items : [];
+        var total = list.length;
+        var errores = list.filter(function (r) { return String(r.status || '') === 'error'; }).length;
+        return { total: total, errores: errores };
+    }
+
+    function renderQueueDetail(items) {
+        if (!colaDetalleEl) {
+            return;
+        }
+        var list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            colaDetalleEl.textContent = 'Cola vacia.';
+            return;
+        }
+        var lines = list.slice(0, 8).map(function (r, idx) {
+            var st = String(r.status || 'pending');
+            var retries = Number(r.retries || 0);
+            var at = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+            return (idx + 1) + '. [' + st + '] ' + (r.operation_id || '-') + ' | reintentos: ' + retries + ' | ' + at;
+        });
+        colaDetalleEl.textContent = lines.join(' | ');
+    }
+
+    async function updateRecord(record) {
+        await withStore('readwrite', function(store) {
+            store.put(record);
+        });
+    }
+
+    async function deleteRecord(operationId) {
+        await withStore('readwrite', function(store) {
+            store.delete(operationId);
+        });
+    }
+
+    async function clearErrorRecords() {
+        var pending = await getPending();
+        var errors = pending.filter(function (r) { return String(r.status || '') === 'error'; });
+        for (var i = 0; i < errors.length; i++) {
+            await deleteRecord(errors[i].operation_id);
+        }
+        return errors.length;
+    }
+
+    function toast(msg, type) {
+        if (typeof window.Swal !== 'undefined') {
+            var icon = type === 'error' ? 'error' : (type === 'warning' ? 'warning' : 'success');
+            window.Swal.fire({ toast: true, position: 'top-end', icon: icon, title: msg, showConfirmButton: false, timer: 3200 });
+            return;
+        }
+        alert(msg);
+    }
+
+    async function refreshStatus() {
+        try {
+            var pending = await getPending();
+            renderQueueDetail(pending);
+            var resumen = summarizeQueue(pending);
+            if (!resumen.total) {
+                estadoEl.textContent = navigator.onLine
+                    ? 'Sin pendientes offline de caja.'
+                    : 'Sin internet. No hay pendientes de caja en cola.';
+                return;
+            }
+            estadoEl.textContent = 'Pendientes: ' + resumen.total + ' | errores: ' + resumen.errores + '.';
+        } catch (err) {
+            estadoEl.textContent = 'No se pudo leer cola de caja.';
+        }
+    }
+
+    async function sendPayload(payload) {
+        var body = new URLSearchParams();
+        body.set('monto_inicial', String(payload.monto_inicial || '0'));
+        body.set('observacion_apertura', String(payload.observacion_apertura || ''));
+        body.set('offline_sync', '1');
+        body.set('offline_operation_id', String(payload.offline_operation_id || ''));
+
+        var resp = await fetch(ACTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: body.toString()
+        });
+
+        var data = await resp.json().catch(function() { return {}; });
+        if (!resp.ok || !data || data.ok !== true) {
+            throw new Error((data && data.message) ? data.message : 'Fallo de sincronizacion de caja');
+        }
+        return data;
+    }
+
+    async function syncQueue() {
+        if (!navigator.onLine) {
+            await refreshStatus();
+            return;
+        }
+        var pending = await getPending();
+        if (!pending.length) {
+            await refreshStatus();
+            return;
+        }
+
+        for (var i = 0; i < pending.length; i++) {
+            var rec = pending[i];
+            try {
+                await sendPayload(rec.payload || {});
+                await deleteRecord(rec.operation_id);
+            } catch (err) {
+                rec.status = 'error';
+                rec.retries = Number(rec.retries || 0) + 1;
+                rec.last_error = String(err && err.message ? err.message : 'Error de sincronizacion');
+                await updateRecord(rec);
+            }
+        }
+
+        await refreshStatus();
+    }
+
+    form.addEventListener('submit', function(event) {
+        if (navigator.onLine) {
+            return;
+        }
+        event.preventDefault();
+
+        var formData = new FormData(form);
+        var monto = String(formData.get('monto_inicial') || '').trim();
+        var obs = String(formData.get('observacion_apertura') || '').trim();
+        if (monto === '' || isNaN(Number(monto)) || Number(monto) < 0) {
+            toast('Monto inicial invalido para cola offline.', 'error');
+            return;
+        }
+
+        var payload = {
+            monto_inicial: monto,
+            observacion_apertura: obs,
+            offline_operation_id: createOperationId()
+        };
+
+        queuePayload(payload)
+            .then(function() {
+                toast('Sin internet: apertura encolada para sincronizar.', 'warning');
+                refreshStatus();
+                form.reset();
+            })
+            .catch(function() {
+                toast('No se pudo guardar la apertura en cola offline.', 'error');
+            });
+    });
+
+    syncBtn.addEventListener('click', function() {
+        syncQueue()
+            .then(function() {
+                toast('Sincronizacion de caja finalizada.', 'success');
+            })
+            .catch(function(err) {
+                toast('Error al sincronizar caja: ' + (err && err.message ? err.message : 'desconocido'), 'error');
+            });
+    });
+
+    if (verColaBtn && colaDetalleEl) {
+        verColaBtn.addEventListener('click', function () {
+            var hidden = colaDetalleEl.style.display === 'none';
+            colaDetalleEl.style.display = hidden ? 'block' : 'none';
+            if (hidden) {
+                refreshStatus();
+            }
+        });
+    }
+
+    if (limpiarErroresBtn) {
+        limpiarErroresBtn.addEventListener('click', function () {
+            clearErrorRecords()
+                .then(function (n) {
+                    toast('Registros con error eliminados: ' + n, 'warning');
+                    refreshStatus();
+                })
+                .catch(function () {
+                    toast('No se pudieron limpiar errores de caja.', 'error');
+                });
+        });
+    }
+
+    if (incidenciaBtn) {
+        incidenciaBtn.addEventListener('click', function () {
+            getPending().then(function (pending) {
+                var r = summarizeQueue(pending);
+                pushIncident('caja', 'Caja pendientes=' + r.total + ', errores=' + r.errores);
+                toast('Incidencia registrada para soporte.', 'warning');
+            });
+        });
+    }
+
+    window.addEventListener('online', function() {
+        syncQueue().catch(function() {});
+    });
+
+    refreshStatus();
+    if (navigator.onLine) {
+        syncQueue().catch(function() {});
+    }
 })();
 </script>

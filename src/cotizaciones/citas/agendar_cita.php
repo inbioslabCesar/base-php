@@ -13,6 +13,17 @@ if ($id_cotizacion > 0) {
     $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+$rolActual = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$urlVolverCotizaciones = 'dashboard.php?vista=cotizaciones';
+if ($rolActual === 'cliente') {
+    $urlVolverCotizaciones = 'dashboard.php?vista=cotizaciones_clientes';
+} elseif ($rolActual === 'empresa') {
+    $urlVolverCotizaciones = 'dashboard.php?vista=cotizaciones_empresas';
+} elseif ($rolActual === 'convenio') {
+    $urlVolverCotizaciones = 'dashboard.php?vista=cotizaciones_convenios';
+}
+$urlEditarCotizacion = 'dashboard.php?vista=form_cotizacion&id=' . $id_cotizacion . '&edit=1';
+
 // Configurar fecha y hora por defecto (fecha y hora actual exacta)
 $fecha_actual = date('Y-m-d');
 $hora_actual = date('H:i'); // Hora exacta actual
@@ -225,6 +236,27 @@ $hora_actual = date('H:i'); // Hora exacta actual
     color: #4CAF50;
 }
 
+.offline-sync-panel {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid #dbe7ff;
+    border-radius: 12px;
+    background: #f8fbff;
+}
+
+.offline-sync-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.offline-sync-text {
+    font-size: 0.92rem;
+    color: #334155;
+}
+
 @media (max-width: 768px) {
     .cita-container {
         padding: 10px;
@@ -271,6 +303,8 @@ $hora_actual = date('H:i'); // Hora exacta actual
             <small>
               <strong>Fecha y hora actual:</strong> Para laboratorio se toma inmediatamente. 
               Para domicilio puedes programar fecha y hora según tu conveniencia.
+                            <br>
+                            <strong>Importante:</strong> La cotización ya está registrada. Si olvidaste agregar o quitar exámenes, usa <em>Volver a editar exámenes</em>.
             </small>
           </div>
         </div>
@@ -351,11 +385,28 @@ $hora_actual = date('H:i'); // Hora exacta actual
               <i class="fas fa-calendar-check"></i>
               Confirmar Cita
             </button>
-            <a href="javascript:history.back()" class="btn btn-custom btn-secondary-custom">
+                        <a href="<?= htmlspecialchars($urlEditarCotizacion, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-custom btn-secondary-custom">
+                            <i class="fas fa-file-medical"></i>
+                            Volver a editar exámenes
+                        </a>
+                        <a href="<?= htmlspecialchars($urlVolverCotizaciones, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-custom btn-secondary-custom">
               <i class="fas fa-arrow-left"></i>
-              Cancelar
+                            Omitir agenda por ahora
             </a>
           </div>
+
+                    <div class="offline-sync-panel">
+                        <div class="offline-sync-row">
+                                <div class="offline-sync-text" id="agendaOfflineEstado">Sin pendientes offline.</div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="agendaSyncNowBtn">Sincronizar</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="agendaVerColaBtn">Ver cola</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="agendaLimpiarErroresBtn">Limpiar errores</button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" id="agendaIncidenciaBtn">Marcar incidencia</button>
+                                </div>
+                        </div>
+                        <div class="mt-2 small text-muted" id="agendaColaDetalle" style="display:none;"></div>
+                    </div>
         </form>
       </div>
     </div>
@@ -371,6 +422,227 @@ document.addEventListener('DOMContentLoaded', function() {
     const fechaInput = document.getElementById('fecha_toma');
     const horaInput = document.getElementById('hora_toma');
     const form = document.getElementById('agendarForm');
+    const offlineStatusEl = document.getElementById('agendaOfflineEstado');
+    const syncNowBtn = document.getElementById('agendaSyncNowBtn');
+    const verColaBtn = document.getElementById('agendaVerColaBtn');
+    const limpiarErroresBtn = document.getElementById('agendaLimpiarErroresBtn');
+    const incidenciaBtn = document.getElementById('agendaIncidenciaBtn');
+    const colaDetalleEl = document.getElementById('agendaColaDetalle');
+
+    const AGENDA_DB_NAME = 'agenda_offline_db_v1';
+    const AGENDA_STORE_NAME = 'agenda_queue';
+    const ACTION_URL = 'dashboard.php?action=procesar_agenda';
+    const INCIDENT_KEY = 'offline_sync_incidents_v1';
+
+    function createOperationId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        return 'op_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+    }
+
+    function openAgendaDb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(AGENDA_DB_NAME, 1);
+            req.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(AGENDA_STORE_NAME)) {
+                    const store = db.createObjectStore(AGENDA_STORE_NAME, { keyPath: 'operation_id' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
+            req.onsuccess = function(event) { resolve(event.target.result); };
+            req.onerror = function(event) { reject(event.target.error || new Error('No se pudo abrir IndexedDB')); };
+        });
+    }
+
+    async function withStore(mode, fn) {
+        const db = await openAgendaDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(AGENDA_STORE_NAME, mode);
+            const store = tx.objectStore(AGENDA_STORE_NAME);
+            let result;
+            try {
+                result = fn(store, tx);
+            } catch (err) {
+                reject(err);
+                return;
+            }
+            tx.oncomplete = function() {
+                resolve(result);
+                db.close();
+            };
+            tx.onerror = function(event) {
+                reject(event.target.error || new Error('Error en transaccion IndexedDB'));
+                db.close();
+            };
+        });
+    }
+
+    async function queueAgendaPayload(payload) {
+        const record = {
+            operation_id: payload.offline_operation_id,
+            payload: payload,
+            status: 'pending',
+            created_at: Date.now(),
+            retries: 0,
+            last_error: ''
+        };
+        await withStore('readwrite', function(store) {
+            store.put(record);
+        });
+    }
+
+    async function getPendingQueue() {
+        return withStore('readonly', function(store) {
+            return new Promise((resolve, reject) => {
+                const req = store.getAll();
+                req.onsuccess = function() {
+                    const rows = Array.isArray(req.result) ? req.result : [];
+                    resolve(rows.filter(function(r) { return r.status !== 'synced'; }));
+                };
+                req.onerror = function(event) {
+                    reject(event.target.error || new Error('No se pudo leer cola offline'));
+                };
+            });
+        });
+    }
+
+    function pushIncident(moduleName, detail) {
+        try {
+            const rows = JSON.parse(localStorage.getItem(INCIDENT_KEY) || '[]');
+            const list = Array.isArray(rows) ? rows : [];
+            list.push({
+                module: moduleName,
+                detail: detail,
+                at: new Date().toISOString(),
+                path: location.pathname + location.search,
+            });
+            localStorage.setItem(INCIDENT_KEY, JSON.stringify(list.slice(-200)));
+        } catch (err) {
+        }
+    }
+
+    function summarizeQueue(items) {
+        const list = Array.isArray(items) ? items : [];
+        const total = list.length;
+        const errores = list.filter((r) => String(r.status || '') === 'error').length;
+        return { total, errores };
+    }
+
+    function renderQueueDetail(items) {
+        if (!colaDetalleEl) {
+            return;
+        }
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            colaDetalleEl.textContent = 'Cola vacia.';
+            return;
+        }
+        const lines = list.slice(0, 8).map(function (r, idx) {
+            const st = String(r.status || 'pending');
+            const retries = Number(r.retries || 0);
+            const at = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+            return (idx + 1) + '. [' + st + '] ' + (r.operation_id || '-') + ' | reintentos: ' + retries + ' | ' + at;
+        });
+        colaDetalleEl.textContent = lines.join(' | ');
+    }
+
+    async function markQueueRecord(record) {
+        await withStore('readwrite', function(store) {
+            store.put(record);
+        });
+    }
+
+    async function deleteQueueRecord(operationId) {
+        await withStore('readwrite', function(store) {
+            store.delete(operationId);
+        });
+    }
+
+    async function clearErrorRecords() {
+        const pending = await getPendingQueue();
+        const errors = pending.filter((r) => String(r.status || '') === 'error');
+        for (const rec of errors) {
+            await deleteQueueRecord(rec.operation_id);
+        }
+        return errors.length;
+    }
+
+    async function refreshOfflineStatus() {
+        if (!offlineStatusEl) {
+            return;
+        }
+        try {
+            const pending = await getPendingQueue();
+            renderQueueDetail(pending);
+            const resumen = summarizeQueue(pending);
+            if (!resumen.total) {
+                offlineStatusEl.textContent = navigator.onLine
+                    ? 'Sin pendientes offline.'
+                    : 'Sin internet. No hay pendientes en cola.';
+                return;
+            }
+            offlineStatusEl.textContent = 'Pendientes: ' + resumen.total + ' | errores: ' + resumen.errores + '. Se sincronizan al reconectar.';
+        } catch (err) {
+            offlineStatusEl.textContent = 'No se pudo leer cola offline.';
+        }
+    }
+
+    async function sendAgendaPayload(payload) {
+        const body = new URLSearchParams();
+        body.set('id_cotizacion', String(payload.id_cotizacion || ''));
+        body.set('tipo_toma', String(payload.tipo_toma || 'laboratorio'));
+        body.set('fecha_toma', String(payload.fecha_toma || ''));
+        body.set('hora_toma', String(payload.hora_toma || ''));
+        body.set('direccion_toma', String(payload.direccion_toma || ''));
+        body.set('offline_sync', '1');
+        body.set('offline_operation_id', String(payload.offline_operation_id || ''));
+
+        const resp = await fetch(ACTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: body.toString()
+        });
+
+        const data = await resp.json().catch(function() { return {}; });
+        if (!resp.ok || !data || data.ok !== true) {
+            throw new Error((data && data.message) ? data.message : 'Fallo de sincronizacion');
+        }
+        return data;
+    }
+
+    async function syncAgendaQueue() {
+        if (!navigator.onLine) {
+            await refreshOfflineStatus();
+            return;
+        }
+
+        const pending = await getPendingQueue();
+        if (!pending.length) {
+            await refreshOfflineStatus();
+            return;
+        }
+
+        for (const rec of pending) {
+            try {
+                await sendAgendaPayload(rec.payload || {});
+                await deleteQueueRecord(rec.operation_id);
+            } catch (err) {
+                rec.status = 'error';
+                rec.retries = Number(rec.retries || 0) + 1;
+                rec.last_error = String(err && err.message ? err.message : 'Error de sincronizacion');
+                await markQueueRecord(rec);
+            }
+        }
+
+        await refreshOfflineStatus();
+    }
 
 
     // Manejar cambio de tipo de toma
@@ -506,11 +778,89 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!confirmacion) {
             e.preventDefault();
+            return;
+        }
+
+        if (!navigator.onLine) {
+            e.preventDefault();
+
+            const payload = {
+                id_cotizacion: String(<?= (int)$id_cotizacion ?>),
+                tipo_toma: tipo,
+                fecha_toma: fechaValue,
+                hora_toma: horaValue,
+                direccion_toma: tipo === 'domicilio' ? direccionInput.value.trim() : '',
+                offline_operation_id: createOperationId(),
+            };
+
+            queueAgendaPayload(payload)
+                .then(function() {
+                    mostrarNotificacion('Sin internet: cita guardada en cola para sincronizar.', 'warning');
+                    refreshOfflineStatus();
+                })
+                .catch(function() {
+                    mostrarNotificacion('No se pudo guardar en cola offline.', 'error');
+                });
         }
     });
 
     // Inicializar estado
     direccionField.classList.remove('show');
+
+    if (syncNowBtn) {
+        syncNowBtn.addEventListener('click', function() {
+            syncAgendaQueue()
+                .then(function() {
+                    mostrarNotificacion('Sincronizacion de agenda completada.', 'success');
+                })
+                .catch(function(err) {
+                    mostrarNotificacion('Error al sincronizar: ' + (err && err.message ? err.message : 'desconocido'), 'error');
+                });
+        });
+    }
+
+    if (verColaBtn && colaDetalleEl) {
+        verColaBtn.addEventListener('click', function () {
+            const hidden = colaDetalleEl.style.display === 'none';
+            colaDetalleEl.style.display = hidden ? 'block' : 'none';
+            if (hidden) {
+                refreshOfflineStatus();
+            }
+        });
+    }
+
+    if (limpiarErroresBtn) {
+        limpiarErroresBtn.addEventListener('click', function () {
+            clearErrorRecords()
+                .then(function (n) {
+                    mostrarNotificacion('Registros con error eliminados: ' + n, 'warning');
+                    refreshOfflineStatus();
+                })
+                .catch(function () {
+                    mostrarNotificacion('No se pudieron limpiar errores.', 'error');
+                });
+        });
+    }
+
+    if (incidenciaBtn) {
+        incidenciaBtn.addEventListener('click', function () {
+            getPendingQueue().then(function (pending) {
+                const r = summarizeQueue(pending);
+                const detail = 'Agenda pendientes=' + r.total + ', errores=' + r.errores;
+                pushIncident('agenda', detail);
+                mostrarNotificacion('Incidencia registrada para soporte.', 'info');
+            });
+        });
+    }
+
+    window.addEventListener('online', function() {
+        syncAgendaQueue().catch(function() {});
+    });
+
+    refreshOfflineStatus();
+    if (navigator.onLine) {
+        syncAgendaQueue().catch(function() {});
+    }
 });
 
 // Función para establecer hora rápida (solo para domicilio)

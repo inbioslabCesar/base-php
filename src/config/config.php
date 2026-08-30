@@ -51,6 +51,9 @@ if ($empresa === '') {
         'www.jeycolab.com' => 'jeycolab',
         'tecnolababrilatalaya.com' => 'tecnolab',
         'www.tecnolababrilatalaya.com' => 'tecnolab',
+        'plum-tiger-189332.hostingersite.com' => 'requena',
+        'seashell-pig-429058.hostingersite.com' => 'farlab',
+        'www.seashell-pig-429058.hostingersite.com' => 'farlab',
 
         // Entornos locales
         'localhost' => 'desarrollo',
@@ -124,3 +127,5 @@ if (!defined('LAB_FORMAT_V2_ENABLED')) {
     $labFormatV2Raw = strtolower(trim((string)$labFormatV2Raw));
     define('LAB_FORMAT_V2_ENABLED', in_array($labFormatV2Raw, ['1', 'true', 'yes', 'on'], true));
 }
+
+require_once __DIR__ . '/operacion_context.php';

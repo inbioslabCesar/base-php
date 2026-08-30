@@ -99,6 +99,17 @@ class FormView {
                 </button>
             </div>
 
+            <div class="alert alert-light border mt-3 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2" role="status" aria-live="polite">
+                <small class="text-muted" id="resultadosOfflineEstado">Sin pendientes offline de resultados.</small>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="resultadosSyncNowBtn">Sincronizar</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="resultadosVerColaBtn">Ver cola</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="resultadosLimpiarErroresBtn">Limpiar errores</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" id="resultadosIncidenciaBtn">Marcar incidencia</button>
+                </div>
+            </div>
+            <div class="small text-muted mt-1" id="resultadosColaDetalle" style="display:none;"></div>
+
             <div id="resultsActionsDock" class="results-actions-dock" aria-label="Acciones rapidas de resultados">
                 <button
                     type="button"

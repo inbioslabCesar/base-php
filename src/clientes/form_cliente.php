@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -72,6 +73,19 @@ function capitalize($string) {
     return mb_convert_case(strtolower(trim((string)$string)), MB_CASE_TITLE, "UTF-8");
 }
 
+function cliente_conflicto_hash(array $row): string {
+    $keys = [
+        'codigo_cliente', 'nombre', 'apellido', 'dni', 'tipo_documento', 'edad', 'email',
+        'telefono', 'direccion', 'sexo', 'fecha_nacimiento', 'estado', 'descuento', 'procedencia'
+    ];
+    $values = [];
+    foreach ($keys as $key) {
+        $value = isset($row[$key]) ? (string)$row[$key] : '';
+        $values[] = mb_strtolower(trim($value), 'UTF-8');
+    }
+    return sha1(implode('|', $values));
+}
+
 function normalizarDominioEmpresa(string $dominio): string {
     $dominio = trim($dominio);
     if ($dominio === '') return '';
@@ -83,17 +97,14 @@ function normalizarDominioEmpresa(string $dominio): string {
     return strtolower(trim($dominio));
 }
 
-$dominioEmpresa = '';
-try {
-    $stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
-    $dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
-} catch (Exception $e) {
-    $dominioEmpresa = '';
-}
+$empresaCfg = ui_theme_fetch_company_config($pdo);
+$dominioEmpresa = is_array($empresaCfg) ? (string)($empresaCfg['dominio'] ?? '') : '';
 $dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
 if ($dominioEmpresa === '') {
     $dominioEmpresa = 'localhost';
 }
+
+$offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
 ?>
 <div class="container mt-4">
     <h4><?= $esEdicion ? 'Editar Paciente' : 'Nuevo Paciente' ?></h4>
@@ -136,7 +147,10 @@ if ($dominioEmpresa === '') {
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>">
+    <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>" id="formClienteOffline">
+        <?php if ($esEdicion): ?>
+            <input type="hidden" name="offline_base_hash" id="offline_base_hash" value="<?= htmlspecialchars($offlineBaseHash) ?>">
+        <?php endif; ?>
         <div class="row">
             <div class="col-md-4 mb-3">
                 <label for="codigo_cliente" class="form-label">Código Paciente *</label>
@@ -265,11 +279,22 @@ if ($dominioEmpresa === '') {
             <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Registrar' ?></button>
             <a href="dashboard.php?vista=clientes" class="btn btn-secondary">Cancelar</a>
         </div>
+        <div class="alert alert-light border mt-3 mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2" role="status" aria-live="polite">
+            <small class="text-muted" id="clientesOfflineEstado">Sin pendientes offline de pacientes.</small>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="clientesSyncNowBtn">Sincronizar</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="clientesVerColaBtn">Ver cola</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="clientesLimpiarErroresBtn">Limpiar errores</button>
+                <button type="button" class="btn btn-sm btn-outline-warning" id="clientesIncidenciaBtn">Marcar incidencia</button>
+            </div>
+        </div>
+        <div class="small text-muted mt-1" id="clientesColaDetalle" style="display:none;"></div>
     </form>
 </div>
 <script>
 const DOMINIO_EMPRESA = <?= json_encode($dominioEmpresa, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
 const ES_EDICION = <?= $esEdicion ? 'true' : 'false' ?>;
+const CLIENTE_ID_ACTUAL = <?= (int)($cliente['id'] ?? 0) ?>;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Poner el foco en el campo nombre al cargar el formulario
@@ -398,4 +423,337 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+(function () {
+    var form = document.getElementById('formClienteOffline');
+    var estadoEl = document.getElementById('clientesOfflineEstado');
+    var syncBtn = document.getElementById('clientesSyncNowBtn');
+    var verColaBtn = document.getElementById('clientesVerColaBtn');
+    var limpiarErroresBtn = document.getElementById('clientesLimpiarErroresBtn');
+    var incidenciaBtn = document.getElementById('clientesIncidenciaBtn');
+    var colaDetalleEl = document.getElementById('clientesColaDetalle');
+    if (!form || !estadoEl || !syncBtn || !window.indexedDB) {
+        return;
+    }
+
+    var DB_NAME = 'clientes_offline_db_v1';
+    var STORE_NAME = 'clientes_queue';
+    var INCIDENT_KEY = 'offline_sync_incidents_v1';
+
+    function showToast(msg, type) {
+        if (typeof window.Swal !== 'undefined') {
+            var icon = type === 'error' ? 'error' : (type === 'warning' ? 'warning' : 'success');
+            window.Swal.fire({ toast: true, position: 'top-end', icon: icon, title: msg, showConfirmButton: false, timer: 3600 });
+            return;
+        }
+        alert(msg);
+    }
+
+    function createOperationId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        return 'cli_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+    }
+
+    function openDb() {
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = function (event) {
+                var db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    var store = db.createObjectStore(STORE_NAME, { keyPath: 'operation_id' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
+            req.onsuccess = function (event) { resolve(event.target.result); };
+            req.onerror = function (event) { reject(event.target.error || new Error('No se pudo abrir IndexedDB')); };
+        });
+    }
+
+    async function withStore(mode, fn) {
+        var db = await openDb();
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(STORE_NAME, mode);
+            var store = tx.objectStore(STORE_NAME);
+            var result;
+            try {
+                result = fn(store, tx);
+            } catch (err) {
+                reject(err);
+                db.close();
+                return;
+            }
+            tx.oncomplete = function () {
+                resolve(result);
+                db.close();
+            };
+            tx.onerror = function (event) {
+                reject(event.target.error || new Error('Error en transaccion IndexedDB'));
+                db.close();
+            };
+        });
+    }
+
+    async function queuePayload(payload) {
+        var record = {
+            operation_id: payload.offline_operation_id,
+            payload: payload,
+            endpoint: payload.endpoint,
+            mode: payload.mode,
+            status: 'pending',
+            created_at: Date.now(),
+            retries: 0,
+            last_error: ''
+        };
+        await withStore('readwrite', function (store) { store.put(record); });
+    }
+
+    async function getPending() {
+        return withStore('readonly', function (store) {
+            return new Promise(function (resolve, reject) {
+                var req = store.getAll();
+                req.onsuccess = function () {
+                    var rows = Array.isArray(req.result) ? req.result : [];
+                    resolve(rows.filter(function (r) { return r.status !== 'synced'; }));
+                };
+                req.onerror = function (event) { reject(event.target.error || new Error('No se pudo leer cola de pacientes')); };
+            });
+        });
+    }
+
+    async function updateRecord(record) {
+        await withStore('readwrite', function (store) { store.put(record); });
+    }
+
+    async function deleteRecord(operationId) {
+        await withStore('readwrite', function (store) { store.delete(operationId); });
+    }
+
+    async function clearErrorRecords() {
+        var pending = await getPending();
+        var errors = pending.filter(function (r) { return String(r.status || '') === 'error'; });
+        for (var i = 0; i < errors.length; i++) {
+            await deleteRecord(errors[i].operation_id);
+        }
+        return errors.length;
+    }
+
+    function summarizeQueue(items) {
+        var list = Array.isArray(items) ? items : [];
+        var total = list.length;
+        var errores = list.filter(function (r) { return String(r.status || '') === 'error'; }).length;
+        var conflictos = list.filter(function (r) { return String(r.status || '') === 'conflict'; }).length;
+        return { total: total, errores: errores, conflictos: conflictos };
+    }
+
+    function renderQueueDetail(items) {
+        if (!colaDetalleEl) return;
+        var list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            colaDetalleEl.textContent = 'Cola vacia.';
+            return;
+        }
+        var lines = list.slice(0, 8).map(function (r, idx) {
+            var st = String(r.status || 'pending');
+            var retries = Number(r.retries || 0);
+            var at = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+            var err = r.last_error ? (' | error: ' + String(r.last_error).slice(0, 90)) : '';
+            return (idx + 1) + '. [' + st + '] ' + (r.mode || '-') + ' | ' + (r.operation_id || '-') + ' | reintentos: ' + retries + ' | ' + at + err;
+        });
+        colaDetalleEl.textContent = lines.join(' | ');
+    }
+
+    function pushIncident(moduleName, detail) {
+        try {
+            var rows = JSON.parse(localStorage.getItem(INCIDENT_KEY) || '[]');
+            var list = Array.isArray(rows) ? rows : [];
+            list.push({ module: moduleName, detail: detail, at: new Date().toISOString(), path: location.pathname + location.search });
+            localStorage.setItem(INCIDENT_KEY, JSON.stringify(list.slice(-200)));
+        } catch (error) {
+        }
+    }
+
+    async function refreshStatus() {
+        try {
+            var pending = await getPending();
+            renderQueueDetail(pending);
+            var r = summarizeQueue(pending);
+            if (!r.total) {
+                estadoEl.textContent = navigator.onLine
+                    ? 'Sin pendientes offline de pacientes.'
+                    : 'Sin internet. No hay pendientes de pacientes en cola.';
+                return;
+            }
+            estadoEl.textContent = 'Pendientes: ' + r.total + ' | errores: ' + r.errores + ' | conflictos: ' + r.conflictos + '.';
+        } catch (err) {
+            estadoEl.textContent = 'No se pudo leer cola offline de pacientes.';
+        }
+    }
+
+    async function sendPayload(payload) {
+        var body = new URLSearchParams();
+        Object.keys(payload.fields || {}).forEach(function (k) {
+            body.set(k, payload.fields[k]);
+        });
+        body.set('offline_sync', '1');
+        body.set('offline_operation_id', String(payload.offline_operation_id || ''));
+        if (payload.mode === 'editar') {
+            body.set('id', String(payload.id || CLIENTE_ID_ACTUAL || ''));
+        }
+
+        var resp = await fetch(payload.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: body.toString()
+        });
+
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || !data || data.ok !== true) {
+            var err = new Error((data && data.message) ? data.message : 'Fallo de sincronizacion de pacientes');
+            err.httpStatus = resp.status;
+            throw err;
+        }
+        return data;
+    }
+
+    async function syncQueue() {
+        var stats = { ok: 0, error: 0, conflict: 0 };
+        if (!navigator.onLine) {
+            await refreshStatus();
+            return stats;
+        }
+        var pending = await getPending();
+        if (!pending.length) {
+            await refreshStatus();
+            return stats;
+        }
+        for (var i = 0; i < pending.length; i++) {
+            var rec = pending[i];
+            try {
+                await sendPayload(rec.payload || {});
+                await deleteRecord(rec.operation_id);
+                stats.ok += 1;
+            } catch (err) {
+                var isConflict = Number(err && err.httpStatus ? err.httpStatus : 0) === 409
+                    && /conflicto|desfasada|version/i.test(String(err && err.message ? err.message : ''));
+                rec.status = isConflict ? 'conflict' : 'error';
+                rec.retries = Number(rec.retries || 0) + 1;
+                rec.last_error = String(err && err.message ? err.message : 'Error de sincronizacion');
+                await updateRecord(rec);
+                if (isConflict) {
+                    stats.conflict += 1;
+                } else {
+                    stats.error += 1;
+                }
+            }
+        }
+        await refreshStatus();
+        return stats;
+    }
+
+    function collectPayloadFromForm() {
+        var fd = new FormData(form);
+        var fields = {};
+        fd.forEach(function (value, key) {
+            fields[key] = String(value == null ? '' : value);
+        });
+        var modo = ES_EDICION ? 'editar' : 'crear';
+        var endpoint = ES_EDICION
+            ? ('dashboard.php?action=editar_cliente&id=' + encodeURIComponent(String(CLIENTE_ID_ACTUAL || '0')))
+            : 'dashboard.php?action=crear_cliente';
+        return {
+            mode: modo,
+            endpoint: endpoint,
+            id: CLIENTE_ID_ACTUAL,
+            fields: fields,
+            offline_operation_id: createOperationId()
+        };
+    }
+
+    form.addEventListener('submit', function (event) {
+        if (navigator.onLine) {
+            return;
+        }
+        event.preventDefault();
+        var payload = collectPayloadFromForm();
+        if (!payload.fields.codigo_cliente || !payload.fields.nombre || !payload.fields.apellido) {
+            showToast('Completa los campos obligatorios para encolar.', 'error');
+            return;
+        }
+        queuePayload(payload)
+            .then(function () {
+                showToast('Paciente encolado offline para sincronizar.', 'warning');
+                refreshStatus();
+            })
+            .catch(function () {
+                showToast('No se pudo guardar en cola offline de pacientes.', 'error');
+            });
+    });
+
+    syncBtn.addEventListener('click', function () {
+        syncQueue()
+            .then(function (stats) {
+                if (stats.conflict > 0) {
+                    showToast('Sincronizacion parcial: ' + stats.ok + ' ok, ' + stats.conflict + ' conflicto(s). Revisar cola.', 'warning');
+                    return;
+                }
+                if (stats.error > 0) {
+                    showToast('Sincronizacion parcial: ' + stats.ok + ' ok, ' + stats.error + ' con error.', 'warning');
+                    return;
+                }
+                showToast('Sincronizacion de pacientes completada.', 'success');
+            })
+            .catch(function (err) {
+                showToast('Error al sincronizar pacientes: ' + (err && err.message ? err.message : 'desconocido'), 'error');
+            });
+    });
+
+    if (verColaBtn && colaDetalleEl) {
+        verColaBtn.addEventListener('click', function () {
+            var hidden = colaDetalleEl.style.display === 'none';
+            colaDetalleEl.style.display = hidden ? 'block' : 'none';
+            if (hidden) {
+                refreshStatus();
+            }
+        });
+    }
+
+    if (limpiarErroresBtn) {
+        limpiarErroresBtn.addEventListener('click', function () {
+            clearErrorRecords()
+                .then(function (n) {
+                    showToast('Registros con error eliminados: ' + n, 'warning');
+                    refreshStatus();
+                })
+                .catch(function () {
+                    showToast('No se pudieron limpiar errores de pacientes.', 'error');
+                });
+        });
+    }
+
+    if (incidenciaBtn) {
+        incidenciaBtn.addEventListener('click', function () {
+            getPending().then(function (pending) {
+                var r = summarizeQueue(pending);
+                pushIncident('pacientes', 'Pacientes pendientes=' + r.total + ', errores=' + r.errores);
+                showToast('Incidencia registrada para soporte.', 'warning');
+            });
+        });
+    }
+
+    window.addEventListener('online', function () {
+        syncQueue().catch(function () {});
+    });
+
+    refreshStatus();
+    if (navigator.onLine) {
+        syncQueue().catch(function () {});
+    }
+})();
 </script>

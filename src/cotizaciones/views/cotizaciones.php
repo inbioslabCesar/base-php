@@ -16,6 +16,7 @@ $convenioFiltro = trim($_GET['convenio'] ?? '');
 $msg = trim((string)($_GET['msg'] ?? ''));
 $modoCotizaciones = 'activas';
 $rolActualCotVista = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$mostrarBotonAnuladas = ($rolActualCotVista === 'admin');
 
 
 
@@ -58,18 +59,20 @@ require_once __DIR__ . '/../api/cotizaciones_consultas.php';
             Debes ingresar un motivo para anular la cotización.
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
+    <?php elseif ($msg === 'cotizacion_actualizada'): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            Cotización actualizada correctamente.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php elseif ($msg === 'sis_cobertura_requerida'): ?>
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            Para registrar una cotización SIS debes ingresar número de afiliación o número de acreditación.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     <?php endif; ?>
 
     <!-- BLOQUE COMPONENTE: cotizaciones_header.php -->
     <?php require_once __DIR__ . '/../components/cotizaciones_header.php'; ?>
-
-    <?php if ($rolActualCotVista === 'admin'): ?>
-        <div class="mb-2 d-flex justify-content-end">
-            <a href="dashboard.php?vista=cotizaciones_anuladas" class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-archive"></i> Ver anuladas
-            </a>
-        </div>
-    <?php endif; ?>
 
     <!-- Filtros mejorados -->
 

@@ -2,14 +2,18 @@
 <?php
 require_once __DIR__ . '/src/config/config.php';
 require_once __DIR__ . '/src/conexion/conexion.php';
+require_once __DIR__ . '/src/config/ui_theme.php';
 
 // Redirección canónica por empresa (opcional)
 // Define CANONICAL_HOST en src/config/empresas/<empresa>.php, ej.: 'jeycolab.com' o 'www.inbioslabstore.com'
 // No aplica en entornos locales
 $hostActual = $_SERVER['HTTP_HOST'] ?? '';
-$isLocalHost = in_array($hostActual, ['localhost', '127.0.0.1'], true);
+$hostNormalizado = strtolower(trim((string)$hostActual));
+$hostSinPuerto = preg_replace('/:\\d+$/', '', $hostNormalizado ?? '');
+$isLocalHost = in_array($hostSinPuerto, ['localhost', '127.0.0.1'], true);
+$isHostingerTemporal = (bool)preg_match('/(^|\.)hostingersite\.com$/i', (string)$hostSinPuerto);
 $canonicalHost = defined('CANONICAL_HOST') ? constant('CANONICAL_HOST') : null;
-if ($canonicalHost && !$isLocalHost && strcasecmp($hostActual, $canonicalHost) !== 0) {
+if ($canonicalHost && !$isLocalHost && !$isHostingerTemporal && strcasecmp($hostActual, $canonicalHost) !== 0) {
     $esHttps = (
         (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
         (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
@@ -21,20 +25,60 @@ if ($canonicalHost && !$isLocalHost && strcasecmp($hostActual, $canonicalHost) !
     exit;
 }
 
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : [
+    'portal_publico_enable' => true,
+];
+if (empty($operacionContext['portal_publico_enable'])) {
+    http_response_code(503);
+    ?>
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Portal deshabilitado</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-light">
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-8 col-lg-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-5 text-center">
+                            <h1 class="h3 mb-3">Portal temporalmente deshabilitado</h1>
+                            <p class="text-muted mb-0">La entidad está operando en un modo que no expone el portal público.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 // Consulta de promociones solo para clientes y todos
 $stmtPromo = $pdo->query("SELECT * FROM promociones WHERE activo = 1 AND (tipo_publico = 'clientes' OR tipo_publico = 'todos') AND (CURDATE() BETWEEN fecha_inicio AND fecha_fin OR vigente = 1) ORDER BY fecha_inicio DESC");
 $promociones = $stmtPromo->fetchAll(PDO::FETCH_ASSOC);
 
-$stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
-$config_empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+$config_empresa = ui_theme_fetch_company_config($pdo);
+
+$uiTheme = ui_theme_get_active($pdo);
 
 $nombre_empresa    = $config_empresa['nombre'] ?? 'Laboratorio Ejemplo';
-$color_principal   = $config_empresa['color_principal'] ?? '#0d6efd';
-$color_secundario  = $config_empresa['color_secundario'] ?? '#f8f9fa';
+$color_principal   = $uiTheme['primary'] ?? ($config_empresa['color_principal'] ?? '#0d6efd');
+$color_secundario  = $uiTheme['secondary'] ?? ($config_empresa['color_secundario'] ?? '#f8f9fa');
 
-$color_footer      = $config_empresa['color_footer'] ?? '#343a40';
-$color_botones     = $config_empresa['color_botones'] ?? '#198754'; // Nuevo campo
-$color_texto       = $config_empresa['color_texto'] ?? '#212529';   // Nuevo campo
+$color_footer      = $uiTheme['footer_bg'] ?? ($config_empresa['color_footer'] ?? '#343a40');
+$color_botones     = $uiTheme['button_bg'] ?? ($config_empresa['color_botones'] ?? '#198754');
+$color_texto       = $uiTheme['text'] ?? ($config_empresa['color_texto'] ?? '#212529');
+$color_navbar_texto = $uiTheme['navbar_text'] ?? '#ffffff';
+$color_boton_texto = $uiTheme['button_text'] ?? '#ffffff';
+$color_principal_hover = ui_theme_adjust_brightness($color_principal, -18);
+$color_boton_hover = ui_theme_adjust_brightness($color_botones, -18);
+$color_footer_texto = $uiTheme['footer_text'] ?? '#ffffff';
+$logo_fondo_navbar = ui_theme_normalize_hex((string)($config_empresa['logo_fondo_navbar'] ?? ''), '#ffffff');
 $tamano_letra      = $config_empresa['tamano_letra'] ?? '1rem';     // Nuevo campo
 $logo              = !empty($config_empresa['logo']) ? $config_empresa['logo'] : '../uploads/empresa/logo_empresa.png';
 if (preg_match('/^data:image\//i', (string)$logo)) {
@@ -101,6 +145,43 @@ $hostHeader = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $protocolo = (!$isLocalHost) ? 'https' : ($esHttps ? 'https' : 'http');
 $dominio   = $protocolo . '://' . $hostHeader;
 $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
+
+$pwaBasePath = $siteBasePath;
+$pwaManifestHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/manifest.php';
+$pwaServiceWorkerHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/sw.js';
+$pwaScope = $pwaBasePath === '' ? '/' : ($pwaBasePath . '/');
+$pwaRegisterScriptHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/pwa-register.js';
+$pwaInstallScriptHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/pwa-install.js';
+
+$portalPublicoEstilo = strtolower(trim((string)($config_empresa['portal_publico_estilo'] ?? 'clasico')));
+if ($portalPublicoEstilo === 'premium') {
+    $portalPublicoEstilo = 'premium_a';
+}
+if (!in_array($portalPublicoEstilo, ['clasico', 'premium_a', 'premium_b'], true)) {
+    $portalPublicoEstilo = 'clasico';
+}
+
+$vistaPublica = isset($_GET['vista']) ? trim((string)$_GET['vista']) : '';
+$promoIdPublico = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($vistaPublica === 'detalle_promocion_publico' && $promoIdPublico > 0) {
+    if ($portalPublicoEstilo === 'premium_a') {
+        require __DIR__ . '/src/public/detalle_promocion_premium.php';
+        exit;
+    }
+    if ($portalPublicoEstilo === 'premium_b') {
+        require __DIR__ . '/src/public/detalle_promocion_premium_b.php';
+        exit;
+    }
+}
+
+if ($portalPublicoEstilo === 'premium_a') {
+    require __DIR__ . '/src/public/portal_premium.php';
+    exit;
+}
+if ($portalPublicoEstilo === 'premium_b') {
+    require __DIR__ . '/src/public/portal_premium_b.php';
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -122,6 +203,8 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="theme-color" content="<?= htmlspecialchars($color_principal, ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="manifest" href="<?= htmlspecialchars($pwaManifestHref, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
@@ -131,8 +214,7 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
             font-size: <?= htmlspecialchars($tamano_letra) ?>;
         }
 
-        .navbar,
-        .btn-primary {
+        .navbar {
             background: <?= htmlspecialchars($color_principal) ?> !important;
         }
 
@@ -163,12 +245,12 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
         .navbar-brand,
         .btn-primary,
         .btn-custom {
-            color: #fff !important;
+            color: <?= htmlspecialchars($color_boton_texto) ?> !important;
         }
 
         footer {
             background: <?= htmlspecialchars($color_footer) ?> !important;
-            color: #fff;
+            color: <?= htmlspecialchars($color_footer_texto) ?>;
         }
 
         .carousel-inner img {
@@ -181,6 +263,15 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
         .logo-navbar {
            height: 150px; /* o el tamaño que prefieras */
            width: auto;
+        }
+
+        .logo-navbar-shell {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            padding: 4px 10px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.12);
         }
 
         .institucional-img {
@@ -326,15 +417,21 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
         }
 
         .btn-primary {
-            background-color: #0069d9 !important;
-            color: #fff !important;
+            background-color: <?= htmlspecialchars($color_botones) ?> !important;
+            color: <?= htmlspecialchars($color_boton_texto) ?> !important;
             font-weight: 600;
             border: none;
         }
 
         .btn-primary:hover {
-            background-color: #0056b3 !important;
-            color: #fff !important;
+            background-color: <?= htmlspecialchars($color_boton_hover) ?> !important;
+            color: <?= htmlspecialchars($color_boton_texto) ?> !important;
+        }
+
+        .navbar .nav-link:hover,
+        .navbar .nav-link:focus {
+            color: <?= htmlspecialchars($color_navbar_texto) ?> !important;
+            opacity: .88;
         }
 
         /* Título de la sección de ubicación */
@@ -496,6 +593,15 @@ $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.APP_PWA = {
+            manifestUrl: <?= json_encode($pwaManifestHref, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+            swUrl: <?= json_encode($pwaServiceWorkerHref, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+            scope: <?= json_encode($pwaScope, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+        };
+    </script>
+    <script src="<?= htmlspecialchars($pwaRegisterScriptHref, ENT_QUOTES, 'UTF-8') ?>"></script>
+    <script src="<?= htmlspecialchars($pwaInstallScriptHref, ENT_QUOTES, 'UTF-8') ?>"></script>
     <!-- Si tienes otros scripts, agrégalos aquí -->
 </body>
 

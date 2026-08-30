@@ -1,21 +1,56 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/ui_theme.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Obtener datos de la tabla config_empresa
-$stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
-$empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+$empresaIdGet = (int)($_GET['empresa_cfg_id'] ?? 0);
+$empresa = ui_theme_fetch_company_config($pdo, $empresaIdGet > 0 ? $empresaIdGet : null);
+$empresa = is_array($empresa) ? $empresa : [];
+$empresaActualId = (int)($empresa['id'] ?? 0);
 
 // Valores por defecto
 $logo = !empty($empresa['logo']) ? $empresa['logo'] : '../uploads/empresa/logo_empresa.png';
 $firma = !empty($empresa['firma']) ? $empresa['firma'] : '../uploads/empresa/firma.png';
-$color_principal = $empresa['color_principal'] ?? '#0d6efd';
-$color_secundario = $empresa['color_secundario'] ?? '#f8f9fa';
-$color_footer = $empresa['color_footer'] ?? '#343a40';
-$color_botones = $empresa['color_botones'] ?? '#198754';
-$color_texto = $empresa['color_texto'] ?? '#212529';
+$suggestedPalette = [
+    'color_principal' => '#294f7a',
+    'color_secundario' => '#e8f4fb',
+    'color_footer' => '#1d3552',
+    'color_botones' => '#3cc0cf',
+    'color_texto' => '#24344a',
+];
+
+$normalizeHexColor = static function ($value): string {
+    $v = strtolower(trim((string)$value));
+    if (preg_match('/^#[0-9a-f]{6}$/', $v)) {
+        return $v;
+    }
+    return '';
+};
+
+$bootstrapLegacyDefaults = [
+    'color_principal' => '#0d6efd',
+    'color_secundario' => '#f8f9fa',
+    'color_footer' => '#343a40',
+    'color_botones' => '#198754',
+    'color_texto' => '#212529',
+];
+
+$pickCompanyColor = static function (string $field) use ($empresa, $suggestedPalette, $bootstrapLegacyDefaults, $normalizeHexColor): string {
+    $stored = $normalizeHexColor($empresa[$field] ?? '');
+    if ($stored === '' || $stored === $bootstrapLegacyDefaults[$field]) {
+        return $suggestedPalette[$field];
+    }
+    return $stored;
+};
+
+$color_principal = $pickCompanyColor('color_principal');
+$color_secundario = $pickCompanyColor('color_secundario');
+$color_footer = $pickCompanyColor('color_footer');
+$color_botones = $pickCompanyColor('color_botones');
+$color_texto = $pickCompanyColor('color_texto');
+$logo_fondo_navbar = $normalizeHexColor($empresa['logo_fondo_navbar'] ?? '') ?: '#ffffff';
 $tamano_letra = $empresa['tamano_letra'] ?? '1rem';
 $frase_promocion = $empresa['frase_promocion'] ?? '';
 $oferta_mes = $empresa['oferta_mes'] ?? '';
@@ -50,7 +85,6 @@ $menu_inicio = $empresa['menu_inicio'] ?? 'Inicio';
 $menu_servicios = $empresa['menu_servicios'] ?? 'Servicios';
 $menu_testimonios = $empresa['menu_testimonios'] ?? 'Testimonios';
 $menu_contacto = $empresa['menu_contacto'] ?? 'Contacto';
-
 $moneda_codigo = strtoupper(trim((string)($empresa['moneda_codigo'] ?? 'PEN')));
 $moneda_simbolo = trim((string)($empresa['moneda_simbolo'] ?? 'S/'));
 $moneda_posicion = strtolower(trim((string)($empresa['moneda_posicion'] ?? 'prefix')));
@@ -75,8 +109,84 @@ $toPreviewUrl = static function (string $path): string {
     return $path;
 };
 
+$srcDir = realpath(__DIR__ . '/..');
+if ($srcDir === false) {
+    $srcDir = __DIR__ . '/..';
+}
+
+$projectRoot = realpath(__DIR__ . '/../..');
+if ($projectRoot === false) {
+    $projectRoot = __DIR__ . '/../..';
+}
+
+$resolveStoredAbsolutePath = static function (string $storedPath) use ($srcDir, $projectRoot): string {
+    $normalized = str_replace('\\', '/', ltrim($storedPath, '/'));
+    if (strpos($normalized, '../uploads/') === 0) {
+        $normalized = substr($normalized, 3);
+    }
+    if (strpos($normalized, 'uploads/') === 0) {
+        return rtrim((string)$projectRoot, '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+    }
+    return rtrim((string)$srcDir, '\\/') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+};
+
+$logoAbs = $resolveStoredAbsolutePath((string)$logo);
+if (!is_file($logoAbs)) {
+    $logo = '';
+}
+
+$firmaAbs = $resolveStoredAbsolutePath((string)$firma);
+if (!is_file($firmaAbs)) {
+    $firma = '';
+}
+
 $logoUrl = $toPreviewUrl((string)$logo);
 $firmaUrl = $toPreviewUrl((string)$firma);
+
+$ubicaciones = [];
+if (!empty($empresa['ubicaciones_json'])) {
+    $tmpUb = json_decode((string)$empresa['ubicaciones_json'], true);
+    if (is_array($tmpUb)) {
+        $ubicaciones = $tmpUb;
+    }
+}
+if (empty($ubicaciones)) {
+    $ubicaciones[] = [
+        'nombre' => 'Sede principal',
+        'direccion' => (string)($empresa['direccion'] ?? ''),
+        'celular' => (string)($empresa['celular'] ?? ''),
+        'telefonos' => !empty($empresa['celular']) ? [(string)$empresa['celular']] : [],
+        'maps_embed' => (string)($empresa['maps_embed'] ?? ''),
+    ];
+}
+
+foreach ($ubicaciones as &$ubItem) {
+    if (!is_array($ubItem)) {
+        continue;
+    }
+    $telefonosUb = [];
+    if (!empty($ubItem['telefonos']) && is_array($ubItem['telefonos'])) {
+        foreach ($ubItem['telefonos'] as $telItem) {
+            $telStr = trim((string)$telItem);
+            if ($telStr !== '') {
+                $telefonosUb[] = $telStr;
+            }
+        }
+    }
+    $celularUb = trim((string)($ubItem['celular'] ?? ''));
+    if ($celularUb !== '' && !in_array($celularUb, $telefonosUb, true)) {
+        array_unshift($telefonosUb, $celularUb);
+    }
+    $ubItem['telefonos'] = array_values(array_unique($telefonosUb));
+    if (!empty($ubItem['telefonos']) && empty($ubItem['celular'])) {
+        $ubItem['celular'] = (string)$ubItem['telefonos'][0];
+    }
+}
+unset($ubItem);
+$ubicacionesJsonPretty = json_encode($ubicaciones, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
+    $ubicacionesJsonPretty = '[]';
+}
 ?>
 <div class="container mt-4">
     <h4>Configuración de Empresa</h4>
@@ -85,6 +195,7 @@ $firmaUrl = $toPreviewUrl((string)$firma);
         <?php unset($_SESSION['msg']); ?>
     <?php endif; ?>
     <form method="POST" action="<?= htmlspecialchars(BASE_URL) ?>dashboard.php?action=config_empresa_guardar" enctype="multipart/form-data" autocomplete="off">
+        <input type="hidden" name="empresa_cfg_id" value="<?= (int)$empresaActualId ?>">
         <div class="row">
             <!-- Datos básicos -->
             <div class="col-md-6 mb-3">
@@ -107,11 +218,15 @@ $firmaUrl = $toPreviewUrl((string)$firma);
                 <input type="text" class="form-control" id="direccion" name="direccion"
                     value="<?= htmlspecialchars($empresa['direccion'] ?? '') ?>" required>
             </div>
-            <div class="col-md-6 mb-3">
-                <label for="maps_embed" class="form-label">Mapa Google (iframe/src) (opcional)</label>
-                <textarea class="form-control" id="maps_embed" name="maps_embed" rows="3"
-                    placeholder="Pega aquí el iframe completo o solo el src (https://www.google.com/maps/embed?pb=...)" autocomplete="off"><?= htmlspecialchars($empresa['maps_embed'] ?? '') ?></textarea>
-                <div class="form-text">Si lo completas, la web pública usará este mapa exacto en la sección Ubicación.</div>
+            <div class="col-12 mb-3">
+                <label class="form-label">Sucursales y ubicaciones (multi sede)</label>
+                <div id="ubicacionesBuilder" class="border rounded p-2 mb-2"></div>
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddUbicacion">Agregar sucursal</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSyncUbicaciones">Actualizar JSON</button>
+                </div>
+                <textarea class="form-control" id="ubicaciones_json" name="ubicaciones_json" rows="6" spellcheck="false"><?= htmlspecialchars($ubicacionesJsonPretty) ?></textarea>
+                <div class="form-text">Formato JSON: [{"nombre":"Sede Centro","direccion":"...","telefonos":["519XXXXXXXX","519YYYYYYYY"],"maps_embed":"https://www.google.com/maps/embed?pb=..."}]</div>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="email" class="form-label">Email *</label>
@@ -188,26 +303,61 @@ $firmaUrl = $toPreviewUrl((string)$firma);
                     value="<?= htmlspecialchars($color_texto) ?>">
             </div>
             <div class="col-md-6 mb-3">
+                <label for="logo_fondo_navbar" class="form-label">Fondo del logo (navbar)</label>
+                <input type="color" class="form-control form-control-color" id="logo_fondo_navbar" name="logo_fondo_navbar"
+                    value="<?= htmlspecialchars($logo_fondo_navbar) ?>">
+                <small class="text-muted">Se aplica detrás del logo en el header público para igualar logos con fondo blanco u otros tonos.</small>
+            </div>
+            <div class="col-md-6 mb-3">
                 <label for="tamano_letra" class="form-label">Tamaño de letra (ej: 1rem, 18px)</label>
                 <input type="text" class="form-control" id="tamano_letra" name="tamano_letra"
                     value="<?= htmlspecialchars($tamano_letra) ?>">
             </div>
+            <div class="col-md-12 mb-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnAplicarPaletaLogo">
+                        Aplicar paleta sugerida
+                    </button>
+                    <span class="small text-muted">Paleta corporativa sugerida:</span>
+                    <span class="badge" style="background:#294f7a;color:#fff;">Principal</span>
+                    <span class="badge" style="background:#e8f4fb;color:#24344a;border:1px solid #c8dcea;">Secundario</span>
+                    <span class="badge" style="background:#1d3552;color:#fff;">Footer</span>
+                    <span class="badge" style="background:#3cc0cf;color:#103240;">Botones</span>
+                    <span class="badge" style="background:#24344a;color:#fff;">Texto</span>
+                </div>
+            </div>
             <!-- Logo y firma -->
             <div class="col-md-6 mb-3 text-center">
                 <label class="form-label fw-bold">Logo actual:</label><br>
-                <img src="<?= htmlspecialchars($logoUrl) ?>?v=<?= time() ?>" alt="Logo de la empresa" style="max-height: 80px;">
+                <?php if ($logoUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($logoUrl) ?>?v=<?= time() ?>" alt="Logo de la empresa" style="max-height: 80px;">
+                <?php else: ?>
+                    <span class="text-muted">Sin logo cargado</span>
+                <?php endif; ?>
             </div>
             <div class="col-md-6 mb-3 text-center">
                 <label class="form-label fw-bold">Firma actual:</label><br>
-                <img src="<?= htmlspecialchars($firmaUrl) ?>?v=<?= time() ?>" alt="Firma de la empresa" style="max-height: 80px;">
+                <?php if ($firmaUrl !== ''): ?>
+                    <img src="<?= htmlspecialchars($firmaUrl) ?>?v=<?= time() ?>" alt="Firma de la empresa" style="max-height: 80px;">
+                <?php else: ?>
+                    <span class="text-muted">Sin firma cargada</span>
+                <?php endif; ?>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="logo" class="form-label">Actualizar logo (PNG):</label>
                 <input type="file" class="form-control" id="logo" name="logo" accept="image/png">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="quitar_logo" name="quitar_logo" value="1">
+                    <label class="form-check-label" for="quitar_logo">Quitar logo actual</label>
+                </div>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="firma" class="form-label">Actualizar firma (PNG):</label>
                 <input type="file" class="form-control" id="firma" name="firma" accept="image/png">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="quitar_firma" name="quitar_firma" value="1">
+                    <label class="form-check-label" for="quitar_firma">Quitar firma actual</label>
+                </div>
             </div>
             <!-- Frase y oferta -->
             <div class="col-md-12 mb-3">
@@ -296,3 +446,128 @@ $firmaUrl = $toPreviewUrl((string)$firma);
         <button type="submit" class="btn btn-success">Guardar</button>
     </form>
 </div>
+<script>
+(function () {
+    const palette = {
+        color_principal: '#294f7a',
+        color_secundario: '#e8f4fb',
+        color_footer: '#1d3552',
+        color_botones: '#3cc0cf',
+        color_texto: '#24344a'
+    };
+
+    const btn = document.getElementById('btnAplicarPaletaLogo');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        Object.keys(palette).forEach(function (field) {
+            const input = document.getElementById(field);
+            if (input) {
+                input.value = palette[field];
+            }
+        });
+    });
+})();
+
+(function () {
+    const builder = document.getElementById('ubicacionesBuilder');
+    const textarea = document.getElementById('ubicaciones_json');
+    const addBtn = document.getElementById('btnAddUbicacion');
+    const syncBtn = document.getElementById('btnSyncUbicaciones');
+    if (!builder || !textarea || !addBtn || !syncBtn) return;
+
+    function createItemRow(item) {
+        const wrap = document.createElement('div');
+        wrap.className = 'border rounded p-2 mb-2';
+        wrap.innerHTML = '' +
+            '<div class="row g-2">' +
+            '  <div class="col-md-3"><label class="form-label">Nombre sede</label><input type="text" class="form-control ub-nombre" value=""></div>' +
+            '  <div class="col-md-3"><label class="form-label">Direccion</label><input type="text" class="form-control ub-direccion" value=""></div>' +
+            '  <div class="col-md-2"><label class="form-label">Telefonos</label><input type="text" class="form-control ub-telefonos" value="" placeholder="519XXXXXXXX,519YYYYYYYY"></div>' +
+            '  <div class="col-md-3"><label class="form-label">Mapa Google (iframe/src)</label><input type="text" class="form-control ub-mapa" value=""></div>' +
+            '  <div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-outline-danger btn-sm w-100 ub-del">X</button></div>' +
+            '</div>';
+
+        wrap.querySelector('.ub-nombre').value = (item && item.nombre) ? String(item.nombre) : '';
+        wrap.querySelector('.ub-direccion').value = (item && item.direccion) ? String(item.direccion) : '';
+        const phones = Array.isArray(item && item.telefonos)
+            ? item.telefonos.map(function (x) { return String(x || '').trim(); }).filter(Boolean)
+            : [];
+        const fallbackCell = (item && item.celular) ? String(item.celular).trim() : '';
+        if (phones.length === 0 && fallbackCell) {
+            phones.push(fallbackCell);
+        }
+        wrap.querySelector('.ub-telefonos').value = phones.join(', ');
+        wrap.querySelector('.ub-mapa').value = (item && item.maps_embed) ? String(item.maps_embed) : '';
+
+        wrap.querySelector('.ub-del').addEventListener('click', function () {
+            wrap.remove();
+        });
+
+        return wrap;
+    }
+
+    function parseTextarea() {
+        try {
+            const raw = JSON.parse(textarea.value || '[]');
+            if (!Array.isArray(raw)) return [];
+            return raw.filter(function (x) { return x && typeof x === 'object'; });
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function renderBuilder(items) {
+        builder.innerHTML = '';
+        if (!items.length) {
+            items = [{ nombre: 'Sede principal', direccion: '', telefonos: [], maps_embed: '' }];
+        }
+        items.forEach(function (item) {
+            builder.appendChild(createItemRow(item));
+        });
+    }
+
+    function parsePhones(value) {
+        return String(value || '')
+            .split(',')
+            .map(function (x) { return x.trim(); })
+            .filter(function (x, i, arr) { return x !== '' && arr.indexOf(x) === i; });
+    }
+
+    function syncToTextarea() {
+        const out = [];
+        builder.querySelectorAll('.border.rounded.p-2.mb-2').forEach(function (row) {
+            const nombre = (row.querySelector('.ub-nombre') || {}).value || '';
+            const direccion = (row.querySelector('.ub-direccion') || {}).value || '';
+            const telefonosTxt = (row.querySelector('.ub-telefonos') || {}).value || '';
+            const telefonos = parsePhones(telefonosTxt);
+            const maps_embed = (row.querySelector('.ub-mapa') || {}).value || '';
+            if (nombre.trim() || direccion.trim() || telefonos.length > 0 || maps_embed.trim()) {
+                out.push({
+                    nombre: nombre.trim(),
+                    direccion: direccion.trim(),
+                    celular: telefonos.length > 0 ? telefonos[0] : '',
+                    telefonos: telefonos,
+                    maps_embed: maps_embed.trim()
+                });
+            }
+        });
+        textarea.value = JSON.stringify(out, null, 2);
+    }
+
+    addBtn.addEventListener('click', function () {
+        builder.appendChild(createItemRow({ nombre: '', direccion: '', telefonos: [], maps_embed: '' }));
+    });
+
+    syncBtn.addEventListener('click', syncToTextarea);
+
+    const form = textarea.closest('form');
+    if (form) {
+        form.addEventListener('submit', function () {
+            syncToTextarea();
+        });
+    }
+
+    renderBuilder(parseTextarea());
+})();
+</script>

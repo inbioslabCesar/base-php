@@ -1,0 +1,26 @@
+# KPI Offline Sync 2026-08-27
+
+- Generado: 2026-08-28 01:00:04
+
+## Modulos
+
+| Modulo | Total | Aplicado | Pendiente | Error | Duplicado | Apl% | Err% | Dup% |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| agenda (N/A) | 0 | 0 | 0 | 0 | 0 | 0.00% | 0.00% | 0.00% |
+| caja (N/A) | 0 | 0 | 0 | 0 | 0 | 0.00% | 0.00% | 0.00% |
+| inventario (N/A) | 0 | 0 | 0 | 0 | 0 | 0.00% | 0.00% | 0.00% |
+| pacientes (N/A) | 0 | 0 | 0 | 0 | 0 | 0.00% | 0.00% | 0.00% |
+| resultados | 0 | 0 | 0 | 0 | 0 | 0.00% | 0.00% | 0.00% |
+
+## Global
+
+- Total: 0
+- Aplicado: 0 (0.00%)
+- Pendiente: 0
+- Error: 0 (0.00%)
+- Duplicado: 0 (0.00%)
+
+## Semaforo
+- operaciones_fallidas_pct: 0.00% (objetivo < 1.00) => SIN_DATOS
+- duplicados_pct: 0.00% (objetivo < 0.20) => SIN_DATOS
+- sincronizacion_aplicada_pct: 0.00% (objetivo >= 95.00) => SIN_DATOS

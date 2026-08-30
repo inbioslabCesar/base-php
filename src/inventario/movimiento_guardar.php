@@ -5,7 +5,22 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/../conexion/conexion.php';
 
+function inventario_mov_json_response(int $statusCode, array $payload): void
+{
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$isOfflineSync = isset($_POST['offline_sync']) && (string)$_POST['offline_sync'] === '1';
+$acceptHeader = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+$expectsJson = $isOfflineSync || strpos($acceptHeader, 'application/json') !== false;
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($expectsJson) {
+        inventario_mov_json_response(405, ['ok' => false, 'message' => 'Metodo no permitido']);
+    }
     header('Location: dashboard.php?vista=inventario');
     exit;
 }
@@ -21,13 +36,16 @@ $fechaVencimiento = trim((string)($_POST['fecha_vencimiento'] ?? ''));
 $formToken = trim((string)($_POST['form_token'] ?? ''));
 $sessionToken = trim((string)($_SESSION['inventario_mov_form_token'] ?? ''));
 $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+$operationId = trim((string)($_POST['offline_operation_id'] ?? ''));
 
-if ($formToken === '' || $sessionToken === '' || !hash_equals($sessionToken, $formToken)) {
-    $_SESSION['mensaje'] = 'El formulario ya fue enviado o expiró. Recarga la página e intenta nuevamente.';
-    header('Location: dashboard.php?vista=inventario');
-    exit;
+if (!$isOfflineSync) {
+    if ($formToken === '' || $sessionToken === '' || !hash_equals($sessionToken, $formToken)) {
+        $_SESSION['mensaje'] = 'El formulario ya fue enviado o expiró. Recarga la página e intenta nuevamente.';
+        header('Location: dashboard.php?vista=inventario');
+        exit;
+    }
+    unset($_SESSION['inventario_mov_form_token']);
 }
-unset($_SESSION['inventario_mov_form_token']);
 
 $tiposEntrada = ['entrada', 'ajuste_pos'];
 $tiposSalida = ['salida', 'ajuste_neg', 'merma', 'vencido'];
@@ -40,18 +58,27 @@ $esSalidaLaboratorio = in_array($tipo, $tiposSalida, true)
     && strpos($observacionLower, 'laboratorio') !== false;
 
 if ($itemId <= 0 || !in_array($tipo, $tiposValidos, true) || ($cantidad <= 0 && $cantidadPresentacion <= 0)) {
+    if ($expectsJson) {
+        inventario_mov_json_response(422, ['ok' => false, 'message' => 'Datos inválidos para registrar movimiento']);
+    }
     $_SESSION['mensaje'] = 'Datos inválidos para registrar movimiento.';
     header('Location: dashboard.php?vista=inventario');
     exit;
 }
 
 if ($cantidadPresentacion < 0) {
+    if ($expectsJson) {
+        inventario_mov_json_response(422, ['ok' => false, 'message' => 'Cantidad por presentación inválida']);
+    }
     $_SESSION['mensaje'] = 'Cantidad por presentación inválida.';
     header('Location: dashboard.php?vista=inventario');
     exit;
 }
 
 if ($fechaVencimiento !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencimiento)) {
+    if ($expectsJson) {
+        inventario_mov_json_response(422, ['ok' => false, 'message' => 'Formato de fecha de vencimiento inválido']);
+    }
     $_SESSION['mensaje'] = 'Formato de fecha de vencimiento inválido.';
     header('Location: dashboard.php?vista=inventario');
     exit;
@@ -72,6 +99,9 @@ try {
     }
 
     if (!$tablesReady) {
+        if ($expectsJson) {
+            inventario_mov_json_response(500, ['ok' => false, 'message' => 'Faltan tablas de inventario']);
+        }
         $_SESSION['mensaje'] = 'Faltan tablas de inventario. Ejecuta sql/agregar_tablas_inventario.sql.';
         header('Location: dashboard.php?vista=inventario');
         exit;
@@ -95,6 +125,9 @@ try {
     $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
 
     if (!$item || (int)($item['activo'] ?? 0) !== 1) {
+        if ($expectsJson) {
+            inventario_mov_json_response(422, ['ok' => false, 'message' => 'Ítem no disponible para movimientos']);
+        }
         $_SESSION['mensaje'] = 'Ítem no disponible para movimientos.';
         header('Location: dashboard.php?vista=inventario');
         exit;
@@ -119,12 +152,61 @@ try {
     }
 
     if ($cantidad <= 0) {
+        if ($expectsJson) {
+            inventario_mov_json_response(422, ['ok' => false, 'message' => 'Cantidad inválida para registrar movimiento']);
+        }
         $_SESSION['mensaje'] = 'Cantidad inválida para registrar movimiento.';
         header('Location: dashboard.php?vista=inventario');
         exit;
     }
 
     $pdo->beginTransaction();
+
+    if ($operationId !== '') {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS inventario_sync_operaciones (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            operation_id VARCHAR(80) NOT NULL,
+            item_id INT NOT NULL,
+            tipo_movimiento VARCHAR(20) NOT NULL,
+            estado ENUM('pendiente','aplicado','error') NOT NULL DEFAULT 'pendiente',
+            payload_json TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_inventario_sync_operation_id (operation_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $stmtOp = $pdo->prepare("SELECT estado FROM inventario_sync_operaciones WHERE operation_id = ? LIMIT 1");
+        $stmtOp->execute([$operationId]);
+        $existingOp = $stmtOp->fetch(PDO::FETCH_ASSOC);
+
+        if ($existingOp && (string)($existingOp['estado'] ?? '') === 'aplicado') {
+            $pdo->commit();
+            if ($expectsJson) {
+                inventario_mov_json_response(200, [
+                    'ok' => true,
+                    'duplicate' => true,
+                    'message' => 'Operacion ya aplicada previamente',
+                ]);
+            }
+            header('Location: dashboard.php?vista=inventario');
+            exit;
+        }
+
+        if (!$existingOp) {
+            $payloadRaw = json_encode([
+                'item_id' => $itemId,
+                'tipo' => $tipo,
+                'cantidad' => $cantidad,
+                'cantidad_presentacion' => $cantidadPresentacion,
+                'observacion' => $observacion,
+                'lote_codigo' => $loteCodigo,
+                'fecha_vencimiento' => $fechaVencimiento,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $stmtInsOp = $pdo->prepare("INSERT INTO inventario_sync_operaciones (operation_id, item_id, tipo_movimiento, estado, payload_json) VALUES (?, ?, ?, 'pendiente', ?)");
+            $stmtInsOp->execute([$operationId, $itemId, $tipo, $payloadRaw]);
+        }
+    }
 
     if (in_array($tipo, $tiposEntrada, true)) {
         if ($loteCodigo === '') {
@@ -164,6 +246,17 @@ try {
 
         if ($stockTotal < $cantidad) {
             $pdo->rollBack();
+            if ($operationId !== '') {
+                try {
+                    $stmtErrOp = $pdo->prepare("UPDATE inventario_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+                    $stmtErrOp->execute([$operationId]);
+                } catch (\Throwable $inner) {
+                    // Ignorar error secundario.
+                }
+            }
+            if ($expectsJson) {
+                inventario_mov_json_response(409, ['ok' => false, 'message' => 'Stock insuficiente. Disponible: ' . number_format($stockTotal, 2)]);
+            }
             $_SESSION['mensaje'] = 'Stock insuficiente. Disponible: ' . number_format($stockTotal, 2);
             header('Location: dashboard.php?vista=inventario');
             exit;
@@ -245,7 +338,19 @@ try {
         }
     }
 
+    if ($operationId !== '') {
+        $stmtOkOp = $pdo->prepare("UPDATE inventario_sync_operaciones SET estado = 'aplicado' WHERE operation_id = ?");
+        $stmtOkOp->execute([$operationId]);
+    }
+
     $pdo->commit();
+    if ($expectsJson) {
+        inventario_mov_json_response(200, [
+            'ok' => true,
+            'duplicate' => false,
+            'message' => 'Movimiento registrado correctamente',
+        ]);
+    }
     if ($esSalidaLaboratorio && $tablasInternoReady) {
         $_SESSION['mensaje'] = 'Movimiento registrado y convertido automáticamente en transferencia interna a laboratorio.';
     } else {
@@ -254,6 +359,23 @@ try {
 } catch (\Throwable $e) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
+    }
+
+    if ($operationId !== '') {
+        try {
+            $stmtErrOp = $pdo->prepare("UPDATE inventario_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+            $stmtErrOp->execute([$operationId]);
+        } catch (\Throwable $inner) {
+            // Ignorar error secundario.
+        }
+    }
+
+    if ($expectsJson) {
+        inventario_mov_json_response(500, [
+            'ok' => false,
+            'message' => 'No se pudo registrar el movimiento',
+            'error' => $e->getMessage(),
+        ]);
     }
     $_SESSION['mensaje'] = 'No se pudo registrar el movimiento: ' . $e->getMessage();
 }

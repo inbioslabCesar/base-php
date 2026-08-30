@@ -20,6 +20,17 @@ if (!$cliente) {
     return;
 }
 
+$rolActual = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$privilegiosActuales = isset($_SESSION['privilegios']) && is_array($_SESSION['privilegios']) ? $_SESSION['privilegios'] : [];
+$tieneMenuPacientes = !empty($privilegiosActuales['menu_pacientes']);
+$tieneMenuCotizaciones = !empty($privilegiosActuales['menu_cotizaciones']);
+$volverUrl = 'dashboard.php?vista=clientes';
+$volverTexto = 'Volver a Pacientes';
+if ($rolActual === 'laboratorista' || (!$tieneMenuPacientes && $tieneMenuCotizaciones)) {
+    $volverUrl = 'dashboard.php?vista=cotizaciones';
+    $volverTexto = 'Volver a Cotizaciones';
+}
+
 $sexoPaciente = strtolower(trim((string)($cliente['sexo'] ?? '')));
 $edadPaciente = null;
 $edadRaw = (string)($cliente['edad'] ?? '');
@@ -552,8 +563,8 @@ if (in_array($export, ['excel', 'pdf'], true)) {
                 | DNI: <strong><?= htmlspecialchars((string)($cliente['dni'] ?? '')) ?></strong>
             </div>
         </div>
-        <a href="dashboard.php?vista=clientes" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Volver a Pacientes
+        <a href="<?= htmlspecialchars($volverUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> <?= htmlspecialchars($volverTexto, ENT_QUOTES, 'UTF-8') ?>
         </a>
     </div>
 

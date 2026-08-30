@@ -1,9 +1,42 @@
 <?php
 require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 // Funciones para obtener datos de cotización, paciente, empresa y resultados
 function obtenerDatosCotizacion($pdo, $cotizacion_id) {
-    $sqlCot = "SELECT c.id_empresa, c.id_convenio, c.referencia_personalizada, e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
+    $hasEsSis = false;
+    try {
+        $stmtCol = $pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'es_sis'");
+        $hasEsSis = (bool)$stmtCol->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $hasEsSis = false;
+    }
+
+    $selectEsSis = $hasEsSis ? "c.es_sis AS es_sis" : "0 AS es_sis";
+    $hasProfId = false;
+    $hasProfNombre = false;
+    $hasProfTipo = false;
+    $hasProfRegistro = false;
+    try {
+        $hasProfId = (bool)$pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'profesional_solicitante_id'")->fetch(PDO::FETCH_ASSOC);
+        $hasProfNombre = (bool)$pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'profesional_solicitante_nombre'")->fetch(PDO::FETCH_ASSOC);
+        $hasProfTipo = (bool)$pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'profesional_solicitante_tipo'")->fetch(PDO::FETCH_ASSOC);
+        $hasProfRegistro = (bool)$pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'profesional_solicitante_registro'")->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $hasProfId = false;
+        $hasProfNombre = false;
+        $hasProfTipo = false;
+        $hasProfRegistro = false;
+    }
+
+    $selectProfId = $hasProfId ? "c.profesional_solicitante_id AS profesional_solicitante_id" : "NULL AS profesional_solicitante_id";
+    $selectProfNombre = $hasProfNombre ? "c.profesional_solicitante_nombre AS profesional_solicitante_nombre" : "NULL AS profesional_solicitante_nombre";
+    $selectProfTipo = $hasProfTipo ? "c.profesional_solicitante_tipo AS profesional_solicitante_tipo" : "NULL AS profesional_solicitante_tipo";
+    $selectProfRegistro = $hasProfRegistro ? "c.profesional_solicitante_registro AS profesional_solicitante_registro" : "NULL AS profesional_solicitante_registro";
+
+    $sqlCot = "SELECT c.id_empresa, c.id_convenio, c.referencia_personalizada, $selectEsSis,
+                $selectProfId, $selectProfNombre, $selectProfTipo, $selectProfRegistro,
+                e.nombre_comercial, e.razon_social, v.nombre AS nombre_convenio
                FROM cotizaciones c
                LEFT JOIN empresas e ON c.id_empresa = e.id
                LEFT JOIN convenios v ON c.id_convenio = v.id
@@ -38,29 +71,18 @@ function obtenerResultadosExamenes($pdo, $cotizacion_id) {
 }
 
 function obtenerDatosEmpresa($pdo) {
-    $dominio_actual = $_SERVER['HTTP_HOST'];
-    $sql3 = "SELECT nombre, ruc, dominio, direccion, telefono, celular, logo, firma FROM config_empresa WHERE dominio = ? LIMIT 1";
-    $stmt3 = $pdo->prepare($sql3);
-    $stmt3->execute([$dominio_actual]);
-    $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
-    if (!$empresa) {
-        // Si no hay empresa para el dominio, usar la primera empresa como fallback
-        $sql3 = "SELECT nombre, ruc, dominio, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
-        $stmt3 = $pdo->prepare($sql3);
-        $stmt3->execute();
-        $empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
-        if (!$empresa) {
-            $empresa = [
-                "nombre" => "",
-                "ruc" => "",
-                "dominio" => "",
-                "direccion" => "",
-                "telefono" => "",
-                "celular" => "",
-                "logo" => "",
-                "firma" => ""
-            ];
-        }
+    $empresa = ui_theme_fetch_company_config($pdo);
+    if (!is_array($empresa)) {
+        $empresa = [
+            "nombre" => "",
+            "ruc" => "",
+            "dominio" => "",
+            "direccion" => "",
+            "telefono" => "",
+            "celular" => "",
+            "logo" => "",
+            "firma" => ""
+        ];
     }
     return $empresa;
 }

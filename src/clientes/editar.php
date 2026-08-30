@@ -1,13 +1,54 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$id = $_GET['id'] ?? null;
+function cliente_editar_json_response(int $statusCode, array $payload): void {
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function cliente_conflicto_hash(array $row): string {
+    $keys = [
+        'codigo_cliente', 'nombre', 'apellido', 'dni', 'tipo_documento', 'edad', 'email',
+        'telefono', 'direccion', 'sexo', 'fecha_nacimiento', 'estado', 'descuento', 'procedencia'
+    ];
+    $values = [];
+    foreach ($keys as $key) {
+        $value = isset($row[$key]) ? (string)$row[$key] : '';
+        $values[] = mb_strtolower(trim($value), 'UTF-8');
+    }
+    return sha1(implode('|', $values));
+}
+
+$id = $_GET['id'] ?? ($_POST['id'] ?? null);
 if (!$id) {
+    $acceptHeader = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+    $isOfflineSync = isset($_POST['offline_sync']) && (string)$_POST['offline_sync'] === '1';
+    $expectsJson = $isOfflineSync || strpos($acceptHeader, 'application/json') !== false;
+    if ($expectsJson) {
+        cliente_editar_json_response(422, ['ok' => false, 'message' => 'ID de cliente no proporcionado']);
+    }
     $_SESSION['msg'] = 'ID de cliente no proporcionado.';
     header('Location: ../dashboard.php?vista=clientes');
+    exit;
+}
+
+$operationId = trim((string)($_POST['offline_operation_id'] ?? ''));
+$isOfflineSync = isset($_POST['offline_sync']) && (string)$_POST['offline_sync'] === '1';
+$baseHash = trim((string)($_POST['offline_base_hash'] ?? ''));
+$acceptHeader = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+$expectsJson = $isOfflineSync || strpos($acceptHeader, 'application/json') !== false;
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($expectsJson) {
+        cliente_editar_json_response(405, ['ok' => false, 'message' => 'Metodo no permitido']);
+    }
+    header('Location: ../dashboard.php?vista=form_cliente&id=' . urlencode((string)$id));
     exit;
 }
 // Campos requeridos
@@ -55,6 +96,9 @@ if ($tipo_documento === 'sin_dni') {
         } while ($existe && $intentos < 20);
 
         if ($existe) {
+            if ($expectsJson) {
+                cliente_editar_json_response(409, ['ok' => false, 'message' => 'No se pudo generar documento provisional unico']);
+            }
             $_SESSION['msg'] = 'No se pudo generar un documento provisional único. Intente nuevamente.';
             header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
             exit;
@@ -62,6 +106,9 @@ if ($tipo_documento === 'sin_dni') {
     }
 } else {
     if ($dni === '') {
+        if ($expectsJson) {
+            cliente_editar_json_response(422, ['ok' => false, 'message' => 'Documento requerido']);
+        }
         $_SESSION['msg'] = 'Por favor, ingrese el documento.';
         header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
         exit;
@@ -69,13 +116,8 @@ if ($tipo_documento === 'sin_dni') {
 }
 
 // Dominio empresa para email
-$dominio = '';
-try {
-    $stmtDom = $pdo->query('SELECT dominio FROM config_empresa LIMIT 1');
-    $dominio = (string)($stmtDom->fetchColumn() ?: '');
-} catch (Exception $e) {
-    $dominio = '';
-}
+$empresaCfg = ui_theme_fetch_company_config($pdo);
+$dominio = is_array($empresaCfg) ? (string)($empresaCfg['dominio'] ?? '') : '';
 $dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
 if ($dominio === '') {
     $dominio = 'localhost';
@@ -86,16 +128,11 @@ $email = ($dni !== '' && $dominio !== '') ? ($dni . '@' . $dominio) : $email;
 
 // Validación de requeridos
 if (!$codigo_cliente || !$nombre || !$apellido || !$dni || !$email) {
+    if ($expectsJson) {
+        cliente_editar_json_response(422, ['ok' => false, 'message' => 'Faltan campos obligatorios']);
+    }
     $_SESSION['msg'] = 'Por favor, complete todos los campos obligatorios.';
     header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
-    exit;
-}
-
-// Validar DNI único (excluyendo el registro actual)
-$stmt = $pdo->prepare('SELECT id FROM clientes WHERE dni = ? AND id <> ? LIMIT 1');
-$stmt->execute([$dni, $id]);
-if ($stmt->fetchColumn()) {
-    header('Location: ../dashboard.php?vista=form_cliente&id=' . $id . '&error=dni_duplicado');
     exit;
 }
 
@@ -104,6 +141,103 @@ function capitalize($string) {
     return mb_convert_case(strtolower(trim($string)), MB_CASE_TITLE, "UTF-8");
 }
 try {
+    $pdo->beginTransaction();
+
+    if ($operationId !== '') {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS clientes_sync_operaciones (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            operation_id VARCHAR(80) NOT NULL,
+            tipo_operacion VARCHAR(20) NOT NULL,
+            cliente_id INT NULL,
+            estado ENUM('pendiente','aplicado','error') NOT NULL DEFAULT 'pendiente',
+            payload_json TEXT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_clientes_sync_operation_id (operation_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $stmtOp = $pdo->prepare("SELECT estado, cliente_id FROM clientes_sync_operaciones WHERE operation_id = ? LIMIT 1");
+        $stmtOp->execute([$operationId]);
+        $existingOp = $stmtOp->fetch(PDO::FETCH_ASSOC);
+        if ($existingOp && (string)($existingOp['estado'] ?? '') === 'aplicado') {
+            $pdo->commit();
+            if ($expectsJson) {
+                cliente_editar_json_response(200, [
+                    'ok' => true,
+                    'duplicate' => true,
+                    'cliente_id' => isset($existingOp['cliente_id']) ? (int)$existingOp['cliente_id'] : (int)$id,
+                    'message' => 'Operacion ya aplicada'
+                ]);
+            }
+            header('Location: ../dashboard.php?vista=clientes');
+            exit;
+        }
+
+        if (!$existingOp) {
+            $payloadRaw = json_encode([
+                'id' => (int)$id,
+                'codigo_cliente' => $codigo_cliente,
+                'nombre' => $nombre,
+                'apellido' => $apellido,
+                'dni' => $dni,
+                'tipo_documento' => $tipo_documento,
+                'telefono' => $telefono,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $stmtInsOp = $pdo->prepare("INSERT INTO clientes_sync_operaciones (operation_id, tipo_operacion, cliente_id, estado, payload_json) VALUES (?, 'editar', ?, 'pendiente', ?)");
+            $stmtInsOp->execute([$operationId, (int)$id, $payloadRaw]);
+        }
+    }
+
+    $stmtCurrent = $pdo->prepare("SELECT codigo_cliente, nombre, apellido, dni, tipo_documento, edad, email, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, procedencia FROM clientes WHERE id = ? LIMIT 1 FOR UPDATE");
+    $stmtCurrent->execute([(int)$id]);
+    $clienteActual = $stmtCurrent->fetch(PDO::FETCH_ASSOC);
+    if (!$clienteActual) {
+        if ($operationId !== '') {
+            $stmtErr = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+            $stmtErr->execute([$operationId]);
+        }
+        $pdo->commit();
+        if ($expectsJson) {
+            cliente_editar_json_response(404, ['ok' => false, 'message' => 'Cliente no encontrado']);
+        }
+        $_SESSION['msg'] = 'Cliente no encontrado.';
+        header('Location: ../dashboard.php?vista=clientes');
+        exit;
+    }
+
+    if ($isOfflineSync && $baseHash !== '') {
+        $serverHash = cliente_conflicto_hash($clienteActual);
+        if (!hash_equals($serverHash, $baseHash)) {
+            if ($operationId !== '') {
+                $stmtErr = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+                $stmtErr->execute([$operationId]);
+            }
+            $pdo->commit();
+            cliente_editar_json_response(409, [
+                'ok' => false,
+                'message' => 'Conflicto de edicion: el paciente fue actualizado en otra sesion. Requiere revision manual.',
+                'code' => 'offline_conflict_edit_stale'
+            ]);
+        }
+    }
+
+    // Validar DNI único (excluyendo el registro actual)
+    $stmt = $pdo->prepare('SELECT id FROM clientes WHERE dni = ? AND id <> ? LIMIT 1');
+    $stmt->execute([$dni, $id]);
+    if ($stmt->fetchColumn()) {
+        if ($operationId !== '') {
+            $stmtErr = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+            $stmtErr->execute([$operationId]);
+        }
+        $pdo->commit();
+        if ($expectsJson) {
+            cliente_editar_json_response(409, ['ok' => false, 'message' => 'Documento duplicado']);
+        }
+        header('Location: ../dashboard.php?vista=form_cliente&id=' . $id . '&error=dni_duplicado');
+        exit;
+    }
+
     if ($password) {
         $sql = "UPDATE clientes SET 
             codigo_cliente=?, nombre=?, apellido=?, dni=?, tipo_documento=?, edad=?, email=?, password=?, telefono=?, direccion=?, sexo=?, fecha_nacimiento=?, estado=?, descuento=?, procedencia=?
@@ -151,6 +285,22 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
+    if ($operationId !== '') {
+        $stmtOk = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'aplicado', cliente_id = ? WHERE operation_id = ?");
+        $stmtOk->execute([(int)$id, $operationId]);
+    }
+
+    $pdo->commit();
+
+    if ($expectsJson) {
+        cliente_editar_json_response(200, [
+            'ok' => true,
+            'duplicate' => false,
+            'cliente_id' => (int)$id,
+            'message' => 'Cliente actualizado correctamente'
+        ]);
+    }
+
     $_SESSION['msg'] = 'Cliente actualizado correctamente.';
 
     // Redirección según rol
@@ -166,6 +316,24 @@ try {
     header('Location: ../dashboard.php?vista=clientes');
     exit;
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    if ($operationId !== '') {
+        try {
+            $stmtErr = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+            $stmtErr->execute([$operationId]);
+        } catch (Throwable $inner) {
+            // Ignorar error secundario.
+        }
+    }
+    if ($expectsJson) {
+        cliente_editar_json_response(500, [
+            'ok' => false,
+            'message' => 'Error al actualizar cliente',
+            'error' => $e->getMessage()
+        ]);
+    }
     $_SESSION['msg'] = 'Error al actualizar: ' . $e->getMessage();
     header('Location: ../dashboard.php?vista=form_cliente&id=' . $id);
     exit;

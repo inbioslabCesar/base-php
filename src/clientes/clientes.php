@@ -548,7 +548,10 @@ function mostrarPaginaActualClientes() {
             card.classList.add('d-none');
         }
     });
-    document.getElementById('paginacionClienteMovil').style.display = '';
+    var nav = document.getElementById('paginacionClienteMovil');
+    if (nav) {
+        nav.style.display = '';
+    }
 }
 function filtrarCardsClientes(valor) {
     var filtro = normalizarTexto(valor);
@@ -568,7 +571,10 @@ function filtrarCardsClientes(valor) {
                 card.classList.add('d-none');
             }
         });
-        document.getElementById('paginacionClienteMovil').style.display = 'none';
+        var nav = document.getElementById('paginacionClienteMovil');
+        if (nav) {
+            nav.style.display = 'none';
+        }
     }
 }
 document.addEventListener('DOMContentLoaded', function() {
@@ -587,9 +593,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
-document.getElementById('buscadorClienteMovil').addEventListener('input', function(e) {
-    filtrarCardsClientes(e.target.value);
-});
+var buscadorMovil = document.getElementById('buscadorClienteMovil');
+if (buscadorMovil) {
+    buscadorMovil.addEventListener('input', function(e) {
+        filtrarCardsClientes(e.target.value);
+    });
+}
 </script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../auth/empresa_config.php';
+require_once __DIR__ . '/../../config/operacion_context.php';
 require_once __DIR__ . '/../../config/currency.php';
 
 $currencyCfg = currency_get_config($pdo);
@@ -27,6 +28,13 @@ if (!$cotizacion) {
 }
 
 $requiereCpe = ((int)($cotizacion['emitir_comprobante'] ?? 1) === 1);
+$esSisCotizacion = ((int)($cotizacion['es_sis'] ?? 0) === 1);
+$sisCobertura = null;
+if ($esSisCotizacion && app_database_has_table($pdo, 'sis_coberturas')) {
+    $stmtSis = $pdo->prepare("SELECT * FROM sis_coberturas WHERE cotizacion_id = ? ORDER BY id DESC LIMIT 1");
+    $stmtSis->execute([$id]);
+    $sisCobertura = $stmtSis->fetch(PDO::FETCH_ASSOC) ?: null;
+}
 
 // Consulta de exámenes cotizados
 $stmt = $pdo->prepare("
@@ -434,7 +442,7 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                         $stmtPagosDet->execute([$cotizacion['id']]);
                         $totalPagadoDet = (float)$stmtPagosDet->fetchColumn();
                         $saldoDet = max(0, (float)$cotizacion['total'] - $totalPagadoDet);
-                        $estado_pago_calc = ($saldoDet <= 0) ? 'pagado' : (($totalPagadoDet > 0) ? 'abonado' : 'pendiente');
+                        $estado_pago_calc = $esSisCotizacion ? 'sis' : (($saldoDet <= 0) ? 'pagado' : (($totalPagadoDet > 0) ? 'abonado' : 'pendiente'));
                         ?>
                         <div class="info-item">
                             <div class="info-icon">
@@ -467,6 +475,21 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                                 </div>
                             </div>
                         </div>
+
+                        <?php if ($esSisCotizacion): ?>
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <i class="bi bi-shield-check"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Modo de atención</div>
+                                <div class="info-value">
+                                    <span class="badge bg-success">SIS</span>
+                                    <span class="ms-2 text-muted">Monto registrado: S/ 0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                         
                         <div class="info-item">
                             <div class="info-icon">
@@ -475,9 +498,14 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                             <div class="info-content">
                                 <div class="info-label">Estado de Pago</div>
                                 <div class="info-value">
-                                    <span class="badge status-badge <?= $estado_pago_calc === 'pagado' ? 'bg-success' : ($estado_pago_calc === 'abonado' ? 'bg-info' : 'bg-warning text-dark') ?>">
-                                        <?= htmlspecialchars(ucwords(strtolower($estado_pago_calc))) ?>
-                                    </span>
+                                    <?php if ($estado_pago_calc === 'sis'): ?>
+                                        <span class="badge status-badge bg-success">SIS</span>
+                                        <span class="ms-2 text-muted">Cobertura sin cobro directo</span>
+                                    <?php else: ?>
+                                        <span class="badge status-badge <?= $estado_pago_calc === 'pagado' ? 'bg-success' : ($estado_pago_calc === 'abonado' ? 'bg-info' : 'bg-warning text-dark') ?>">
+                                            <?= htmlspecialchars(ucwords(strtolower($estado_pago_calc))) ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -546,6 +574,22 @@ if ($tipo === 'empresa' && !empty($cotizacion['id_empresa'])) {
                             <div class="info-content">
                                 <div class="info-label">Observaciones</div>
                                 <div class="info-value"><?= htmlspecialchars($cotizacion['observaciones']) ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($sisCobertura): ?>
+                        <div class="info-item">
+                            <div class="info-icon">
+                                <i class="bi bi-shield-lock"></i>
+                            </div>
+                            <div class="info-content">
+                                <div class="info-label">Cobertura SIS</div>
+                                <div class="info-value small text-muted">
+                                    Afiliación: <?= htmlspecialchars((string)($sisCobertura['numero_afiliacion'] ?? '-')) ?> | 
+                                    Autorización: <?= htmlspecialchars((string)($sisCobertura['numero_autorizacion'] ?? '-')) ?> | 
+                                    FUA: <?= htmlspecialchars((string)($sisCobertura['numero_fua'] ?? '-')) ?>
+                                </div>
                             </div>
                         </div>
                         <?php endif; ?>

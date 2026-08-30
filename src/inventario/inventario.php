@@ -507,6 +507,18 @@ function label_tipo_mov(string $tipo): string
                             <div class="col-12 d-grid">
                                 <button type="submit" class="btn btn-primary" id="btnRegistrarMovimiento"><i class="bi bi-arrow-left-right"></i> Registrar movimiento</button>
                             </div>
+                            <div class="col-12">
+                                <div class="alert alert-light border mb-0 d-flex flex-wrap align-items-center justify-content-between gap-2 py-2" role="status" aria-live="polite">
+                                    <small class="text-muted" id="inventarioOfflineEstado">Sin pendientes offline de inventario.</small>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="inventarioSyncNowBtn">Sincronizar</button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="inventarioVerColaBtn">Ver cola</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" id="inventarioLimpiarErroresBtn">Limpiar errores</button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" id="inventarioIncidenciaBtn">Marcar incidencia</button>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mt-1" id="inventarioColaDetalle" style="display:none;"></div>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -1148,9 +1160,247 @@ function label_tipo_mov(string $tipo): string
     if (!movForm) return;
 
     var selectItem = movForm.querySelector('select[name="item_id"]');
+    var selectTipo = movForm.querySelector('select[name="tipo"]');
     var inputCantidad = movForm.querySelector('input[name="cantidad"]');
     var inputCantPresentacion = movForm.querySelector('input[name="cantidad_presentacion"]');
+    var inputLote = movForm.querySelector('input[name="lote_codigo"]');
+    var inputVencimiento = movForm.querySelector('input[name="fecha_vencimiento"]');
+    var inputObservacion = movForm.querySelector('input[name="observacion"]');
+    var offlineStatus = document.getElementById('inventarioOfflineEstado');
+    var syncNowBtn = document.getElementById('inventarioSyncNowBtn');
+    var verColaBtn = document.getElementById('inventarioVerColaBtn');
+    var limpiarErroresBtn = document.getElementById('inventarioLimpiarErroresBtn');
+    var incidenciaBtn = document.getElementById('inventarioIncidenciaBtn');
+    var colaDetalleEl = document.getElementById('inventarioColaDetalle');
     var hint = document.getElementById('inventarioHintConversion');
+
+    var DB_NAME = 'inventario_offline_db_v1';
+    var STORE_NAME = 'inventario_queue';
+    var ACTION_URL = 'dashboard.php?action=inventario_movimiento_guardar';
+    var OFFLINE_ALLOWED_TYPES = ['entrada', 'ajuste_pos'];
+    var INCIDENT_KEY = 'offline_sync_incidents_v1';
+
+    var showToast = function (msg, type) {
+        if (typeof window.Swal !== 'undefined') {
+            var icon = type === 'error' ? 'error' : (type === 'warning' ? 'warning' : 'success');
+            window.Swal.fire({ toast: true, position: 'top-end', icon: icon, title: msg, showConfirmButton: false, timer: 3600 });
+            return;
+        }
+        alert(msg);
+    };
+
+    var createOperationId = function () {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        return 'inv_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+    };
+
+    var openDb = function () {
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = function (event) {
+                var db = event.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    var store = db.createObjectStore(STORE_NAME, { keyPath: 'operation_id' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
+            req.onsuccess = function (event) { resolve(event.target.result); };
+            req.onerror = function (event) { reject(event.target.error || new Error('No se pudo abrir IndexedDB')); };
+        });
+    };
+
+    var withStore = async function (mode, handler) {
+        var db = await openDb();
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(STORE_NAME, mode);
+            var store = tx.objectStore(STORE_NAME);
+            var result;
+            try {
+                result = handler(store, tx);
+            } catch (err) {
+                reject(err);
+                db.close();
+                return;
+            }
+            tx.oncomplete = function () {
+                resolve(result);
+                db.close();
+            };
+            tx.onerror = function (event) {
+                reject(event.target.error || new Error('Error en transaccion IndexedDB'));
+                db.close();
+            };
+        });
+    };
+
+    var queuePayload = async function (payload) {
+        var record = {
+            operation_id: payload.offline_operation_id,
+            payload: payload,
+            status: 'pending',
+            created_at: Date.now(),
+            retries: 0,
+            last_error: ''
+        };
+        await withStore('readwrite', function (store) {
+            store.put(record);
+        });
+    };
+
+    var getPending = async function () {
+        return withStore('readonly', function (store) {
+            return new Promise(function (resolve, reject) {
+                var req = store.getAll();
+                req.onsuccess = function () {
+                    var rows = Array.isArray(req.result) ? req.result : [];
+                    resolve(rows.filter(function (r) { return r.status !== 'synced'; }));
+                };
+                req.onerror = function (event) {
+                    reject(event.target.error || new Error('No se pudo leer cola de inventario'));
+                };
+            });
+        });
+    };
+
+    var pushIncident = function (moduleName, detail) {
+        try {
+            var rows = JSON.parse(localStorage.getItem(INCIDENT_KEY) || '[]');
+            var list = Array.isArray(rows) ? rows : [];
+            list.push({
+                module: moduleName,
+                detail: detail,
+                at: new Date().toISOString(),
+                path: location.pathname + location.search
+            });
+            localStorage.setItem(INCIDENT_KEY, JSON.stringify(list.slice(-200)));
+        } catch (error) {
+        }
+    };
+
+    var summarizeQueue = function (items) {
+        var list = Array.isArray(items) ? items : [];
+        var total = list.length;
+        var errores = list.filter(function (r) { return String(r.status || '') === 'error'; }).length;
+        return { total: total, errores: errores };
+    };
+
+    var renderQueueDetail = function (items) {
+        if (!colaDetalleEl) {
+            return;
+        }
+        var list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            colaDetalleEl.textContent = 'Cola vacia.';
+            return;
+        }
+        var lines = list.slice(0, 8).map(function (r, idx) {
+            var st = String(r.status || 'pending');
+            var retries = Number(r.retries || 0);
+            var at = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+            return (idx + 1) + '. [' + st + '] ' + (r.operation_id || '-') + ' | reintentos: ' + retries + ' | ' + at;
+        });
+        colaDetalleEl.textContent = lines.join(' | ');
+    };
+
+    var updateRecord = async function (record) {
+        await withStore('readwrite', function (store) {
+            store.put(record);
+        });
+    };
+
+    var deleteRecord = async function (operationId) {
+        await withStore('readwrite', function (store) {
+            store.delete(operationId);
+        });
+    };
+
+    var clearErrorRecords = async function () {
+        var pending = await getPending();
+        var errors = pending.filter(function (r) { return String(r.status || '') === 'error'; });
+        for (var i = 0; i < errors.length; i++) {
+            await deleteRecord(errors[i].operation_id);
+        }
+        return errors.length;
+    };
+
+    var refreshOfflineStatus = async function () {
+        if (!offlineStatus) {
+            return;
+        }
+        try {
+            var pending = await getPending();
+            renderQueueDetail(pending);
+            var resumen = summarizeQueue(pending);
+            if (!resumen.total) {
+                offlineStatus.textContent = navigator.onLine
+                    ? 'Sin pendientes offline de inventario.'
+                    : 'Sin internet. No hay pendientes de inventario en cola.';
+                return;
+            }
+            offlineStatus.textContent = 'Pendientes: ' + resumen.total + ' | errores: ' + resumen.errores + ' (solo bajo riesgo).';
+        } catch (err) {
+            offlineStatus.textContent = 'No se pudo leer cola offline de inventario.';
+        }
+    };
+
+    var sendPayload = async function (payload) {
+        var body = new URLSearchParams();
+        body.set('item_id', String(payload.item_id || ''));
+        body.set('tipo', String(payload.tipo || ''));
+        body.set('cantidad', String(payload.cantidad || '0'));
+        body.set('cantidad_presentacion', String(payload.cantidad_presentacion || ''));
+        body.set('lote_codigo', String(payload.lote_codigo || ''));
+        body.set('fecha_vencimiento', String(payload.fecha_vencimiento || ''));
+        body.set('observacion', String(payload.observacion || ''));
+        body.set('offline_sync', '1');
+        body.set('offline_operation_id', String(payload.offline_operation_id || ''));
+
+        var resp = await fetch(ACTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: body.toString()
+        });
+
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || !data || data.ok !== true) {
+            throw new Error((data && data.message) ? data.message : 'Fallo de sincronizacion de inventario');
+        }
+        return data;
+    };
+
+    var syncQueue = async function () {
+        if (!navigator.onLine) {
+            await refreshOfflineStatus();
+            return;
+        }
+        var pending = await getPending();
+        if (!pending.length) {
+            await refreshOfflineStatus();
+            return;
+        }
+
+        for (var i = 0; i < pending.length; i++) {
+            var rec = pending[i];
+            try {
+                await sendPayload(rec.payload || {});
+                await deleteRecord(rec.operation_id);
+            } catch (err) {
+                rec.status = 'error';
+                rec.retries = Number(rec.retries || 0) + 1;
+                rec.last_error = String(err && err.message ? err.message : 'Error de sincronizacion');
+                await updateRecord(rec);
+            }
+        }
+
+        await refreshOfflineStatus();
+    };
 
     var renderConversion = function () {
         if (!selectItem || !inputCantidad || !inputCantPresentacion) {
@@ -1180,12 +1430,105 @@ function label_tipo_mov(string $tipo): string
         inputCantPresentacion.addEventListener('input', renderConversion);
     }
 
-    movForm.addEventListener('submit', function () {
+    movForm.addEventListener('submit', function (event) {
+        var tipoSeleccionado = selectTipo ? String(selectTipo.value || '') : '';
+        var esOffline = !navigator.onLine;
+
+        if (esOffline) {
+            if (OFFLINE_ALLOWED_TYPES.indexOf(tipoSeleccionado) === -1) {
+                event.preventDefault();
+                showToast('Sin internet: solo se permite encolar Entrada o Ajuste (+).', 'warning');
+                return;
+            }
+
+            event.preventDefault();
+            var payload = {
+                item_id: selectItem ? String(selectItem.value || '') : '',
+                tipo: tipoSeleccionado,
+                cantidad: inputCantidad ? String(inputCantidad.value || '') : '',
+                cantidad_presentacion: inputCantPresentacion ? String(inputCantPresentacion.value || '') : '',
+                lote_codigo: inputLote ? String(inputLote.value || '') : '',
+                fecha_vencimiento: inputVencimiento ? String(inputVencimiento.value || '') : '',
+                observacion: inputObservacion ? String(inputObservacion.value || '') : '',
+                offline_operation_id: createOperationId()
+            };
+
+            if (!payload.item_id || !payload.tipo || !payload.cantidad || Number(payload.cantidad) <= 0) {
+                showToast('Completa item, tipo y cantidad valida para encolar.', 'error');
+                return;
+            }
+
+            queuePayload(payload)
+                .then(function () {
+                    showToast('Movimiento encolado offline para sincronizar.', 'warning');
+                    refreshOfflineStatus();
+                    movForm.reset();
+                })
+                .catch(function () {
+                    showToast('No se pudo guardar en cola offline de inventario.', 'error');
+                });
+            return;
+        }
+
         var submitBtn = document.getElementById('btnRegistrarMovimiento');
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Registrando...';
         }
     });
+
+    if (syncNowBtn) {
+        syncNowBtn.addEventListener('click', function () {
+            syncQueue()
+                .then(function () {
+                    showToast('Sincronizacion de inventario completada.', 'success');
+                })
+                .catch(function (err) {
+                    showToast('Error al sincronizar inventario: ' + (err && err.message ? err.message : 'desconocido'), 'error');
+                });
+        });
+    }
+
+    if (verColaBtn && colaDetalleEl) {
+        verColaBtn.addEventListener('click', function () {
+            var hidden = colaDetalleEl.style.display === 'none';
+            colaDetalleEl.style.display = hidden ? 'block' : 'none';
+            if (hidden) {
+                refreshOfflineStatus();
+            }
+        });
+    }
+
+    if (limpiarErroresBtn) {
+        limpiarErroresBtn.addEventListener('click', function () {
+            clearErrorRecords()
+                .then(function (n) {
+                    showToast('Registros con error eliminados: ' + n, 'warning');
+                    refreshOfflineStatus();
+                })
+                .catch(function () {
+                    showToast('No se pudieron limpiar errores de inventario.', 'error');
+                });
+        });
+    }
+
+    if (incidenciaBtn) {
+        incidenciaBtn.addEventListener('click', function () {
+            getPending().then(function (pending) {
+                var r = summarizeQueue(pending);
+                pushIncident('inventario', 'Inventario pendientes=' + r.total + ', errores=' + r.errores);
+                showToast('Incidencia registrada para soporte.', 'warning');
+            });
+        });
+    }
+
+    window.addEventListener('online', function () {
+        syncQueue().catch(function () {});
+    });
+
+    refreshOfflineStatus();
+    if (navigator.onLine) {
+        syncQueue().catch(function () {});
+    }
 })();
 </script>
