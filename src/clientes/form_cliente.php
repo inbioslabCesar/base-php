@@ -12,17 +12,25 @@ $cliente = [
     'codigo_cliente' => '',
     'nombre' => '',
     'apellido' => '',
+    'razon_social' => isset($_GET['razon_social']) ? $_GET['razon_social'] : '',
     'dni' => isset($_GET['dni']) ? $_GET['dni'] : '',
-    'tipo_documento' => 'dni',
+    'tipo_documento' => isset($_GET['tipo_documento']) ? $_GET['tipo_documento'] : 'dni',
     'edad' => '',
     'email' => '',
     'telefono' => '',
-    'direccion' => '',
+    'direccion' => isset($_GET['direccion']) ? $_GET['direccion'] : '',
     'sexo' => '',
     'fecha_nacimiento' => '',
     'estado' => 'activo',
     'descuento' => ''
 ];
+
+if (isset($_GET['nombre']) && trim((string)$_GET['nombre']) !== '') {
+    $cliente['nombre'] = trim((string)$_GET['nombre']);
+}
+if (isset($_GET['apellido']) && trim((string)$_GET['apellido']) !== '') {
+    $cliente['apellido'] = trim((string)$_GET['apellido']);
+}
 
 // Variables para mostrar información del último paciente
 $ultimoCodigoCliente = '';
@@ -167,14 +175,6 @@ $offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
                 </small>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="nombre" class="form-label">Nombre *</label>
-                <input type="text" class="form-control" name="nombre" id="nombre" value="<?= capitalize($cliente['nombre']) ?>" required>
-            </div>
-            <div class="col-md-4 mb-3">
-                <label for="apellido" class="form-label">Apellido *</label>
-                <input type="text" class="form-control" name="apellido" id="apellido" value="<?= capitalize($cliente['apellido']) ?>" required>
-            </div>
-            <div class="col-md-4 mb-3">
                 <label for="dni" class="form-label">Documento</label>
                 <div class="input-group">
                     <?php
@@ -184,12 +184,28 @@ $offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
                     ?>
                     <select class="form-select" id="tipo_documento" name="tipo_documento" style="max-width: 180px;">
                         <option value="dni" <?= $tipoDocumento==='dni'?'selected':'' ?>>DNI</option>
+                        <option value="ruc" <?= $tipoDocumento==='ruc'?'selected':'' ?>>RUC</option>
                         <option value="carnet" <?= $tipoDocumento==='carnet'?'selected':'' ?>>Carnet de extranjería</option>
                         <option value="sin_dni" <?= $tipoDocumento==='sin_dni'?'selected':'' ?>>Sin DNI</option>
                     </select>
                     <input type="text" class="form-control" name="dni" id="dni" value="<?= $dniValue ?>" maxlength="20" pattern="[A-Za-z0-9]{6,20}">
                 </div>
                 <small id="dniHelp" class="form-text text-muted">Selecciona el tipo de documento y completa el campo.</small>
+                <small id="docLookupStatus" class="form-text"></small>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="nombre" class="form-label">Nombre *</label>
+                <input type="text" class="form-control" name="nombre" id="nombre" value="<?= capitalize($cliente['nombre']) ?>" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label for="apellido" class="form-label">Apellido *</label>
+                <input type="text" class="form-control" name="apellido" id="apellido" value="<?= capitalize($cliente['apellido']) ?>" required>
+            </div>
+            <div class="col-md-4 mb-3 d-none" id="razonSocialWrap">
+                <label for="razon_social" class="form-label">Razón Social</label>
+                <input type="text" class="form-control" name="razon_social" id="razon_social" value="<?= htmlspecialchars((string)($cliente['razon_social'] ?? '')) ?>" maxlength="255">
             </div>
             <div class="col-md-4 mb-3">
                 <label for="fecha_nacimiento" class="form-label">Fecha Nacimiento</label>
@@ -318,8 +334,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoDocumento = document.getElementById('tipo_documento');
     const dniInput = document.getElementById('dni');
     const dniHelp = document.getElementById('dniHelp');
+    const docLookupStatus = document.getElementById('docLookupStatus');
+    const razonSocialWrap = document.getElementById('razonSocialWrap');
+    const razonSocialInput = document.getElementById('razon_social');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+    const nombreInput = document.getElementById('nombre');
+    const apellidoInput = document.getElementById('apellido');
 
     let usuarioTocoDocumento = false;
     let lastAutoPassword = '';
@@ -349,6 +370,131 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function setLookupStatus(msg, type) {
+        if (!docLookupStatus) return;
+        docLookupStatus.textContent = msg || '';
+        docLookupStatus.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+        if (!msg) return;
+        if (type === 'success') {
+            docLookupStatus.classList.add('text-success');
+        } else if (type === 'error') {
+            docLookupStatus.classList.add('text-danger');
+        } else if (type === 'warning') {
+            docLookupStatus.classList.add('text-warning');
+        } else {
+            docLookupStatus.classList.add('text-muted');
+        }
+    }
+
+    function showRazonSocial(enable) {
+        if (!razonSocialWrap) return;
+        razonSocialWrap.classList.toggle('d-none', !enable);
+        if (razonSocialInput) {
+            razonSocialInput.required = !!enable;
+        }
+        if (apellidoInput) {
+            if (enable && (apellidoInput.value || '').trim() === '') {
+                apellidoInput.value = '-';
+            }
+        }
+    }
+
+    function titleCase(text) {
+        return String(text || '')
+            .toLowerCase()
+            .replace(/\b\w/g, function (m) { return m.toUpperCase(); })
+            .trim();
+    }
+
+    function applyLookupData(result) {
+        if (!result || !result.data) return;
+        const data = result.data;
+        if (data.tipo_documento === 'ruc') {
+            showRazonSocial(true);
+            const razon = (data.razon_social || '').toString().trim();
+            if (razonSocialInput && razon) {
+                razonSocialInput.value = titleCase(razon);
+            }
+            if (nombreInput && razon && (nombreInput.value || '').trim() === '') {
+                nombreInput.value = titleCase(razon);
+            }
+            if (apellidoInput && (apellidoInput.value || '').trim() === '') {
+                apellidoInput.value = '-';
+            }
+        } else {
+            const nombres = (data.nombres || '').toString().trim();
+            const apPat = (data.apellido_paterno || '').toString().trim();
+            const apMat = (data.apellido_materno || '').toString().trim();
+            if (nombreInput && nombres && (nombreInput.value || '').trim() === '') {
+                nombreInput.value = titleCase(nombres);
+            }
+            const ape = (apPat + ' ' + apMat).trim();
+            if (apellidoInput && ape && ((apellidoInput.value || '').trim() === '' || (apellidoInput.value || '').trim() === '-')) {
+                apellidoInput.value = titleCase(ape);
+            }
+            if (razonSocialInput && !razonSocialInput.value) {
+                razonSocialInput.value = '';
+            }
+        }
+
+        if (data.direccion && document.getElementById('direccion') && !document.getElementById('direccion').value) {
+            document.getElementById('direccion').value = titleCase(data.direccion);
+        }
+        if (data.telefono && document.getElementById('telefono') && !document.getElementById('telefono').value) {
+            document.getElementById('telefono').value = data.telefono;
+        }
+    }
+
+    let lastLookupDoc = '';
+    async function lookupDocumento() {
+        const tipo = tipoDocumento ? tipoDocumento.value : '';
+        const raw = (dniInput?.value || '').trim();
+        const doc = raw.replace(/\D+/g, '');
+
+        if (tipo !== 'dni' && tipo !== 'ruc') {
+            setLookupStatus('', 'muted');
+            return;
+        }
+        if ((tipo === 'dni' && doc.length !== 8) || (tipo === 'ruc' && doc.length !== 11)) {
+            setLookupStatus('', 'muted');
+            return;
+        }
+        if (lastLookupDoc === (tipo + ':' + doc)) {
+            return;
+        }
+
+        setLookupStatus('Consultando documento...', 'muted');
+
+        try {
+            const resp = await fetch('dashboard.php?action=consultar_documento_identidad&scope=cliente&documento=' + encodeURIComponent(doc), {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const result = await resp.json();
+
+            if (result && result.ok) {
+                lastLookupDoc = tipo + ':' + doc;
+                applyLookupData(result);
+                if (result.status === 'encontrado_bd') {
+                    setLookupStatus('Documento encontrado en base local.', 'success');
+                } else {
+                    setLookupStatus('Documento encontrado en APISPERU.', 'success');
+                }
+                return;
+            }
+
+            if (result && result.status === 'no_encontrado') {
+                setLookupStatus('No se encontro informacion para este documento.', 'warning');
+                return;
+            }
+
+            setLookupStatus((result && result.message) ? result.message : 'No se pudo consultar el documento.', 'error');
+        } catch (error) {
+            setLookupStatus('Error de red al consultar documento.', 'error');
+        }
+    }
+
     if (tipoDocumento && dniInput) {
         tipoDocumento.addEventListener('change', function() {
             usuarioTocoDocumento = true;
@@ -362,18 +508,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 dniInput.setAttribute('maxlength', '8');
                 dniInput.setAttribute('pattern', '[0-9]{8}');
                 dniHelp.textContent = 'Se generó un número provisional de 8 dígitos.';
+                showRazonSocial(false);
             } else if (this.value === 'dni') {
                 dniInput.removeAttribute('readonly');
                 dniInput.setAttribute('maxlength', '8');
                 dniInput.setAttribute('pattern', '[0-9]{8}');
                 dniHelp.textContent = 'Ingrese el DNI (8 dígitos numéricos).';
+                showRazonSocial(false);
+            } else if (this.value === 'ruc') {
+                dniInput.removeAttribute('readonly');
+                dniInput.setAttribute('maxlength', '11');
+                dniInput.setAttribute('pattern', '[0-9]{11}');
+                dniHelp.textContent = 'Ingrese el RUC (11 dígitos numéricos).';
+                showRazonSocial(true);
             } else if (this.value === 'carnet') {
                 dniInput.removeAttribute('readonly');
                 dniInput.setAttribute('maxlength', '20');
                 dniInput.setAttribute('pattern', '[A-Za-z0-9]{6,20}');
                 dniHelp.textContent = 'Ingrese el número de carnet (6 a 20 caracteres alfanuméricos).';
+                showRazonSocial(false);
             }
 
+            lastLookupDoc = '';
+            setLookupStatus('', 'muted');
             actualizarCredenciales();
         });
         // Inicializar según valor actual, sin borrar el valor existente
@@ -382,7 +539,15 @@ document.addEventListener('DOMContentLoaded', function() {
         dniInput.addEventListener('input', function() {
             usuarioTocoDocumento = true;
             actualizarCredenciales();
+            setLookupStatus('', 'muted');
+            lastLookupDoc = '';
         });
+
+        dniInput.addEventListener('blur', function() {
+            lookupDocumento();
+        });
+
+        showRazonSocial(tipoDocumento.value === 'ruc');
     }
 
     // Calcular edad automáticamente al seleccionar fecha de nacimiento

@@ -73,6 +73,7 @@ if ($dominioEmpresa === '') {
                 <small class="text-muted d-block mt-1">
                     El email y la contraseña se generan automáticamente según el RUC.
                 </small>
+                <small id="rucLookupStatus" class="form-text"></small>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="razon_social" class="form-label">Razón Social *</label>
@@ -156,6 +157,10 @@ if ($dominioEmpresa === '') {
     const $sinRuc = document.getElementById('sin_ruc');
     const $email = document.getElementById('email');
     const $password = document.getElementById('password');
+    const $razonSocial = document.getElementById('razon_social');
+    const $nombreComercial = document.getElementById('nombre_comercial');
+    const $direccion = document.getElementById('direccion');
+    const $status = document.getElementById('rucLookupStatus');
 
     if (!$ruc || !$sinRuc || !$email || !$password) return;
 
@@ -182,6 +187,84 @@ if ($dominioEmpresa === '') {
         }
     }
 
+    function setLookupStatus(msg, type) {
+        if (!$status) return;
+        $status.textContent = msg || '';
+        $status.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+        if (!msg) return;
+        if (type === 'success') {
+            $status.classList.add('text-success');
+        } else if (type === 'error') {
+            $status.classList.add('text-danger');
+        } else if (type === 'warning') {
+            $status.classList.add('text-warning');
+        } else {
+            $status.classList.add('text-muted');
+        }
+    }
+
+    function titleCase(text) {
+        return String(text || '')
+            .toLowerCase()
+            .replace(/\b\w/g, function (m) { return m.toUpperCase(); })
+            .trim();
+    }
+
+    let lastLookupRuc = '';
+    async function lookupRuc() {
+        if ($sinRuc.checked) {
+            return;
+        }
+        const ruc = cleanDigits($ruc.value);
+        if (ruc.length !== 11) {
+            setLookupStatus('', 'muted');
+            return;
+        }
+        if (lastLookupRuc === ruc) {
+            return;
+        }
+
+        setLookupStatus('Consultando RUC...', 'muted');
+        try {
+            const resp = await fetch('dashboard.php?action=consultar_documento_identidad&scope=empresa&documento=' + encodeURIComponent(ruc), {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const result = await resp.json();
+
+            if (result && result.ok && result.data) {
+                lastLookupRuc = ruc;
+                const data = result.data;
+                if ($razonSocial && data.razon_social && !$razonSocial.value) {
+                    $razonSocial.value = titleCase(data.razon_social);
+                }
+                if ($nombreComercial && data.nombre_comercial && !$nombreComercial.value) {
+                    $nombreComercial.value = titleCase(data.nombre_comercial);
+                }
+                if ($direccion && data.direccion && !$direccion.value) {
+                    $direccion.value = titleCase(data.direccion);
+                }
+
+                if (result.status === 'encontrado_bd') {
+                    setLookupStatus('RUC encontrado en base local.', 'success');
+                } else {
+                    setLookupStatus('RUC encontrado en APISPERU.', 'success');
+                }
+                return;
+            }
+
+            if (result && result.status === 'no_encontrado') {
+                setLookupStatus('No se encontro informacion para este RUC.', 'warning');
+                return;
+            }
+
+            setLookupStatus((result && result.message) ? result.message : 'No se pudo consultar el RUC.', 'error');
+        } catch (error) {
+            setLookupStatus('Error de red al consultar RUC.', 'error');
+        }
+    }
+
     function onToggleSinRuc() {
         const enabled = $sinRuc.checked;
         if (enabled) {
@@ -196,7 +279,13 @@ if ($dominioEmpresa === '') {
 
     $ruc.addEventListener('input', function () {
         if ($ruc.readOnly) return;
+        lastLookupRuc = '';
+        setLookupStatus('', 'muted');
         syncCredencialesFromRuc();
+    });
+
+    $ruc.addEventListener('blur', function () {
+        lookupRuc();
     });
 
     $sinRuc.addEventListener('change', onToggleSinRuc);

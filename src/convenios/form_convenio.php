@@ -60,7 +60,7 @@ function capitalizar($texto) {
                 value="<?= htmlspecialchars(capitalizar($convenio['nombre'] ?? '')) ?>">
         </div>
         <div class="mb-3">
-            <label for="dni" class="form-label">DNI *</label>
+            <label for="dni" class="form-label">Documento (DNI/RUC) *</label>
             <input type="text" class="form-control" id="dni" name="dni" required
                 value="<?= htmlspecialchars($convenio['dni'] ?? '') ?>">
             <div class="form-check mt-2">
@@ -70,8 +70,9 @@ function capitalizar($texto) {
                 </label>
             </div>
             <small class="text-muted d-block mt-1">
-                El email y la contraseña se generan automáticamente según el DNI.
+                El email y la contraseña se generan automáticamente según el documento.
             </small>
+            <small id="docLookupStatusConvenio" class="form-text"></small>
         </div>
         <div class="mb-3">
             <label for="especialidad" class="form-label">Especialidad</label>
@@ -115,6 +116,9 @@ function capitalizar($texto) {
     const $sinDni = document.getElementById('sin_dni');
     const $email = document.getElementById('email');
     const $password = document.getElementById('password');
+    const $nombre = document.getElementById('nombre');
+    const $descripcion = document.getElementById('descripcion');
+    const $status = document.getElementById('docLookupStatusConvenio');
 
     if (!$dni || !$sinDni || !$email || !$password) return;
 
@@ -143,6 +147,93 @@ function capitalizar($texto) {
         }
     }
 
+    function setLookupStatus(msg, type) {
+        if (!$status) return;
+        $status.textContent = msg || '';
+        $status.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+        if (!msg) return;
+        if (type === 'success') {
+            $status.classList.add('text-success');
+        } else if (type === 'error') {
+            $status.classList.add('text-danger');
+        } else if (type === 'warning') {
+            $status.classList.add('text-warning');
+        } else {
+            $status.classList.add('text-muted');
+        }
+    }
+
+    function titleCase(text) {
+        return String(text || '')
+            .toLowerCase()
+            .replace(/\b\w/g, function (m) { return m.toUpperCase(); })
+            .trim();
+    }
+
+    let lastLookupDoc = '';
+    async function lookupDocumento() {
+        if ($sinDni.checked) {
+            return;
+        }
+
+        const doc = cleanDigits($dni.value);
+        if (doc.length !== 8 && doc.length !== 11) {
+            setLookupStatus('', 'muted');
+            return;
+        }
+        if (lastLookupDoc === doc) {
+            return;
+        }
+
+        setLookupStatus('Consultando documento...', 'muted');
+        try {
+            const resp = await fetch('dashboard.php?action=consultar_documento_identidad&scope=convenio&documento=' + encodeURIComponent(doc), {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            const result = await resp.json();
+
+            if (result && result.ok && result.data) {
+                lastLookupDoc = doc;
+                const data = result.data;
+                if (doc.length === 8) {
+                    const nombres = (data.nombres || '').toString().trim();
+                    const apPat = (data.apellido_paterno || '').toString().trim();
+                    const apMat = (data.apellido_materno || '').toString().trim();
+                    const nombreCompleto = (nombres + ' ' + apPat + ' ' + apMat).trim();
+                    if ($nombre && nombreCompleto && !$nombre.value) {
+                        $nombre.value = titleCase(nombreCompleto);
+                    }
+                } else if (doc.length === 11) {
+                    const razon = (data.razon_social || '').toString().trim();
+                    if ($nombre && razon && !$nombre.value) {
+                        $nombre.value = titleCase(razon);
+                    }
+                    if ($descripcion && data.direccion && !$descripcion.value) {
+                        $descripcion.value = titleCase(data.direccion);
+                    }
+                }
+
+                if (result.status === 'encontrado_bd') {
+                    setLookupStatus('Documento encontrado en base local.', 'success');
+                } else {
+                    setLookupStatus('Documento encontrado en APISPERU.', 'success');
+                }
+                return;
+            }
+
+            if (result && result.status === 'no_encontrado') {
+                setLookupStatus('No se encontro informacion para este documento.', 'warning');
+                return;
+            }
+
+            setLookupStatus((result && result.message) ? result.message : 'No se pudo consultar el documento.', 'error');
+        } catch (error) {
+            setLookupStatus('Error de red al consultar documento.', 'error');
+        }
+    }
+
     function onToggleSinDni() {
         const enabled = $sinDni.checked;
         if (enabled) {
@@ -158,7 +249,13 @@ function capitalizar($texto) {
 
     $dni.addEventListener('input', function () {
         if ($dni.readOnly) return;
+        lastLookupDoc = '';
+        setLookupStatus('', 'muted');
         syncCredencialesFromDni();
+    });
+
+    $dni.addEventListener('blur', function () {
+        lookupDocumento();
     });
 
     $sinDni.addEventListener('change', onToggleSinDni);

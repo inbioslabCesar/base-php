@@ -17,6 +17,7 @@ function cliente_crear_json_response(int $statusCode, array $payload): void {
 $codigo_cliente    = trim($_POST['codigo_cliente'] ?? '');
 $nombre            = trim($_POST['nombre'] ?? '');
 $apellido          = trim($_POST['apellido'] ?? '');
+$razon_social      = trim($_POST['razon_social'] ?? '');
 $dni               = trim($_POST['dni'] ?? '');
 $tipo_documento    = $_POST['tipo_documento'] ?? 'dni';
 $edad_valor        = trim($_POST['edad_valor'] ?? '');
@@ -54,6 +55,18 @@ function normalizarDominioEmpresa(string $dominio): string {
     $dominio = preg_replace('#:\\d+$#', '', $dominio);
     $dominio = preg_replace('#^www\\.#i', '', $dominio);
     return strtolower(trim($dominio));
+}
+
+function cliente_has_column(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM clientes LIKE ?');
+    $stmt->execute([$column]);
+    $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$column];
 }
 
 // Nuevos campos para empresa/convenio y tipo_registro
@@ -102,6 +115,50 @@ if ($tipo_documento === 'sin_dni') {
         header('Location: ../dashboard.php?vista=form_cliente');
         exit;
     }
+
+    $docDigits = preg_replace('/\D+/', '', $dni) ?? '';
+    if ($tipo_documento === 'dni') {
+        if (strlen($docDigits) !== 8) {
+            if ($expectsJson) {
+                cliente_crear_json_response(422, ['ok' => false, 'message' => 'DNI invalido: debe tener 8 digitos']);
+            }
+            $_SESSION['msg'] = 'DNI invalido: debe tener 8 digitos.';
+            header('Location: ../dashboard.php?vista=form_cliente');
+            exit;
+        }
+        $dni = $docDigits;
+    } elseif ($tipo_documento === 'ruc') {
+        if (strlen($docDigits) !== 11) {
+            if ($expectsJson) {
+                cliente_crear_json_response(422, ['ok' => false, 'message' => 'RUC invalido: debe tener 11 digitos']);
+            }
+            $_SESSION['msg'] = 'RUC invalido: debe tener 11 digitos.';
+            header('Location: ../dashboard.php?vista=form_cliente');
+            exit;
+        }
+        $dni = $docDigits;
+    } elseif ($tipo_documento === 'carnet') {
+        if (!preg_match('/^[A-Za-z0-9]{6,20}$/', $dni)) {
+            if ($expectsJson) {
+                cliente_crear_json_response(422, ['ok' => false, 'message' => 'Carnet invalido: 6 a 20 caracteres alfanumericos']);
+            }
+            $_SESSION['msg'] = 'Carnet invalido: 6 a 20 caracteres alfanumericos.';
+            header('Location: ../dashboard.php?vista=form_cliente');
+            exit;
+        }
+    }
+}
+
+if ($tipo_documento === 'ruc') {
+    if ($razon_social === '' && $nombre !== '') {
+        $razon_social = $nombre . ($apellido !== '' ? (' ' . $apellido) : '');
+    }
+    if ($nombre === '' && $razon_social !== '') {
+        $nombre = $razon_social;
+    }
+    if ($apellido === '') {
+        $apellido = '-';
+    }
 }
 
 // Dominio empresa para email
@@ -120,7 +177,7 @@ if (!$password) {
     $password = $dni;
 }
 
-if (!$codigo_cliente || !$nombre || !$apellido || !$email || !$password) {
+if (!$codigo_cliente || !$nombre || !$email || !$password) {
     if ($expectsJson) {
         cliente_crear_json_response(422, ['ok' => false, 'message' => 'Faltan campos obligatorios']);
     }
@@ -198,12 +255,12 @@ try {
         exit;
     }
 
-    $stmt = $pdo->prepare(
-        "INSERT INTO clientes 
-        (codigo_cliente, nombre, apellido, dni, tipo_documento, edad, email, password, telefono, direccion, sexo, fecha_nacimiento, estado, descuento, procedencia, rol_creador, empresa_nombre, convenio_nombre, tipo_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    );
-    $stmt->execute([
+    $cols = [
+        'codigo_cliente', 'nombre', 'apellido', 'dni', 'tipo_documento', 'edad', 'email', 'password', 'telefono',
+        'direccion', 'sexo', 'fecha_nacimiento', 'estado', 'descuento', 'procedencia', 'rol_creador',
+        'empresa_nombre', 'convenio_nombre', 'tipo_registro'
+    ];
+    $vals = [
         $codigo_cliente,
         capitalize($nombre),
         capitalize($apellido),
@@ -223,7 +280,18 @@ try {
         $empresa_nombre,
         $convenio_nombre,
         $tipo_registro
-    ]);
+    ];
+
+    if (cliente_has_column($pdo, 'razon_social')) {
+        $cols[] = 'razon_social';
+        $vals[] = $razon_social !== '' ? mb_convert_case($razon_social, MB_CASE_TITLE, 'UTF-8') : null;
+    }
+
+    $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+    $stmt = $pdo->prepare(
+        'INSERT INTO clientes (' . implode(', ', $cols) . ') VALUES (' . $placeholders . ')'
+    );
+    $stmt->execute($vals);
 
     $id_cliente_nuevo = $pdo->lastInsertId();
 

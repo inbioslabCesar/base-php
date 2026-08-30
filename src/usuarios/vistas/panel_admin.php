@@ -49,7 +49,7 @@ $esModoSisPanelAdmin = !empty($operacionPanelAdmin['es_sis']);
             <form method="get" action="dashboard.php" class="row g-3 align-items-end">
                 <input type="hidden" name="vista" value="buscar_paciente">
                 <div class="col-md-6">
-                    <input type="text" name="busqueda_paciente" class="form-control form-control-lg" placeholder="DNI, código, nombre o apellido" required>
+                    <input type="text" name="busqueda_paciente" class="form-control form-control-lg" placeholder="DNI, RUC, código, nombre o apellido" required>
                 </div>
                 <div class="col-md-3">
                     <button type="submit" class="btn btn-primary btn-lg w-100">

@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
 <div class="container mt-4">
     <h4>Buscar Cliente</h4>
     <form method="POST" action="dashboard.php?action=buscar_cliente_accion">
-        <label for="dni">DNI del cliente:</label>
+        <label for="dni">Documento del cliente (DNI/RUC):</label>
         <input type="text" name="dni" id="dni" class="form-control d-inline w-auto" required>
         <button type="submit" class="btn btn-primary">Buscar</button>
     </form>
@@ -48,6 +48,35 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
                 <a href="dashboard.php?vista=form_cliente&dni=<?= urlencode($_SESSION['dni_buscado']) ?>">Registrar cliente</a>
             <?php endif; ?>
         </div>
-        <?php unset($_SESSION['cliente_no_encontrado'], $_SESSION['dni_buscado']); ?>
+        <?php if (isset($_SESSION['cliente_api_sugerido']) && is_array($_SESSION['cliente_api_sugerido'])):
+            $sugerido = $_SESSION['cliente_api_sugerido'];
+            $doc = (string)($sugerido['documento'] ?? ($_SESSION['dni_buscado'] ?? ''));
+            $tipo = (string)($sugerido['tipo_documento'] ?? 'dni');
+            $nombre = '';
+            $apellido = '';
+            $razon = '';
+            if ($tipo === 'ruc') {
+                $razon = (string)($sugerido['razon_social'] ?? '');
+                $nombre = $razon;
+                $apellido = '-';
+            } else {
+                $nombre = (string)($sugerido['nombres'] ?? '');
+                $apellido = trim(((string)($sugerido['apellido_paterno'] ?? '')) . ' ' . ((string)($sugerido['apellido_materno'] ?? '')));
+            }
+            $direccion = (string)($sugerido['direccion'] ?? '');
+            $url = 'dashboard.php?vista=form_cliente'
+                . '&dni=' . urlencode($doc)
+                . '&tipo_documento=' . urlencode($tipo)
+                . '&nombre=' . urlencode($nombre)
+                . '&apellido=' . urlencode($apellido)
+                . '&razon_social=' . urlencode($razon)
+                . '&direccion=' . urlencode($direccion);
+        ?>
+            <div class="alert alert-info mt-2">
+                Se encontró información en APISPERU para el documento consultado.
+            </div>
+            <a href="<?= $url ?>" class="btn btn-success">Registrar con datos sugeridos</a>
+        <?php endif; ?>
+        <?php unset($_SESSION['cliente_no_encontrado'], $_SESSION['dni_buscado'], $_SESSION['cliente_api_sugerido']); ?>
     <?php endif; ?>
 </div>

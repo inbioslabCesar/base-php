@@ -1,0 +1,4 @@
+laboratorio,host,puerto,base_datos,responsable,ventana_cambio,estado,backup_archivo,backup_ok,migracion_ok,verificacion_tecnica_ok,verificacion_funcional_ok,rollback,fecha_inicio,fecha_fin,duracion_min,observacion
+LAB_01,host1,3306,bd_lab_01,pendiente,2026-09-01 22:00-23:00,pendiente,,no,no,no,no,no,,,,
+LAB_02,host2,3306,bd_lab_02,pendiente,2026-09-01 23:00-00:00,pendiente,,no,no,no,no,no,,,,
+LAB_03,host3,3306,bd_lab_03,pendiente,2026-09-02 00:00-01:00,pendiente,,no,no,no,no,no,,,,

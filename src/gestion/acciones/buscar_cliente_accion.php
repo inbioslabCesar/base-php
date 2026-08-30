@@ -1,16 +1,18 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../servicios/documento_lookup.php';
 
 $dni = trim($_POST['dni'] ?? '');
+$documento = documento_lookup_normalize($dni);
 $rol = $_SESSION['rol'] ?? '';
 $empresa_id = $_SESSION['empresa_id'] ?? null;
 $convenio_id = $_SESSION['convenio_id'] ?? null;
 
-if ($dni && $rol) {
+if ($documento !== '' && $rol) {
     // 1. Buscar cliente por DNI
     $stmt = $pdo->prepare("SELECT * FROM clientes WHERE dni = :dni");
-    $stmt->execute([':dni' => $dni]);
+    $stmt->execute([':dni' => $documento]);
     $cliente = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($cliente) {
@@ -34,8 +36,14 @@ if ($dni && $rol) {
         $_SESSION['cliente_para_asociar'] = $cliente;
     }
 } else {
+    $lookup = documento_lookup_consultar($pdo, 'cliente', $documento);
     $_SESSION['cliente_no_encontrado'] = true;
-    $_SESSION['dni_buscado'] = $dni;
+    $_SESSION['dni_buscado'] = $documento;
+    if (!empty($lookup['ok']) && ($lookup['status'] ?? '') === 'encontrado_api' && !empty($lookup['data'])) {
+        $_SESSION['cliente_api_sugerido'] = $lookup['data'];
+    } else {
+        unset($_SESSION['cliente_api_sugerido']);
+    }
 }
 
 }
