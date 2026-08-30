@@ -5,7 +5,8 @@ class FormView {
         $pdfDownloadUrl = 'resultados/descarga-pdf.php?cotizacion_id=' . urlencode((string)$cotizacion_id);
         $nombrePaciente = trim((string)($datos_paciente['nombre'] ?? '') . ' ' . (string)($datos_paciente['apellido'] ?? ''));
         $dniPaciente = trim((string)($datos_paciente['dni'] ?? ''));
-        $edadPaciente = trim((string)($datos_paciente['edad'] ?? ''));
+        $edadPaciente = trim((string)($datos_paciente['edad_texto'] ?? $datos_paciente['edad'] ?? ''));
+        $edadPacienteValor = trim((string)($datos_paciente['edad_valor'] ?? $datos_paciente['edad'] ?? ''));
         $sexoPaciente = trim((string)($datos_paciente['sexo'] ?? ''));
         ?>
         <div class="alert alert-info" style="border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.06);">
@@ -57,7 +58,7 @@ class FormView {
             <input type="hidden" name="cotizacion_id" value="<?= htmlspecialchars($cotizacion_id) ?>">
             <input type="hidden" name="stay_on_form" value="1">
             <input type="hidden" name="force_incomplete_save" id="forceIncompleteSave" value="0">
-            <input type="hidden" id="edad-paciente" value="<?= htmlspecialchars($datos_paciente['edad'] ?? '') ?>">
+            <input type="hidden" id="edad-paciente" value="<?= htmlspecialchars($edadPacienteValor) ?>">
             <input type="hidden" id="sexo-paciente" value="<?= htmlspecialchars($datos_paciente['sexo'] ?? '') ?>">
             <div class="results-progress-card mb-3" id="resultsProgressCard" aria-live="polite">
                 <div class="results-progress-card__top">

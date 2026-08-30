@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../resultados/servicios/EdadPacienteService.php';
 
 // Protección: si no es una solicitud POST válida, redirigir a la lista
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -154,6 +155,21 @@ function cotizacionesDetalleHasColumn(PDO $pdo, string $column): bool {
     } catch (Throwable $e) {
         return false;
     }
+}
+
+function clientesHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM clientes LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
 }
 
 function servicioTieneProfesionalesActivos(PDO $pdo, int $servicioId): bool {
@@ -643,6 +659,35 @@ if (!empty($_POST['id_cotizacion'])) {
         $sqlDel = "DELETE FROM resultados_examenes WHERE id_cotizacion = ? AND id_examen IN ($in)";
         $pdo->prepare($sqlDel)->execute(array_merge([$id_cotizacion], $examenes_eliminados));
     }
+    $fechaRefEdad = $fecha_update;
+    if (!$fechaRefEdad) {
+        $stmtFechaCot = $pdo->prepare("SELECT fecha FROM cotizaciones WHERE id = ? LIMIT 1");
+        $stmtFechaCot->execute([$id_cotizacion]);
+        $fechaRefEdad = (string)($stmtFechaCot->fetchColumn() ?: '');
+    }
+    if ($fechaRefEdad === '') {
+        date_default_timezone_set('America/Lima');
+        $fechaRefEdad = date('Y-m-d H:i:s');
+    }
+
+    $selectEdadReferidaValor = clientesHasColumn($pdo, 'edad_referida_valor')
+        ? 'edad_referida_valor'
+        : 'NULL AS edad_referida_valor';
+    $selectEdadReferidaFecha = clientesHasColumn($pdo, 'edad_referida_fecha')
+        ? 'edad_referida_fecha'
+        : 'NULL AS edad_referida_fecha';
+    $stmtEdadCliente = $pdo->prepare("SELECT fecha_nacimiento, edad, {$selectEdadReferidaValor}, {$selectEdadReferidaFecha} FROM clientes WHERE id = ? LIMIT 1");
+    $stmtEdadCliente->execute([(int)$id_cliente]);
+    $edadClienteRow = $stmtEdadCliente->fetch(PDO::FETCH_ASSOC) ?: [];
+    $edadSnapshot = EdadPacienteService::resolverEdadParaEvento(
+        $edadClienteRow['fecha_nacimiento'] ?? null,
+        $fechaRefEdad,
+        ($edadClienteRow['edad_referida_valor'] ?? null) !== null && (string)$edadClienteRow['edad_referida_valor'] !== ''
+            ? (string)$edadClienteRow['edad_referida_valor']
+            : ($edadClienteRow['edad'] ?? null),
+        $edadClienteRow['edad_referida_fecha'] ?? null
+    );
+
     // Insertar resultados vacíos solo para exámenes nuevos
     $hasSnapshotCol = false;
     try {
@@ -650,6 +695,16 @@ if (!empty($_POST['id_cotizacion'])) {
         $hasSnapshotCol = !empty($col);
     } catch (Exception $e) {
         $hasSnapshotCol = false;
+    }
+
+    $hasEdadValorCol = false;
+    $hasEdadTextoCol = false;
+    $hasFechaRefEdadCol = false;
+    try {
+        $hasEdadValorCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'edad_paciente_valor'")->fetch(PDO::FETCH_ASSOC);
+        $hasEdadTextoCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'edad_paciente_texto'")->fetch(PDO::FETCH_ASSOC);
+        $hasFechaRefEdadCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'fecha_ref_edad'")->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
     }
 
     $hasOrderCol = false;
@@ -668,30 +723,42 @@ if (!empty($_POST['id_cotizacion'])) {
     }
 
     foreach ($examenes_nuevos as $id_examen) {
+        $colsRes = ['id_examen', 'id_cliente', 'id_cotizacion', 'resultados', 'estado'];
+        $valsRes = ['?', '?', '?', '?', '?'];
+        $paramsRes = [$id_examen, $id_cliente, $id_cotizacion, '{}', 'pendiente'];
+
         if ($hasSnapshotCol) {
             $stmtAd = $pdo->prepare('SELECT adicional FROM examenes WHERE id = ?');
             $stmtAd->execute([$id_examen]);
             $adicional_snapshot = $stmtAd->fetchColumn();
-            if ($hasOrderCol) {
-                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado, orden_impresion) VALUES (?, ?, ?, '{}', ?, 'pendiente', ?)";
-                $stmtRes = $pdo->prepare($sql);
-                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot, $nextOrderPos]);
-            } else {
-                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
-                $stmtRes = $pdo->prepare($sql);
-                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
-            }
-        } else {
-            if ($hasOrderCol) {
-                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado, orden_impresion) VALUES (?, ?, ?, '{}', 'pendiente', ?)";
-                $stmtRes = $pdo->prepare($sql);
-                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $nextOrderPos]);
-            } else {
-                $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-                $stmtRes = $pdo->prepare($sql);
-                $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
-            }
+            $colsRes[] = 'adicional_snapshot';
+            $valsRes[] = '?';
+            $paramsRes[] = $adicional_snapshot;
         }
+        if ($hasEdadValorCol) {
+            $colsRes[] = 'edad_paciente_valor';
+            $valsRes[] = '?';
+            $paramsRes[] = $edadSnapshot['edad_valor'];
+        }
+        if ($hasEdadTextoCol) {
+            $colsRes[] = 'edad_paciente_texto';
+            $valsRes[] = '?';
+            $paramsRes[] = $edadSnapshot['edad_texto'];
+        }
+        if ($hasFechaRefEdadCol) {
+            $colsRes[] = 'fecha_ref_edad';
+            $valsRes[] = '?';
+            $paramsRes[] = $fechaRefEdad;
+        }
+        if ($hasOrderCol) {
+            $colsRes[] = 'orden_impresion';
+            $valsRes[] = '?';
+            $paramsRes[] = $nextOrderPos;
+        }
+
+        $sql = "INSERT INTO resultados_examenes (" . implode(', ', $colsRes) . ") VALUES (" . implode(', ', $valsRes) . ")";
+        $stmtRes = $pdo->prepare($sql);
+        $stmtRes->execute($paramsRes);
         if ($hasOrderCol) {
             $nextOrderPos++;
         }

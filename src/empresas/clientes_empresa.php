@@ -1,8 +1,25 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../resultados/servicios/EdadPacienteService.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+$formatearEdadCliente = static function (array $cliente): string {
+    date_default_timezone_set('America/Lima');
+    $edadResol = EdadPacienteService::resolverEdadParaEvento(
+        $cliente['fecha_nacimiento'] ?? null,
+        date('Y-m-d H:i:s'),
+        ($cliente['edad_referida_valor'] ?? null) !== null && (string)$cliente['edad_referida_valor'] !== ''
+            ? (string)$cliente['edad_referida_valor']
+            : ($cliente['edad'] ?? null),
+        $cliente['edad_referida_fecha'] ?? null
+    );
+    return EdadPacienteService::formatearEdadDetalladaDesdeValor(
+        (string)($edadResol['edad_valor'] ?? ''),
+        $edadResol['edad_texto'] ?? ($cliente['edad'] ?? '')
+    );
+};
 
 $id_empresa = $_SESSION['empresa_id'] ?? null;
 $rol = $_SESSION['rol'] ?? null;
@@ -48,7 +65,7 @@ $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
                             <td><?= htmlspecialchars((string)$cliente['nombre'] ?? '') ?></td>
                             <td><?= htmlspecialchars((string)$cliente['apellido'] ?? '') ?></td>
                             <td><?= htmlspecialchars((string)$cliente['dni'] ?? '') ?></td>
-                            <td><?= htmlspecialchars((string)$cliente['edad'] ?? '') ?></td>
+                            <td><?= htmlspecialchars($formatearEdadCliente($cliente)) ?></td>
                             <td><?= htmlspecialchars((string)$cliente['email'] ?? '') ?></td>
                             <td><?= htmlspecialchars((string)$cliente['telefono'] ?? '') ?></td>
                             <td>

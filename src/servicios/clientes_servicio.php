@@ -1,9 +1,41 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/funciones/servicios_schema.php';
+require_once __DIR__ . '/../resultados/servicios/EdadPacienteService.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+function clientes_servicio_has_column(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM clientes LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
+}
+
+$formatearEdadCliente = static function (array $cliente): string {
+    date_default_timezone_set('America/Lima');
+    $edadResol = EdadPacienteService::resolverEdadParaEvento(
+        $cliente['fecha_nacimiento'] ?? null,
+        date('Y-m-d H:i:s'),
+        ($cliente['edad_referida_valor'] ?? null) !== null && (string)$cliente['edad_referida_valor'] !== ''
+            ? (string)$cliente['edad_referida_valor']
+            : ($cliente['edad'] ?? null),
+        $cliente['edad_referida_fecha'] ?? null
+    );
+    return EdadPacienteService::formatearEdadDetalladaDesdeValor(
+        (string)($edadResol['edad_valor'] ?? ''),
+        $edadResol['edad_texto'] ?? ($cliente['edad'] ?? '')
+    );
+};
 
 try {
     servicios_asegurar_tabla($pdo);
@@ -20,7 +52,15 @@ if ($servicioId <= 0 || strtolower(trim((string)($_SESSION['rol'] ?? ''))) !== '
 
 $q = trim((string)($_GET['q'] ?? ''));
 
-$sql = "SELECT c.id, c.codigo_cliente, c.nombre, c.apellido, c.dni, c.edad, c.email, c.telefono
+$selectEdadReferidaValor = clientes_servicio_has_column($pdo, 'edad_referida_valor')
+    ? 'c.edad_referida_valor AS edad_referida_valor'
+    : 'NULL AS edad_referida_valor';
+$selectEdadReferidaFecha = clientes_servicio_has_column($pdo, 'edad_referida_fecha')
+    ? 'c.edad_referida_fecha AS edad_referida_fecha'
+    : 'NULL AS edad_referida_fecha';
+
+$sql = "SELECT c.id, c.codigo_cliente, c.nombre, c.apellido, c.dni, c.edad, c.fecha_nacimiento,
+               {$selectEdadReferidaValor}, {$selectEdadReferidaFecha}, c.email, c.telefono
         FROM servicio_cliente sc
         INNER JOIN clientes c ON c.id = sc.cliente_id
         WHERE sc.servicio_id = ?";
@@ -87,7 +127,7 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td><?= htmlspecialchars((string)($cliente['nombre'] ?? '')) ?></td>
                             <td><?= htmlspecialchars((string)($cliente['apellido'] ?? '')) ?></td>
                             <td><?= htmlspecialchars((string)($cliente['dni'] ?? '')) ?></td>
-                            <td><?= htmlspecialchars((string)($cliente['edad'] ?? '')) ?></td>
+                            <td><?= htmlspecialchars($formatearEdadCliente($cliente)) ?></td>
                             <td><?= htmlspecialchars((string)($cliente['email'] ?? '')) ?></td>
                             <td><?= htmlspecialchars((string)($cliente['telefono'] ?? '')) ?></td>
                         </tr>

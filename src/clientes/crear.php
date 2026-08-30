@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/../resultados/servicios/EdadPacienteService.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -192,7 +193,18 @@ function capitalize($string) {
 }
 
 try {
+    date_default_timezone_set('America/Lima');
     $pdo->beginTransaction();
+
+    $edadReferidaValor = null;
+    $edadReferidaFecha = null;
+    if (trim((string)$fecha_nacimiento) === '' && trim((string)$edad) !== '') {
+        $parsedEdad = EdadPacienteService::convertirEdadTextoADecimal($edad);
+        if ($parsedEdad !== null) {
+            $edadReferidaValor = number_format($parsedEdad, 6, '.', '');
+            $edadReferidaFecha = date('Y-m-d H:i:s');
+        }
+    }
 
     if ($operationId !== '') {
         $pdo->exec("CREATE TABLE IF NOT EXISTS clientes_sync_operaciones (
@@ -285,6 +297,15 @@ try {
     if (cliente_has_column($pdo, 'razon_social')) {
         $cols[] = 'razon_social';
         $vals[] = $razon_social !== '' ? mb_convert_case($razon_social, MB_CASE_TITLE, 'UTF-8') : null;
+    }
+
+    if (cliente_has_column($pdo, 'edad_referida_valor')) {
+        $cols[] = 'edad_referida_valor';
+        $vals[] = $edadReferidaValor;
+    }
+    if (cliente_has_column($pdo, 'edad_referida_fecha')) {
+        $cols[] = 'edad_referida_fecha';
+        $vals[] = $edadReferidaFecha;
     }
 
     $placeholders = implode(', ', array_fill(0, count($cols), '?'));

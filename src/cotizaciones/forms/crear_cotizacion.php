@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../../resultados/servicios/EdadPacienteService.php';
 
 // Protección: si la solicitud no es POST, redirigir a la vista de cotizaciones
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -134,6 +135,21 @@ function cotizacionesDetalleHasColumn(PDO $pdo, string $column): bool {
     } catch (Throwable $e) {
         return false;
     }
+}
+
+function clientesHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM clientes LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
 }
 
 function servicioTieneProfesionalesActivos(PDO $pdo, int $servicioId): bool {
@@ -488,10 +504,6 @@ foreach ($detalles as $detalle) {
         ]);
     }
 }
-foreach ($detalles as $detalle) {
-    $id_examen = $detalle['id_examen'];
-
-
 if ($servicio_id > 0) {
     try {
         $tablaServiciosExiste = (bool)$pdo->query("SHOW TABLES LIKE 'servicios'")->fetchColumn();
@@ -508,14 +520,45 @@ if ($servicio_id > 0) {
         // No interrumpir la cotizacion por fallo de asociacion a servicio.
     }
 }
-    // Snapshot del formato (adicional) para que el histórico no cambie si se edita el examen luego.
-    $hasSnapshotCol = false;
-    try {
-        $col = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'adicional_snapshot'")->fetch(PDO::FETCH_ASSOC);
-        $hasSnapshotCol = !empty($col);
-    } catch (Exception $e) {
-        $hasSnapshotCol = false;
-    }
+
+// Snapshot de edad al momento de crear la cotización: nuevos exámenes usan edad real actual,
+// el histórico ya emitido queda inmutable en su propia fila de resultados.
+$selectEdadReferidaValor = clientesHasColumn($pdo, 'edad_referida_valor')
+    ? 'edad_referida_valor'
+    : 'NULL AS edad_referida_valor';
+$selectEdadReferidaFecha = clientesHasColumn($pdo, 'edad_referida_fecha')
+    ? 'edad_referida_fecha'
+    : 'NULL AS edad_referida_fecha';
+$stmtEdadCliente = $pdo->prepare("SELECT fecha_nacimiento, edad, {$selectEdadReferidaValor}, {$selectEdadReferidaFecha} FROM clientes WHERE id = ? LIMIT 1");
+$stmtEdadCliente->execute([(int)$id_cliente]);
+$edadClienteRow = $stmtEdadCliente->fetch(PDO::FETCH_ASSOC) ?: [];
+$edadSnapshot = EdadPacienteService::resolverEdadParaEvento(
+    $edadClienteRow['fecha_nacimiento'] ?? null,
+    $fecha,
+    ($edadClienteRow['edad_referida_valor'] ?? null) !== null && (string)$edadClienteRow['edad_referida_valor'] !== ''
+        ? (string)$edadClienteRow['edad_referida_valor']
+        : ($edadClienteRow['edad'] ?? null),
+    $edadClienteRow['edad_referida_fecha'] ?? null
+);
+
+$hasSnapshotCol = false;
+$hasOrderCol = false;
+$hasEdadValorCol = false;
+$hasEdadTextoCol = false;
+$hasFechaRefEdadCol = false;
+try {
+    $hasSnapshotCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'adicional_snapshot'")->fetch(PDO::FETCH_ASSOC);
+    $hasOrderCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(PDO::FETCH_ASSOC);
+    $hasEdadValorCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'edad_paciente_valor'")->fetch(PDO::FETCH_ASSOC);
+    $hasEdadTextoCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'edad_paciente_texto'")->fetch(PDO::FETCH_ASSOC);
+    $hasFechaRefEdadCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'fecha_ref_edad'")->fetch(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+}
+
+$orderPos = 1;
+foreach ($detalles as $detalle) {
+    $id_examen = $detalle['id_examen'];
+
     $adicional_snapshot = null;
     if ($hasSnapshotCol) {
         $stmtAd = $pdo->prepare('SELECT adicional FROM examenes WHERE id = ?');
@@ -523,38 +566,39 @@ if ($servicio_id > 0) {
         $adicional_snapshot = $stmtAd->fetchColumn();
     }
 
-    static $hasOrderCol = null;
-    static $orderPos = 1;
-    if ($hasOrderCol === null) {
-        try {
-            $colOrder = $pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'orden_impresion'")->fetch(PDO::FETCH_ASSOC);
-            $hasOrderCol = !empty($colOrder);
-        } catch (Exception $e) {
-            $hasOrderCol = false;
-        }
-    }
+    $colsRes = ['id_examen', 'id_cliente', 'id_cotizacion', 'resultados', 'estado'];
+    $valsRes = ['?', '?', '?', '?', '?'];
+    $paramsRes = [$id_examen, $id_cliente, $id_cotizacion, '{}', 'pendiente'];
 
     if ($hasSnapshotCol) {
-        if ($hasOrderCol) {
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado, orden_impresion) VALUES (?, ?, ?, '{}', ?, 'pendiente', ?)";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot, $orderPos]);
-        } else {
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, adicional_snapshot, estado) VALUES (?, ?, ?, '{}', ?, 'pendiente')";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $adicional_snapshot]);
-        }
-    } else {
-        if ($hasOrderCol) {
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado, orden_impresion) VALUES (?, ?, ?, '{}', 'pendiente', ?)";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion, $orderPos]);
-        } else {
-            $sql = "INSERT INTO resultados_examenes (id_examen, id_cliente, id_cotizacion, resultados, estado) VALUES (?, ?, ?, '{}', 'pendiente')";
-            $stmtRes = $pdo->prepare($sql);
-            $stmtRes->execute([$id_examen, $id_cliente, $id_cotizacion]);
-        }
+        $colsRes[] = 'adicional_snapshot';
+        $valsRes[] = '?';
+        $paramsRes[] = $adicional_snapshot;
     }
+    if ($hasEdadValorCol) {
+        $colsRes[] = 'edad_paciente_valor';
+        $valsRes[] = '?';
+        $paramsRes[] = $edadSnapshot['edad_valor'];
+    }
+    if ($hasEdadTextoCol) {
+        $colsRes[] = 'edad_paciente_texto';
+        $valsRes[] = '?';
+        $paramsRes[] = $edadSnapshot['edad_texto'];
+    }
+    if ($hasFechaRefEdadCol) {
+        $colsRes[] = 'fecha_ref_edad';
+        $valsRes[] = '?';
+        $paramsRes[] = $fecha;
+    }
+    if ($hasOrderCol) {
+        $colsRes[] = 'orden_impresion';
+        $valsRes[] = '?';
+        $paramsRes[] = $orderPos;
+    }
+
+    $sql = "INSERT INTO resultados_examenes (" . implode(', ', $colsRes) . ") VALUES (" . implode(', ', $valsRes) . ")";
+    $stmtRes = $pdo->prepare($sql);
+    $stmtRes->execute($paramsRes);
     $orderPos++;
 }
 

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
 require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/servicios/EdadPacienteService.php';
 
 // Funciones para obtener datos de cotización, paciente, empresa y resultados
 function obtenerDatosCotizacion($pdo, $cotizacion_id) {
@@ -61,9 +62,11 @@ function obtenerResultadosExamenes($pdo, $cotizacion_id) {
         ? " ORDER BY COALESCE(re.orden_impresion, 2147483647), re.id"
         : " ORDER BY re.id";
 
-    $sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.tipo_documento, c.id AS cliente_id
+    $sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.fecha_nacimiento, c.sexo, c.codigo_cliente, c.dni, c.tipo_documento, c.id AS cliente_id,
+                   co.fecha AS cotizacion_fecha, co.fecha_toma AS cotizacion_fecha_toma
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
+        LEFT JOIN cotizaciones co ON co.id = re.id_cotizacion
         WHERE re.id_cotizacion = :cotizacion_id" . $orderSql;
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['cotizacion_id' => $cotizacion_id]);

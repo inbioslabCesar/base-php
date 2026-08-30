@@ -7,6 +7,7 @@ file_put_contents(__DIR__ . '/debug_tcpdf.txt', 'Se ejecutó reporte_tcpdf.php: 
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_once __DIR__ . '/../conexion/conexion.php'; // $pdo disponible
 require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/servicios/EdadPacienteService.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 ini_set('display_errors', 1);
@@ -20,9 +21,11 @@ if ($cotizacion_id <= 0) {
 }
 
 // 1. Consulta resultados y datos del cliente
-$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id
+$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.fecha_nacimiento, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id,
+           co.fecha AS cotizacion_fecha, co.fecha_toma AS cotizacion_fecha_toma
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
+    LEFT JOIN cotizaciones co ON co.id = re.id_cotizacion
         WHERE re.id_cotizacion = :cotizacion_id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute(['cotizacion_id' => $cotizacion_id]);
@@ -73,7 +76,38 @@ $firma_path = $resolverRutaEmpresaAbs($empresa['firma'] ?? '');
 
 // 4. Prepara los datos del paciente y empresa para el encabezado
 $paciente = $rows[0];
-$paciente_info = "Paciente: {$paciente['nombre']} {$paciente['apellido']}   DNI: {$paciente['dni']}   Edad: {$paciente['edad']}   Sexo: {$paciente['sexo']}";
+
+$fechaRefEdad = '';
+if (!empty($paciente['fecha_ref_edad'])) {
+    $fechaRefEdad = (string)$paciente['fecha_ref_edad'];
+} elseif (!empty($paciente['cotizacion_fecha_toma'])) {
+    $fechaRefEdad = trim((string)$paciente['cotizacion_fecha_toma']) . ' 00:00:00';
+} elseif (!empty($paciente['cotizacion_fecha'])) {
+    $fechaRefEdad = (string)$paciente['cotizacion_fecha'];
+} else {
+    $fechaRefEdad = (string)($paciente['fecha_ingreso'] ?? '');
+}
+
+$edadTextoSnapshot = trim((string)($paciente['edad_paciente_texto'] ?? ''));
+$edadValorSnapshot = trim((string)($paciente['edad_paciente_valor'] ?? ''));
+$edadResol = [
+    'edad_valor' => $edadValorSnapshot !== '' ? $edadValorSnapshot : null,
+    'edad_texto' => $edadTextoSnapshot,
+];
+if ($edadResol['edad_texto'] === '' || $edadResol['edad_valor'] === null || $edadResol['edad_valor'] === '') {
+    $edadResol = EdadPacienteService::resolverEdadParaEvento(
+        $paciente['fecha_nacimiento'] ?? null,
+        $fechaRefEdad,
+        $paciente['edad'] ?? null
+    );
+}
+
+$edadDisplay = EdadPacienteService::formatearEdadDetalladaDesdeValor(
+    (string)($edadResol['edad_valor'] ?? ''),
+    $edadResol['edad_texto'] ?? ($paciente['edad'] ?? '')
+);
+
+$paciente_info = "Paciente: {$paciente['nombre']} {$paciente['apellido']}   DNI: {$paciente['dni']}   Edad: {$edadDisplay}   Sexo: {$paciente['sexo']}";
 $empresa_info = "{$empresa['nombre']}\nDirección: {$empresa['direccion']}\nTel: {$empresa['telefono']} Cel: {$empresa['celular']}";
 // Clase personalizada para encabezado y pie de página
 class MYPDF extends TCPDF {

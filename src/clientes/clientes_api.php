@@ -4,6 +4,7 @@
 <?php
 // API para DataTables server-side: listado de clientes
 require_once __DIR__ . '/funciones/clientes_crud.php';
+require_once __DIR__ . '/../resultados/servicios/EdadPacienteService.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -36,6 +37,8 @@ if ($orderCol !== null && isset($columns[$orderCol])) {
 }
 
 try {
+    date_default_timezone_set('America/Lima');
+
     if ($search !== '') {
         $data = clientes_buscar($search, $orderBy, $orderDir, $start, $length);
         $totalFiltered = clientes_count($search);
@@ -44,6 +47,25 @@ try {
         $totalFiltered = clientes_count();
     }
     $totalRecords = clientes_count();
+
+    foreach ($data as &$row) {
+        $edadResol = EdadPacienteService::resolverEdadParaEvento(
+            $row['fecha_nacimiento'] ?? null,
+            date('Y-m-d H:i:s'),
+            ($row['edad_referida_valor'] ?? null) !== null && (string)$row['edad_referida_valor'] !== ''
+                ? (string)$row['edad_referida_valor']
+                : ($row['edad'] ?? null),
+            $row['edad_referida_fecha'] ?? null
+        );
+        $edadTexto = EdadPacienteService::formatearEdadDetalladaDesdeValor(
+            (string)($edadResol['edad_valor'] ?? ''),
+            $edadResol['edad_texto'] ?? ($row['edad'] ?? '')
+        );
+        $row['edad'] = $edadTexto;
+        $row['edad_display'] = $edadTexto;
+        $row['edad_valor'] = $edadResol['edad_valor'];
+    }
+    unset($row);
 
     // Modo debug opcional
     if (isset($_GET['debug']) && $_GET['debug'] == '1') {

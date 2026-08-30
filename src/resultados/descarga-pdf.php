@@ -74,11 +74,45 @@ if (!$rows || count($rows) === 0) {
     die('No se encontraron resultados para esta cotización.');
 }
 $primer_row = $rows[0];
+
+$fechaRefEdad = '';
+if (!empty($primer_row['fecha_ref_edad'])) {
+    $fechaRefEdad = (string)$primer_row['fecha_ref_edad'];
+} elseif (!empty($primer_row['cotizacion_fecha_toma'])) {
+    $fechaRefEdad = trim((string)$primer_row['cotizacion_fecha_toma']) . ' 00:00:00';
+} elseif (!empty($primer_row['cotizacion_fecha'])) {
+    $fechaRefEdad = (string)$primer_row['cotizacion_fecha'];
+} else {
+    $fechaRefEdad = (string)($primer_row['fecha_ingreso'] ?? '');
+}
+
+$edadTextoSnapshot = trim((string)($primer_row['edad_paciente_texto'] ?? ''));
+$edadValorSnapshot = trim((string)($primer_row['edad_paciente_valor'] ?? ''));
+$edadResol = [
+    'edad_valor' => $edadValorSnapshot !== '' ? $edadValorSnapshot : null,
+    'edad_texto' => $edadTextoSnapshot,
+];
+if ($edadResol['edad_texto'] === '' || $edadResol['edad_valor'] === null || $edadResol['edad_valor'] === '') {
+    $edadResol = EdadPacienteService::resolverEdadParaEvento(
+        $primer_row['fecha_nacimiento'] ?? null,
+        $fechaRefEdad,
+        $primer_row['edad'] ?? null
+    );
+}
+
+$edadValorPdf = (string)($edadResol['edad_valor'] ?? '');
+$edadTextoPdf = trim((string)($edadResol['edad_texto'] ?? ''));
+$edadHeaderPdf = EdadPacienteService::formatearEdadDetalladaDesdeValor(
+    $edadValorPdf,
+    $edadTextoPdf !== '' ? $edadTextoPdf : (string)($primer_row['edad'] ?? '')
+);
+
 $paciente = [
     "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
     "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
     "dni"            => ($primer_row['tipo_documento'] ?? '') === 'sin_dni' ? '--' : ($primer_row['dni'] ?? ""),
-    "edad"           => $primer_row['edad'],
+    "edad"           => ($edadValorPdf !== '' ? $edadValorPdf : null),
+    "edad_display"   => $edadHeaderPdf,
     "sexo"           => $primer_row['sexo'],
     "fecha"          => $primer_row['fecha_ingreso'],
     "id"             => $primer_row['cliente_id']
@@ -310,7 +344,7 @@ $headerHtml = '
     </table>
     <table class="datos-cliente-tabla" style="font-size:12px; line-height:1.2; margin:6px 0 10px 0;">
         <tr><td style="padding:1px 6px;"><strong>Paciente:</strong> ' . htmlspecialchars($paciente['nombre']) . '</td><td style="padding:1px 6px;"><strong>Código Paciente:</strong> ' . htmlspecialchars($paciente['codigo_cliente']) . '</td></tr>
-        <tr><td style="padding:1px 6px;"><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td><td style="padding:1px 6px;"><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td></tr>
+        <tr><td style="padding:1px 6px;"><strong>DNI:</strong> ' . htmlspecialchars($paciente['dni']) . '</td><td style="padding:1px 6px;"><strong>Edad:</strong> ' . htmlspecialchars($paciente['edad_display'] ?? $paciente['edad']) . '   <strong>Sexo:</strong> ' . htmlspecialchars($paciente['sexo']) . '</td></tr>
         ' . $profesionalHeaderHtml . '
         ' . $solicitanteHeaderHtml . '
         <tr><td colspan="2" style="padding:1px 6px;"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td></tr>

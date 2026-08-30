@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
 require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/servicios/EdadPacienteService.php';
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 if (!$cotizacion_id) {
@@ -34,9 +35,11 @@ if (!$cotizacion_id) {
 }
 
 // 1. Obtener todos los resultados de la cotización
-$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id
+$sql = "SELECT re.*, c.nombre, c.apellido, c.edad, c.fecha_nacimiento, c.sexo, c.codigo_cliente, c.dni, c.id AS cliente_id,
+           co.fecha AS cotizacion_fecha, co.fecha_toma AS cotizacion_fecha_toma
         FROM resultados_examenes re
         JOIN clientes c ON re.id_cliente = c.id
+    LEFT JOIN cotizaciones co ON co.id = re.id_cotizacion
         WHERE re.id_cotizacion = :cotizacion_id";
 $stmt = $pdo->prepare($sql);
 $stmt->execute(['cotizacion_id' => $cotizacion_id]);
@@ -67,11 +70,44 @@ if (!$rows || count($rows) === 0) {
 }
 // Tomar datos del paciente del primer examen
 $primer_row = $rows[0];
+
+$fechaRefEdad = '';
+if (!empty($primer_row['fecha_ref_edad'])) {
+    $fechaRefEdad = (string)$primer_row['fecha_ref_edad'];
+} elseif (!empty($primer_row['cotizacion_fecha_toma'])) {
+    $fechaRefEdad = trim((string)$primer_row['cotizacion_fecha_toma']) . ' 00:00:00';
+} elseif (!empty($primer_row['cotizacion_fecha'])) {
+    $fechaRefEdad = (string)$primer_row['cotizacion_fecha'];
+} else {
+    $fechaRefEdad = (string)($primer_row['fecha_ingreso'] ?? '');
+}
+
+$edadTextoSnapshot = trim((string)($primer_row['edad_paciente_texto'] ?? ''));
+$edadValorSnapshot = trim((string)($primer_row['edad_paciente_valor'] ?? ''));
+$edadResol = [
+    'edad_valor' => $edadValorSnapshot !== '' ? $edadValorSnapshot : null,
+    'edad_texto' => $edadTextoSnapshot,
+];
+if ($edadResol['edad_texto'] === '' || $edadResol['edad_valor'] === null || $edadResol['edad_valor'] === '') {
+    $edadResol = EdadPacienteService::resolverEdadParaEvento(
+        $primer_row['fecha_nacimiento'] ?? null,
+        $fechaRefEdad,
+        $primer_row['edad'] ?? null
+    );
+}
+
+$edadValorReporte = (string)($edadResol['edad_valor'] ?? '');
+$edadTextoReporte = EdadPacienteService::formatearEdadDetalladaDesdeValor(
+    $edadValorReporte,
+    $edadResol['edad_texto'] ?? ($primer_row['edad'] ?? '')
+);
+
 $paciente = [
     "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
     "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
     "dni"            => $primer_row['dni'] ?? "",
-    "edad"           => $primer_row['edad'],
+    "edad"           => ($edadValorReporte !== '' ? $edadValorReporte : null),
+    "edad_display"   => $edadTextoReporte,
     "sexo"           => $primer_row['sexo'],
     "fecha"          => $primer_row['fecha_ingreso'],
     "id"             => $primer_row['cliente_id']
