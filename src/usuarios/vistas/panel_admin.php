@@ -31,6 +31,11 @@
 </style>
 <?php
 require_once __DIR__ . '/../../config/config.php';
+
+$operacionPanelAdmin = function_exists('app_operacion_context') && isset($pdo) && $pdo instanceof PDO
+    ? app_operacion_context($pdo)
+    : ['es_sis' => false];
+$esModoSisPanelAdmin = !empty($operacionPanelAdmin['es_sis']);
 ?>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
@@ -64,60 +69,73 @@ require_once __DIR__ . '/../../config/config.php';
                 <!-- Encabezado destacado -->
                 <!-- Opciones en cards -->
                 <div class="row g-4">
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-building display-4 text-primary mb-2"></i>
-                                <h5 class="card-title mb-2">Vista Empresa</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=empresa" class="btn btn-gradient w-100">Ir</a>
+                    <?php if (!$esModoSisPanelAdmin): ?>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-building display-4 text-primary mb-2"></i>
+                                    <h5 class="card-title mb-2">Vista Empresa</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=empresa" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-eyeglasses display-4 text-warning mb-2"></i>
-                                <h5 class="card-title mb-2">Vista Laboratorista</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=laboratorista" class="btn btn-gradient w-100">Ir</a>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-eyeglasses display-4 text-warning mb-2"></i>
+                                    <h5 class="card-title mb-2">Vista Laboratorista</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=laboratorista" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-person-lines-fill display-4 text-success mb-2"></i>
-                                <h5 class="card-title mb-2">Vista Recepcionista</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-gradient w-100">Ir</a>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-person-lines-fill display-4 text-success mb-2"></i>
+                                    <h5 class="card-title mb-2">Vista Recepcionista</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=recepcionista" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-people display-4 text-info mb-2"></i>
-                                <h5 class="card-title mb-2">Vista Cliente</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=cliente" class="btn btn-gradient w-100">Ir</a>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-people display-4 text-info mb-2"></i>
+                                    <h5 class="card-title mb-2">Vista Cliente</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=cliente" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-cash-stack display-4 text-danger mb-2"></i>
-                                <h5 class="card-title mb-2">Contabilidad</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=contabilidad" class="btn btn-gradient w-100">Ir</a>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-cash-stack display-4 text-danger mb-2"></i>
+                                    <h5 class="card-title mb-2">Contabilidad</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=contabilidad" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-sm-6">
-                        <div class="card panel-card h-100 shadow-lg border-0">
-                            <div class="card-body text-center">
-                                <i class="bi bi-file-earmark-medical display-4 text-warning mb-2"></i>
-                                <h5 class="card-title mb-2">Vista Convenio</h5>
-                                <a href="<?= BASE_URL ?>dashboard.php?vista=convenio" class="btn btn-gradient w-100">Ir</a>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-file-earmark-medical display-4 text-warning mb-2"></i>
+                                    <h5 class="card-title mb-2">Vista Convenio</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=convenio" class="btn btn-gradient w-100">Ir</a>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
+                    <?php if ($esModoSisPanelAdmin): ?>
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card panel-card h-100 shadow-lg border-0">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-hospital display-4 text-info mb-2"></i>
+                                    <h5 class="card-title mb-2">Servicios</h5>
+                                    <a href="<?= BASE_URL ?>dashboard.php?vista=servicios" class="btn btn-gradient w-100">Ir</a>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                     <div class="col-md-3 col-sm-6">
                         <div class="card panel-card h-100 shadow-lg border-0">
                             <div class="card-body text-center">
@@ -128,24 +146,26 @@ require_once __DIR__ . '/../../config/config.php';
                         </div>
                     </div>
                     <?php if ($_SESSION['rol'] === 'admin'): ?>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card panel-card h-100 shadow-lg border-0">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-megaphone display-4 text-warning mb-2"></i>
-                                    <h5 class="card-title mb-2">Promociones</h5>
-                                    <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-gradient w-100">Ir</a>
+                        <?php if (!$esModoSisPanelAdmin): ?>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="card panel-card h-100 shadow-lg border-0">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-megaphone display-4 text-warning mb-2"></i>
+                                        <h5 class="card-title mb-2">Promociones</h5>
+                                        <a href="<?= BASE_URL ?>dashboard.php?vista=promociones" class="btn btn-gradient w-100">Ir</a>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card panel-card h-100 shadow-lg border-0">
-                                <div class="card-body text-center">
-                                    <i class="bi bi-clock-history display-4 text-warning mb-2"></i>
-                                    <h5 class="card-title mb-2">Pendientes de Toma</h5>
-                                    <a href="<?= BASE_URL ?>dashboard.php?vista=pendientes_toma" class="btn btn-gradient w-100">Ir</a>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="card panel-card h-100 shadow-lg border-0">
+                                    <div class="card-body text-center">
+                                        <i class="bi bi-clock-history display-4 text-warning mb-2"></i>
+                                        <h5 class="card-title mb-2">Pendientes de Toma</h5>
+                                        <a href="<?= BASE_URL ?>dashboard.php?vista=pendientes_toma" class="btn btn-gradient w-100">Ir</a>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        <?php endif; ?>
                         <div class="col-md-3 col-sm-6">
                             <div class="card panel-card h-100 shadow-lg border-0">
                                 <div class="card-body text-center">

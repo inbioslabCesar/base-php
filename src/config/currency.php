@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/ui_theme.php';
+
 if (!function_exists('currency_default_config')) {
     function currency_default_config(): array
     {
@@ -77,8 +79,7 @@ if (!function_exists('currency_get_config')) {
             }
 
             if ($pdo instanceof PDO) {
-                $stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
-                $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : null;
+                $row = ui_theme_fetch_company_config($pdo);
                 if (is_array($row)) {
                     $config = currency_normalize_config($row);
                 }

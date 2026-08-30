@@ -10,6 +10,7 @@ require_once __DIR__ . '/vistas/ExamCardView.php';
 require_once __DIR__ . '/vistas/PdfConfigView.php';
 require_once __DIR__ . '/vistas/AlertView.php';
 require_once __DIR__ . '/vistas/FormView.php';
+require_once __DIR__ . '/../usuarios/funciones/laboratorio_turnos.php';
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 // Inicializar variables
@@ -18,6 +19,14 @@ $examenes = [];
 $referencia_personalizada = '';
 $datos_paciente = [];
 $areas_disponibles = [];
+$turnoRequeridoSinAbrir = false;
+
+$rolActualFormulario = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$usuarioActualFormulario = (int)($_SESSION['usuario_id'] ?? 0);
+if ($rolActualFormulario === 'laboratorista' && $usuarioActualFormulario > 0) {
+    laboratorio_turnos_asegurar_esquema($pdo);
+    $turnoRequeridoSinAbrir = empty(laboratorio_turno_abierto_por_usuario($pdo, $usuarioActualFormulario));
+}
 
 if ($cotizacion_id) {
     $examenesService = new ExamenesService($pdo);
@@ -47,6 +56,9 @@ $v_formulario_css = @filemtime(__DIR__ . '/recursos/formulario.css') ?: time();
 </div>
 <div class="container mb-5">
     <?php
+    if ($turnoRequeridoSinAbrir) {
+        echo '<div class="alert alert-warning"><strong>Turno no abierto:</strong> abre tu turno desde el panel de laboratorista antes de guardar resultados.</div>';
+    }
     if (!empty($examenes)) {
         echo FormView::render($examenes, $cotizacion_id, $referencia_personalizada, $datos_paciente, $areas_disponibles);
     } else {
@@ -60,3 +72,15 @@ $v_validacion_js = @filemtime(__DIR__ . '/recursos/validacion-realtime.js') ?: t
 ?>
 <script src="<?= BASE_URL ?>resultados/recursos/formulario.js?v=<?= $v_formulario_js ?>"></script>
 <script src="<?= BASE_URL ?>resultados/recursos/validacion-realtime.js?v=<?= $v_validacion_js ?>"></script>
+<?php if ($turnoRequeridoSinAbrir): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-save-submit').forEach(function (btn) {
+        btn.disabled = true;
+        btn.title = 'Debes abrir turno para guardar resultados';
+        btn.style.opacity = '0.65';
+        btn.style.cursor = 'not-allowed';
+    });
+});
+</script>
+<?php endif; ?>

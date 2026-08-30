@@ -1,7 +1,17 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
-$stmt = $pdo->query("SELECT nombre, ruc, direccion, celular, telefono, logo, dominio FROM config_empresa LIMIT 1");
-$config = $stmt->fetch(PDO::FETCH_ASSOC);
+require_once __DIR__ . '/../config/ui_theme.php';
+
+$empresaCfg = ui_theme_fetch_company_config($pdo);
+$config = [
+    'nombre' => (string)($empresaCfg['nombre'] ?? ''),
+    'ruc' => (string)($empresaCfg['ruc'] ?? ''),
+    'direccion' => (string)($empresaCfg['direccion'] ?? ''),
+    'celular' => (string)($empresaCfg['celular'] ?? ''),
+    'telefono' => (string)($empresaCfg['telefono'] ?? ''),
+    'logo' => (string)($empresaCfg['logo'] ?? ''),
+    'dominio' => (string)($empresaCfg['dominio'] ?? ''),
+];
 
 // Si no hay datos, usa valores por defecto
 if (!$config) {

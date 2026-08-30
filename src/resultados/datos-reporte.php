@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
 if (!$cotizacion_id) {
@@ -369,11 +370,8 @@ foreach ($rows as $row) {
     $items = array_merge($items, $examen_items);
 }
 
-// Datos de la empresa
-$sql3 = "SELECT nombre, direccion, telefono, celular, logo, firma FROM config_empresa LIMIT 1";
-$stmt3 = $pdo->prepare($sql3);
-$stmt3->execute();
-$empresa = $stmt3->fetch(PDO::FETCH_ASSOC);
+// Datos de la empresa (multiempresa por dominio)
+$empresa = ui_theme_fetch_company_config($pdo);
 
 if (!$empresa) {
     $empresa = [

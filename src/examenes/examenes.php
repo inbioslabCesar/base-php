@@ -1,5 +1,23 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../usuarios/funciones/usuarios_privilegios.php';
+
+$privilegiosExamenes = isset($_SESSION['privilegios']) && is_array($_SESSION['privilegios'])
+    ? $_SESSION['privilegios']
+    : ((isset($pdo) && $pdo instanceof PDO) ? usuarios_privilegios_usuario_actual($pdo) : []);
+$puedeExamen = static function (string $clave) use ($privilegiosExamenes): bool {
+    return usuarios_tiene_privilegio($privilegiosExamenes, $clave);
+};
+$puedeCrearExamen = $puedeExamen('examenes_crear') || (($_SESSION['rol'] ?? '') === 'admin');
+$puedeEditarExamen = $puedeExamen('examenes_editar') || (($_SESSION['rol'] ?? '') === 'admin');
+$puedeEliminarExamen = $puedeExamen('examenes_eliminar') || (($_SESSION['rol'] ?? '') === 'admin');
+$rolActualExamenes = strtolower((string)($_SESSION['rol'] ?? ''));
+$volverPanelExamenes = match ($rolActualExamenes) {
+    'laboratorista' => 'dashboard.php?vista=laboratorista',
+    'admin' => 'dashboard.php?vista=admin',
+    'recepcionista' => 'dashboard.php?vista=recepcionista',
+    default => 'dashboard.php',
+};
 
 $stmt = $pdo->query("SELECT * FROM examenes WHERE vigente = 1 ORDER BY id ASC");
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -41,11 +59,16 @@ function capitalizar($texto)
     }
     </style>
     <div class="header-section mb-3">
-        <div class="p-3">
+        <div class="p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h3 class="mb-0 text-white text-3xl">Lista de Exámenes</h3>
+            <a href="<?= htmlspecialchars($volverPanelExamenes, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-light btn-sm shadow-sm">
+                <i class="fa fa-arrow-left me-1"></i> Volver al panel
+            </a>
         </div>
     </div>
-    <a href="dashboard.php?vista=form_examen" class="btn btn-primary mb-3">Agregar Examen</a>
+    <?php if ($puedeCrearExamen): ?>
+        <a href="dashboard.php?vista=form_examen" class="btn btn-primary mb-3">Agregar Examen</a>
+    <?php endif; ?>
     <div class="table-responsive">
         <table id="tabla-examenes" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
             <thead class="bg-indigo-600 text-white">
@@ -133,11 +156,10 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
         </div>
     </div>
     <?php
-    // Filtrar exámenes por nombre si hay búsqueda
     $examenes_filtrados = $examenes;
     if (!empty($_GET['busqueda'])) {
         $busqueda = mb_strtolower(trim($_GET['busqueda']));
-        $examenes_filtrados = array_filter($examenes, function($ex) use ($busqueda) {
+        $examenes_filtrados = array_filter($examenes, function ($ex) use ($busqueda) {
             return strpos(mb_strtolower($ex['nombre']), $busqueda) !== false;
         });
     }
@@ -163,12 +185,16 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                     <div class="col-6"><span class="fw-semibold text-primary">Precio Público:</span> <span class="text-dark">S/.<?= htmlspecialchars($examen['precio_publico'] ?? '') ?></span></div>
                 </div>
                 <div class="mt-3 d-flex gap-2">
-                    <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm" title="Editar">
-                        <i class="fa fa-edit"></i>
-                    </a>
-                    <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm enlace-eliminar-examen" data-id="<?= $examen['id'] ?>" title="Eliminar">
-                        <i class="fa fa-trash"></i>
-                    </a>
+                    <?php if ($puedeEditarExamen): ?>
+                        <a href="dashboard.php?vista=form_examen&id=<?= $examen['id'] ?>" class="btn btn-warning btn-sm" title="Editar">
+                            <i class="fa fa-edit"></i>
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($puedeEliminarExamen): ?>
+                        <a href="dashboard.php?action=eliminar_examen&id=<?= $examen['id'] ?>" class="btn btn-danger btn-sm enlace-eliminar-examen" data-id="<?= $examen['id'] ?>" title="Eliminar">
+                            <i class="fa fa-trash"></i>
+                        </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -368,6 +394,9 @@ document.addEventListener('click', async function (e) {
             dt.ajax.reload();
         }
 
+        const puedeEditarExamen = <?= json_encode($puedeEditarExamen) ?>;
+        const puedeEliminarExamen = <?= json_encode($puedeEliminarExamen) ?>;
+
         var tablaExamenes = $('#tabla-examenes').DataTable({
             serverSide: true,
             processing: true,
@@ -401,12 +430,14 @@ document.addEventListener('click', async function (e) {
                     data: null,
                     orderable: false,
                     render: function(data, type, row) {
-                        return `<a href="dashboard.php?vista=form_examen&id=${row.id}" class="btn btn-warning btn-sm" title="Editar">
-                                    <i class="fa fa-edit"></i>
-                                </a>
-                                <a href="dashboard.php?action=eliminar_examen&id=${row.id}" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm('¿Estás seguro de eliminar este examen?');">
-                                    <i class="fa fa-trash"></i>
-                                </a>`;
+                        let acciones = '';
+                        if (puedeEditarExamen) {
+                            acciones += '<a href="dashboard.php?vista=form_examen&id=' + row.id + '" class="btn btn-warning btn-sm" title="Editar"><i class="fa fa-edit"></i></a> ';
+                        }
+                        if (puedeEliminarExamen) {
+                            acciones += '<a href="dashboard.php?action=eliminar_examen&id=' + row.id + '" class="btn btn-danger btn-sm" title="Eliminar" onclick="return confirm(\'¿Estás seguro de eliminar este examen?\');"><i class="fa fa-trash"></i></a>';
+                        }
+                        return acciones.trim();
                     }
                 }
             ],

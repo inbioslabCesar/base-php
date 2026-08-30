@@ -1,5 +1,13 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/../config/operacion_context.php';
+require_once __DIR__ . '/funciones/usuarios_schema.php';
+require_once __DIR__ . '/funciones/usuarios_privilegios.php';
+
+usuarios_asegurar_columnas_profesional($pdo);
+$operacionForm = function_exists('app_operacion_context') ? app_operacion_context($pdo) : ['es_sis' => false];
+$esModoSisForm = !empty($operacionForm['es_sis']);
 
 $esEdicion = isset($_GET['id']);
 $usuario = [
@@ -13,6 +21,10 @@ $usuario = [
     'direccion' => '',
     'cargo' => '',
     'profesion' => '',
+    'colegiatura_numero' => '',
+    'ctmp_numero' => '',
+    'privilegios_json' => '',
+    'firma' => '',
     'rol' => '',
     'estado' => 'activo',
     'password' => ''
@@ -29,6 +41,13 @@ if ($esEdicion) {
         header('Location: dashboard.php?vista=usuarios');
         exit;
     }
+}
+
+$privilegiosFormulario = usuarios_privilegios_desde_json((string)($usuario['privilegios_json'] ?? ''), (string)($usuario['rol'] ?? ''), $esModoSisForm);
+$catalogoPrivilegios = usuarios_privilegios_catalogo($esModoSisForm);
+
+function usuarioCheckboxChecked(array $privilegios, string $clave): string {
+    return !empty($privilegios[$clave]) ? 'checked' : '';
 }
 
 function capitalizar($texto) {
@@ -49,17 +68,37 @@ function normalizarDominioEmpresa(string $dominio): string {
     return $dominio;
 }
 
-$stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
-$dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
+$empresaCfg = ui_theme_fetch_company_config($pdo);
+$dominioEmpresa = is_array($empresaCfg) ? (string)($empresaCfg['dominio'] ?? '') : '';
 $dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
 if ($dominioEmpresa === '') {
     $dominioEmpresa = 'ejemplo.com';
 }
+
+$resolverPreviewFirma = static function (string $storedPath): string {
+    $storedPath = trim($storedPath);
+    if ($storedPath === '') {
+        return '';
+    }
+    $normalized = str_replace('\\', '/', ltrim($storedPath, '/'));
+
+    // Las vistas viven bajo /src/, pero los assets se guardan en /uploads (raiz del proyecto).
+    if (strpos($normalized, '../uploads/') === 0) {
+        return BASE_URL . '../' . substr($normalized, 3);
+    }
+    if (strpos($normalized, 'uploads/') === 0) {
+        return BASE_URL . '../' . $normalized;
+    }
+
+    return BASE_URL . $normalized;
+};
+
+$firmaPreviewUrl = $resolverPreviewFirma((string)($usuario['firma'] ?? ''));
 ?>
 
 <div class="container mt-4">
     <h2><?= $esEdicion ? 'Editar Usuario' : 'Agregar Usuario' ?></h2>
-    <form method="post" action="dashboard.php?action=<?= $esEdicion ? 'editar_usuario&id=' . $_GET['id'] : 'crear_usuario' ?>">
+    <form method="post" enctype="multipart/form-data" action="dashboard.php?action=<?= $esEdicion ? 'editar_usuario&id=' . $_GET['id'] : 'crear_usuario' ?>">
         <div class="row">
             <div class="col-md-4 mb-3">
                 <label for="nombre" class="form-label">Nombre *</label>
@@ -152,6 +191,21 @@ if ($dominioEmpresa === '') {
         </div>
         <div class="row">
             <div class="col-md-4 mb-3">
+                <label for="colegiatura_numero" class="form-label">Numero de colegiatura</label>
+                <input type="text" class="form-control" id="colegiatura_numero" name="colegiatura_numero"
+                    value="<?= htmlspecialchars($usuario['colegiatura_numero'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Ejemplo: CMP 12345">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="ctmp_numero" class="form-label">C.T.M.P. (Tecnologo Medico)</label>
+                <input type="text" class="form-control" id="ctmp_numero" name="ctmp_numero"
+                    value="<?= htmlspecialchars($usuario['ctmp_numero'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                    placeholder="Ejemplo: CTMP 67890">
+                <small class="text-muted d-block mt-1">Completar cuando el profesional sea Tecnologo Medico.</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-3">
                 <label for="password" class="form-label"><?= $esEdicion ? 'Nueva Contraseña' : 'Contraseña *' ?></label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="password" name="password" <?= $esEdicion ? '' : 'required' ?>>
@@ -163,7 +217,45 @@ if ($dominioEmpresa === '') {
                     <small class="text-muted">Por defecto, la contraseña es el mismo DNI.</small>
                 <?php endif; ?>
             </div>
+            <div class="col-md-4 mb-3">
+                <label for="firma" class="form-label">Firma del profesional</label>
+                <input type="file" class="form-control" id="firma" name="firma" accept="image/png,image/jpeg,image/jpg,image/webp">
+                <small class="text-muted d-block mt-1">Sube solo la firma. El sello se genera automáticamente en el PDF.</small>
+                <?php if (!empty($firmaPreviewUrl)): ?>
+                    <div class="mt-2">
+                        <div class="small text-muted">Firma actual:</div>
+                        <img src="<?= htmlspecialchars($firmaPreviewUrl, ENT_QUOTES, 'UTF-8') ?>?v=<?= time() ?>" alt="Firma" style="max-height: 90px; border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 4px;">
+                        <?php if ($esEdicion): ?>
+                            <div class="form-check mt-2 text-start">
+                                <input class="form-check-input" type="checkbox" id="quitar_firma" name="quitar_firma" value="1">
+                                <label class="form-check-label" for="quitar_firma">Quitar firma actual</label>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
+        <?php if (($usuario['rol'] ?? '') === 'admin' || ($_SESSION['rol'] ?? '') === 'admin'): ?>
+            <div class="card mb-3 border-primary">
+                <div class="card-header bg-primary text-white">Privilegios del usuario</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <?php foreach ($catalogoPrivilegios as $clave => $meta): ?>
+                            <div class="col-md-4 col-lg-3">
+                                <div class="form-check">
+                                    <input type="hidden" name="privilegios[<?= htmlspecialchars($clave, ENT_QUOTES, 'UTF-8') ?>]" value="0">
+                                    <input class="form-check-input" type="checkbox" value="1" id="priv_<?= htmlspecialchars($clave, ENT_QUOTES, 'UTF-8') ?>" name="privilegios[<?= htmlspecialchars($clave, ENT_QUOTES, 'UTF-8') ?>]" <?= usuarioCheckboxChecked($privilegiosFormulario, $clave) ?>>
+                                    <label class="form-check-label" for="priv_<?= htmlspecialchars($clave, ENT_QUOTES, 'UTF-8') ?>">
+                                        <strong><?= htmlspecialchars($meta['label'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                        <small class="text-muted"><?= htmlspecialchars($meta['group'], ENT_QUOTES, 'UTF-8') ?></small>
+                                    </label>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
         <button type="submit" class="btn btn-success"><?= $esEdicion ? 'Actualizar' : 'Crear' ?></button>
         <a href="dashboard.php?vista=usuarios" class="btn btn-secondary">Cancelar</a>
     </form>

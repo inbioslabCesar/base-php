@@ -51,6 +51,7 @@ if (!is_file($currencyPath)) {
     exit;
 }
 require_once $currencyPath;
+require_once __DIR__ . '/../../config/ui_theme.php';
 
 set_exception_handler(function ($e) {
     pdf_cot_log('Excepción no controlada', [
@@ -137,9 +138,8 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id_cotizacion]);
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Traer datos de la empresa
-$stmtEmpresa = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
-$empresa = $stmtEmpresa->fetch(PDO::FETCH_ASSOC);
+// Traer datos de la empresa (multiempresa por dominio)
+$empresa = ui_theme_fetch_company_config($pdo);
 if (!is_array($empresa)) {
     $empresa = [
         'logo' => '../uploads/empresa/logo_empresa.png',

@@ -115,7 +115,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         . '.tabla-resultados th.unidades, .tabla-resultados td.unidades { width: 14%; }'
         . '.tabla-resultados th.referencia, .tabla-resultados td.referencia { width: 26%; }'
         . '.referencia-list { margin: 0; padding-left: 16px; font-size: 0.97em; color: #1f2f49; }'
-        . '.firma-footer { text-align: right; margin-top: 45px; }'
+        . '.firma-footer { margin-top: 45px; }'
         . '.subtitulo { background: #e9f0fc !important; color: #1a237e !important; font-weight: bold !important; border-radius: 6px; }';
 
     // Generar código QR con datos clave
@@ -135,10 +135,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     } catch (\Exception $e) {}
 
     // Inicializar $html para el contenido principal (sin cabecera)
-    $html = '';
-
-    // El titulo principal se imprime en el header repetido de mPDF para asegurar
-    // visibilidad en todas las paginas (incluida la segunda en adelante).
+    $html = '<div class="titulo-reporte" style="margin:2px 0 8px 0;">Reporte de Resultados</div>';
 
     $legacyTableOpen = false;
     $openLegacyTable = function () use (&$html, &$legacyTableOpen) {

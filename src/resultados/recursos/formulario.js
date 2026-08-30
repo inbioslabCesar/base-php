@@ -37,6 +37,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const orderInputsContainer = document.getElementById('examOrderInputs');
     const formGuardar = document.querySelector('form[action="dashboard.php?action=guardar"]');
     const forceIncompleteInput = document.getElementById('forceIncompleteSave');
+    const offlineEstadoEl = document.getElementById('resultadosOfflineEstado');
+    const syncNowBtn = document.getElementById('resultadosSyncNowBtn');
+    const verColaBtn = document.getElementById('resultadosVerColaBtn');
+    const limpiarErroresBtn = document.getElementById('resultadosLimpiarErroresBtn');
+    const incidenciaBtn = document.getElementById('resultadosIncidenciaBtn');
+    const colaDetalleEl = document.getElementById('resultadosColaDetalle');
     const actionsDock = document.getElementById('resultsActionsDock');
     const dockModeToggle = document.getElementById('resultsDockModeToggle');
     const dockModeStorageKey = 'resultados_actions_dock_mode';
@@ -46,6 +52,320 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultsProgressHint = document.getElementById('resultsProgressHint');
     const resultsProgressWrap = document.querySelector('#resultsProgressCard .results-progress-card__bar-wrap');
     const getActionProgressCircles = () => Array.from(document.querySelectorAll('.js-results-progress-circle'));
+    const RESULTADOS_DB_NAME = 'resultados_offline_db_v1';
+    const RESULTADOS_STORE_NAME = 'resultados_queue';
+    const INCIDENT_KEY = 'offline_sync_incidents_v1';
+
+    const showToast = (msg, type = 'success') => {
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            const icon = type === 'error' ? 'error' : (type === 'warning' ? 'warning' : 'success');
+            window.Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon,
+                title: String(msg || ''),
+                showConfirmButton: false,
+                timer: 3200,
+                timerProgressBar: true,
+            });
+            return;
+        }
+        alert(msg);
+    };
+
+    const createOperationId = () => {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return window.crypto.randomUUID();
+        }
+        return `res_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+    };
+
+    const openResultadosDb = () => {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(RESULTADOS_DB_NAME, 1);
+            req.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(RESULTADOS_STORE_NAME)) {
+                    const store = db.createObjectStore(RESULTADOS_STORE_NAME, { keyPath: 'operation_id' });
+                    store.createIndex('status', 'status', { unique: false });
+                    store.createIndex('created_at', 'created_at', { unique: false });
+                }
+            };
+            req.onsuccess = (event) => resolve(event.target.result);
+            req.onerror = (event) => reject(event.target.error || new Error('No se pudo abrir IndexedDB de resultados'));
+        });
+    };
+
+    const withResultadosStore = async (mode, fn) => {
+        const db = await openResultadosDb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(RESULTADOS_STORE_NAME, mode);
+            const store = tx.objectStore(RESULTADOS_STORE_NAME);
+            let result;
+            try {
+                result = fn(store, tx);
+            } catch (err) {
+                reject(err);
+                db.close();
+                return;
+            }
+            tx.oncomplete = () => {
+                resolve(result);
+                db.close();
+            };
+            tx.onerror = (event) => {
+                reject(event.target.error || new Error('Error de transaccion IndexedDB resultados'));
+                db.close();
+            };
+        });
+    };
+
+    const getResultadosQueue = async () => {
+        return withResultadosStore('readonly', (store) => new Promise((resolve, reject) => {
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const rows = Array.isArray(req.result) ? req.result : [];
+                resolve(rows.filter((r) => String(r.status || '') !== 'synced'));
+            };
+            req.onerror = (event) => reject(event.target.error || new Error('No se pudo leer la cola de resultados'));
+        }));
+    };
+
+    const queueResultadosPayload = async (payload) => {
+        const record = {
+            operation_id: payload.offline_operation_id,
+            payload,
+            endpoint: payload.endpoint,
+            status: 'pending',
+            retries: 0,
+            last_error: '',
+            created_at: Date.now(),
+        };
+        await withResultadosStore('readwrite', (store) => store.put(record));
+    };
+
+    const updateResultadosRecord = async (record) => {
+        await withResultadosStore('readwrite', (store) => store.put(record));
+    };
+
+    const deleteResultadosRecord = async (operationId) => {
+        await withResultadosStore('readwrite', (store) => store.delete(operationId));
+    };
+
+    const clearResultadosErrores = async () => {
+        const all = await getResultadosQueue();
+        const errors = all.filter((r) => String(r.status || '') === 'error');
+        for (const row of errors) {
+            await deleteResultadosRecord(row.operation_id);
+        }
+        return errors.length;
+    };
+
+    const summarizeResultadosQueue = (items) => {
+        const list = Array.isArray(items) ? items : [];
+        return {
+            total: list.length,
+            errores: list.filter((r) => String(r.status || '') === 'error').length,
+        };
+    };
+
+    const renderResultadosQueueDetail = (items) => {
+        if (!colaDetalleEl) return;
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+            colaDetalleEl.textContent = 'Cola vacia.';
+            return;
+        }
+        const lines = list.slice(0, 8).map((r, idx) => {
+            const st = String(r.status || 'pending');
+            const retries = Number(r.retries || 0);
+            const at = r.created_at ? new Date(r.created_at).toLocaleString() : '-';
+            const err = r.last_error ? ` | error: ${String(r.last_error).slice(0, 90)}` : '';
+            return `${idx + 1}. [${st}] ${r.operation_id || '-'} | reintentos: ${retries} | ${at}${err}`;
+        });
+        colaDetalleEl.textContent = lines.join(' | ');
+    };
+
+    const pushIncident = (moduleName, detail) => {
+        try {
+            const rows = JSON.parse(localStorage.getItem(INCIDENT_KEY) || '[]');
+            const list = Array.isArray(rows) ? rows : [];
+            list.push({ module: moduleName, detail, at: new Date().toISOString(), path: location.pathname + location.search });
+            localStorage.setItem(INCIDENT_KEY, JSON.stringify(list.slice(-200)));
+        } catch (error) {
+            // Ignorar para no bloquear UX.
+        }
+    };
+
+    const refreshResultadosStatus = async () => {
+        if (!offlineEstadoEl || !window.indexedDB) return;
+        try {
+            const pending = await getResultadosQueue();
+            renderResultadosQueueDetail(pending);
+            const summary = summarizeResultadosQueue(pending);
+            if (!summary.total) {
+                offlineEstadoEl.textContent = navigator.onLine
+                    ? 'Sin pendientes offline de resultados.'
+                    : 'Sin internet. No hay pendientes de resultados en cola.';
+                return;
+            }
+            offlineEstadoEl.textContent = `Pendientes: ${summary.total} | errores: ${summary.errores}.`;
+        } catch (error) {
+            offlineEstadoEl.textContent = 'No se pudo leer la cola offline de resultados.';
+        }
+    };
+
+    const serializeFormAsUrlEncoded = (form, forcePendingSave = true, operationId = '') => {
+        const fd = new FormData(form);
+        if (forcePendingSave) {
+            fd.set('force_incomplete_save', '1');
+        }
+        fd.set('offline_sync', '1');
+        if (operationId) {
+            fd.set('offline_operation_id', operationId);
+        }
+        const body = new URLSearchParams();
+        for (const [k, v] of fd.entries()) {
+            body.append(k, String(v == null ? '' : v));
+        }
+        return body.toString();
+    };
+
+    const sendResultadosPayload = async (record) => {
+        const payload = record && record.payload ? record.payload : {};
+        const resp = await fetch(String(payload.endpoint || ''), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+            body: String(payload.body || ''),
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data || data.success !== true) {
+            const err = new Error((data && data.message) ? data.message : 'Fallo de sincronizacion de resultados');
+            err.httpStatus = resp.status;
+            throw err;
+        }
+        return data;
+    };
+
+    const syncResultadosQueue = async () => {
+        const stats = { ok: 0, error: 0 };
+        if (!window.indexedDB) {
+            return stats;
+        }
+        if (!navigator.onLine) {
+            await refreshResultadosStatus();
+            return stats;
+        }
+
+        const pending = await getResultadosQueue();
+        if (!pending.length) {
+            await refreshResultadosStatus();
+            return stats;
+        }
+
+        for (const rec of pending) {
+            try {
+                await sendResultadosPayload(rec);
+                await deleteResultadosRecord(rec.operation_id);
+                stats.ok += 1;
+            } catch (err) {
+                rec.status = 'error';
+                rec.retries = Number(rec.retries || 0) + 1;
+                rec.last_error = String(err && err.message ? err.message : 'Error de sincronizacion');
+                await updateResultadosRecord(rec);
+                stats.error += 1;
+            }
+        }
+
+        await refreshResultadosStatus();
+        return stats;
+    };
+
+    const escapeHtml = (value) => {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
+    const extractParamName = (rawName) => {
+        const m = String(rawName || '').match(/\[resultados\]\[([^\]]+)\]/);
+        return m ? String(m[1] || '').trim() : String(rawName || '').trim();
+    };
+
+    const buildOfflineReportHtml = () => {
+        const cotizacionId = String((formGuardar && new FormData(formGuardar).get('cotizacion_id')) || '').trim();
+        const patientCard = document.querySelector('.card .fs-5.fw-bold.text-dark');
+        const paciente = patientCard ? String(patientCard.textContent || '').trim() : 'Paciente';
+        const now = new Date();
+        const fecha = now.toLocaleString();
+
+        const examBlocks = getExamCards().map((card) => {
+            const examenNombre = String(card.getAttribute('data-examen-nombre') || '').trim() || 'Examen';
+            const fields = Array.from(card.querySelectorAll('input[name*="[resultados]"], textarea[name*="[resultados]"], select[name*="[resultados]"]'));
+            const rows = [];
+            fields.forEach((field) => {
+                if (field.type === 'hidden') return;
+                const param = extractParamName(field.name);
+                const valor = String(field.value || '').trim();
+                if (!param || valor === '') return;
+                rows.push(`<tr><td>${escapeHtml(param)}</td><td>${escapeHtml(valor)}</td></tr>`);
+            });
+            if (!rows.length) {
+                rows.push('<tr><td colspan="2"><em>Sin datos llenados.</em></td></tr>');
+            }
+            return `
+                <section style="margin: 16px 0; border: 1px solid #dce3f0; border-radius: 10px; overflow: hidden;">
+                    <div style="background:#0d6efd;color:#fff;padding:10px 12px;font-weight:700;">${escapeHtml(examenNombre)}</div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #e9eef8;">Parametro</th><th style="text-align:left;padding:8px;border-bottom:1px solid #e9eef8;">Valor</th></tr></thead>
+                        <tbody>${rows.join('')}</tbody>
+                    </table>
+                </section>
+            `;
+        }).join('');
+
+        return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Resultados Offline - Cotizacion ${escapeHtml(cotizacionId || '-')}</title>
+</head>
+<body style="font-family:Arial,sans-serif;margin:20px;color:#1f2937;">
+  <h2 style="margin:0 0 8px;">Resultados Offline Provisional</h2>
+  <div style="margin:0 0 4px;"><strong>Cotizacion:</strong> ${escapeHtml(cotizacionId || '-')}</div>
+  <div style="margin:0 0 4px;"><strong>Paciente:</strong> ${escapeHtml(paciente)}</div>
+  <div style="margin:0 0 12px;"><strong>Fecha de exportacion:</strong> ${escapeHtml(fecha)}</div>
+  <div style="padding:10px;background:#fff3cd;border:1px solid #ffe69c;border-radius:8px;margin-bottom:12px;">
+    Documento provisional generado sin internet. El PDF oficial se emite al reconectar y descargar desde servidor.
+  </div>
+  ${examBlocks}
+</body>
+</html>`;
+    };
+
+    const downloadOfflineReport = () => {
+        const html = buildOfflineReportHtml();
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const cotizacionId = String((formGuardar && new FormData(formGuardar).get('cotizacion_id')) || '').trim() || 'sin_id';
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resultados_offline_cotizacion_${cotizacionId}_${Date.now()}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
 
     const submitSnapshotUpdate = (cotizacionId, idResultado) => {
         const cid = String(cotizacionId || '').trim();
@@ -602,11 +922,79 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('.js-download-pdf-resultados');
+        if (!link) return;
+        if (navigator.onLine) return;
+        event.preventDefault();
+        event.stopPropagation();
+        downloadOfflineReport();
+        showToast('Sin internet: se descargó un reporte provisional local.', 'warning');
+    }, true);
+
     document.querySelectorAll('input[data-decimales], textarea[data-decimales]').forEach((field) => {
         applyDecimalConstraint(field, false);
     });
 
     recalcularProgresoFormulario(false);
+    refreshResultadosStatus();
+
+    if (syncNowBtn && window.indexedDB) {
+        syncNowBtn.addEventListener('click', () => {
+            syncResultadosQueue()
+                .then((stats) => {
+                    if (stats.error > 0) {
+                        showToast(`Sincronizacion parcial: ${stats.ok} ok, ${stats.error} con error.`, 'warning');
+                        return;
+                    }
+                    showToast('Sincronizacion de resultados completada.', 'success');
+                })
+                .catch((err) => {
+                    showToast('Error al sincronizar resultados: ' + (err && err.message ? err.message : 'desconocido'), 'error');
+                });
+        });
+    }
+
+    if (verColaBtn && colaDetalleEl && window.indexedDB) {
+        verColaBtn.addEventListener('click', () => {
+            const hidden = colaDetalleEl.style.display === 'none';
+            colaDetalleEl.style.display = hidden ? 'block' : 'none';
+            if (hidden) {
+                refreshResultadosStatus();
+            }
+        });
+    }
+
+    if (limpiarErroresBtn && window.indexedDB) {
+        limpiarErroresBtn.addEventListener('click', () => {
+            clearResultadosErrores()
+                .then((n) => {
+                    showToast(`Registros con error eliminados: ${n}`, 'warning');
+                    refreshResultadosStatus();
+                })
+                .catch(() => {
+                    showToast('No se pudieron limpiar errores de resultados.', 'error');
+                });
+        });
+    }
+
+    if (incidenciaBtn && window.indexedDB) {
+        incidenciaBtn.addEventListener('click', () => {
+            getResultadosQueue().then((rows) => {
+                const s = summarizeResultadosQueue(rows);
+                pushIncident('resultados', `Resultados pendientes=${s.total}, errores=${s.errores}`);
+                showToast('Incidencia registrada para soporte.', 'warning');
+            });
+        });
+    }
+
+    window.addEventListener('online', () => {
+        syncResultadosQueue().catch(() => {});
+    });
+
+    if (navigator.onLine) {
+        syncResultadosQueue().catch(() => {});
+    }
 
     if (actionsDock) {
         let ticking = false;
@@ -1297,6 +1685,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 form.dataset.forceNativeSubmit = '1';
                 HTMLFormElement.prototype.submit.call(form);
             };
+
+            if (!navigator.onLine) {
+                if (!window.indexedDB) {
+                    alert('No hay internet y este navegador no soporta cola offline para resultados.');
+                    return false;
+                }
+                syncExamOrderInputs();
+                applyVisualThousandsFormatting();
+                const operationId = createOperationId();
+                const body = serializeFormAsUrlEncoded(form, true, operationId);
+                const payload = {
+                    endpoint: form.action,
+                    mode: 'guardar_resultados',
+                    cotizacion_id: String((new FormData(form).get('cotizacion_id') || '')).trim(),
+                    offline_operation_id: operationId,
+                    body,
+                    created_at: Date.now(),
+                };
+
+                await queueResultadosPayload(payload);
+                showToast('Resultados encolados offline. Se sincronizaran al reconectar.', 'warning');
+                await refreshResultadosStatus();
+                return false;
+            }
 
             setSavingState();
             form.dataset.submitting = '1';

@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/conexion/conexion.php';
+require_once __DIR__ . '/config/ui_theme.php';
 
 $logo = '../uploads/empresa/logo_empresa.png';
 
 try {
-    $stmt = $pdo->query("SELECT logo FROM config_empresa LIMIT 1");
-    $logoDb = $stmt ? $stmt->fetchColumn() : null;
+    $cfg = ui_theme_fetch_company_config($pdo);
+    $logoDb = is_array($cfg) ? ($cfg['logo'] ?? null) : null;
     if (is_string($logoDb) && trim($logoDb) !== '') {
         $logo = trim($logoDb);
     }

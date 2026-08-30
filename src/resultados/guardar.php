@@ -4,18 +4,23 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../examenes/formato_dinamico_helper.php';
+require_once __DIR__ . '/../usuarios/funciones/laboratorio_turnos.php';
 
 $examenes = $_POST['examenes'] ?? [];
 $cotizacion_id = $_POST['cotizacion_id'] ?? null;
 $stayOnForm = isset($_POST['stay_on_form']) && (int)$_POST['stay_on_form'] === 1;
 $referencia_personalizada = trim($_POST['referencia_personalizada'] ?? '');
 $usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
+$rol_usuario_actual = strtolower(trim((string)($_SESSION['rol'] ?? '')));
+$id_laboratorista_responsable = ($usuario_id > 0 && $rol_usuario_actual === 'laboratorista') ? $usuario_id : 0;
 $exam_order = $_POST['exam_order'] ?? [];
 $forceIncompleteSave = isset($_POST['force_incomplete_save']) && (int)$_POST['force_incomplete_save'] === 1;
+$operationId = trim((string)($_POST['offline_operation_id'] ?? ''));
+$isOfflineSync = isset($_POST['offline_sync']) && (string)$_POST['offline_sync'] === '1';
 
 $requestedWith = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
 $acceptHeader = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
-$isAjaxRequest = ($requestedWith === 'xmlhttprequest') || (strpos($acceptHeader, 'application/json') !== false);
+$isAjaxRequest = $isOfflineSync || ($requestedWith === 'xmlhttprequest') || (strpos($acceptHeader, 'application/json') !== false);
 
 $sendJson = function (array $payload, int $statusCode = 200) {
     http_response_code($statusCode);
@@ -23,6 +28,91 @@ $sendJson = function (array $payload, int $statusCode = 200) {
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
 };
+
+$markSyncError = function () use ($pdo, $operationId) {
+    if ($operationId === '') {
+        return;
+    }
+    try {
+        $stmtErr = $pdo->prepare("UPDATE resultados_sync_operaciones SET estado = 'error' WHERE operation_id = ?");
+        $stmtErr->execute([$operationId]);
+    } catch (Throwable $e) {
+    }
+};
+
+if ($isOfflineSync && $operationId === '') {
+    $sendJson([
+        'success' => false,
+        'message' => 'offline_operation_id es obligatorio en modo offline_sync.',
+    ], 422);
+}
+
+if ($operationId !== '') {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS resultados_sync_operaciones (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        operation_id VARCHAR(80) NOT NULL,
+        cotizacion_id INT NULL,
+        estado ENUM('pendiente','aplicado','error') NOT NULL DEFAULT 'pendiente',
+        payload_json MEDIUMTEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_resultados_sync_operation_id (operation_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $stmtOp = $pdo->prepare("SELECT estado FROM resultados_sync_operaciones WHERE operation_id = ? LIMIT 1");
+    $stmtOp->execute([$operationId]);
+    $opRow = $stmtOp->fetch(PDO::FETCH_ASSOC);
+    if ($opRow && (string)($opRow['estado'] ?? '') === 'aplicado') {
+        if ($isAjaxRequest) {
+            $sendJson([
+                'success' => true,
+                'duplicate' => true,
+                'message' => 'Operacion de resultados ya aplicada.',
+            ], 200);
+        }
+        header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
+        exit;
+    }
+
+    if (!$opRow) {
+        $payloadRaw = json_encode([
+            'cotizacion_id' => $cotizacion_id,
+            'examenes_count' => is_array($examenes) ? count($examenes) : 0,
+            'stay_on_form' => $stayOnForm ? 1 : 0,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $stmtIns = $pdo->prepare("INSERT INTO resultados_sync_operaciones (operation_id, cotizacion_id, estado, payload_json) VALUES (?, ?, 'pendiente', ?)");
+        $stmtIns->execute([$operationId, $cotizacion_id ?: null, $payloadRaw]);
+    }
+}
+
+laboratorio_turnos_asegurar_esquema($pdo);
+
+$turno_activo_laboratorio = null;
+$id_turno_activo = 0;
+if ($rol_usuario_actual === 'laboratorista') {
+    $turno_activo_laboratorio = laboratorio_turno_abierto_por_usuario($pdo, $usuario_id);
+    if (empty($turno_activo_laboratorio)) {
+        $msgTurno = 'Debes abrir tu turno antes de guardar resultados.';
+        if ($isAjaxRequest) {
+            $sendJson([
+                'success' => false,
+                'message' => $msgTurno,
+                'turno_requerido' => true,
+            ], 422);
+        }
+
+        $_SESSION['mensaje'] = $msgTurno;
+        $_SESSION['mensaje_tipo'] = 'warning';
+        if ($stayOnForm && $cotizacion_id) {
+            header('Location: dashboard.php?vista=formulario&cotizacion_id=' . urlencode((string)$cotizacion_id));
+        } else {
+            header('Location: dashboard.php?vista=laboratorista');
+        }
+        exit;
+    }
+    $id_turno_activo = (int)($turno_activo_laboratorio['id'] ?? 0);
+}
 
 $resumenConsumo = [
     'aplicados' => 0,
@@ -79,6 +169,15 @@ $hasOrderColumn = function () use ($pdo, &$hasOrderCol) {
         $hasOrderCol = false;
     }
     return $hasOrderCol;
+};
+
+$hasTurnoCol = null;
+$hasTurnoColumn = function () use ($pdo, &$hasTurnoCol) {
+    if ($hasTurnoCol !== null) {
+        return $hasTurnoCol;
+    }
+    $hasTurnoCol = laboratorio_turnos_columna_id_turno_existe($pdo);
+    return $hasTurnoCol;
 };
 
 $alarmColumnMap = null;
@@ -872,6 +971,7 @@ $progresoGlobal = [
     'percent' => 0,
 ];
 
+try {
 if (!empty($examenes) && is_array($examenes)) {
     foreach ($examenes as $examenPrevio) {
         $idResultadoPrevio = isset($examenPrevio['id_resultado']) ? (int)$examenPrevio['id_resultado'] : 0;
@@ -1510,6 +1610,7 @@ if (!empty($examenes) && is_array($examenes)) {
             }
 
             $json_resultados = json_encode($merged, JSON_UNESCAPED_UNICODE);
+            $setIdTurno = $hasTurnoColumn() ? ", id_turno = CASE WHEN :id_turno > 0 THEN :id_turno ELSE id_turno END" : '';
             if ($hasAlarmColumns) {
                 $setWhatsappDestino = !empty($alarmCols['alarma_whatsapp_destino']) ? ", alarma_whatsapp_destino = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 THEN :alarma_whatsapp_destino ELSE NULL END" : '';
                 $setUltimoAviso = !empty($alarmCols['alarma_ultimo_aviso']) ? ", alarma_ultimo_aviso = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 AND alarma_ultimo_aviso IS NULL THEN NULL WHEN :alarma_activa = 0 OR :alarma_dias IS NULL OR :alarma_dias <= 0 THEN NULL ELSE alarma_ultimo_aviso END" : '';
@@ -1517,6 +1618,7 @@ if (!empty($examenes) && is_array($examenes)) {
                 $sql = "UPDATE resultados_examenes
                         SET resultados = :resultados,
                             estado = :estado_resultado,
+                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno},
                             alarma_activa = :alarma_activa,
                             alarma_dias = :alarma_dias,
                             alarma_fecha_objetivo = CASE
@@ -1535,24 +1637,38 @@ if (!empty($examenes) && is_array($examenes)) {
                             {$setWhatsappDestino}
                             {$setUltimoAviso}
                         WHERE id = :id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
+                $paramsUpd = [
                     'resultados' => $json_resultados,
                     'estado_resultado' => $estadoResultado,
+                    'id_laboratorista' => $id_laboratorista_responsable,
                     'alarma_activa' => $alarmaActivaEf,
                     'alarma_dias' => $alarmaDiasEf,
                     'alarma_whatsapp_destino' => $companyWhatsappNumber,
                     'id' => $id_resultado
-                ]);
+                ];
+                if ($hasTurnoColumn()) {
+                    $paramsUpd['id_turno'] = $id_turno_activo;
+                }
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($paramsUpd);
             } else {
                 // Actualiza los resultados y el estado
-                $sql = "UPDATE resultados_examenes SET resultados = :resultados, estado = :estado_resultado WHERE id = :id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
+                $sql = "UPDATE resultados_examenes
+                        SET resultados = :resultados,
+                            estado = :estado_resultado,
+                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno}
+                        WHERE id = :id";
+                $paramsUpd = [
                     'resultados' => $json_resultados,
                     'estado_resultado' => $estadoResultado,
+                    'id_laboratorista' => $id_laboratorista_responsable,
                     'id' => $id_resultado
-                ]);
+                ];
+                if ($hasTurnoColumn()) {
+                    $paramsUpd['id_turno'] = $id_turno_activo;
+                }
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($paramsUpd);
             }
 
             if ($inventarioInternoDisponible) {
@@ -1626,6 +1742,10 @@ if (!empty($examenes) && is_array($examenes)) {
     }
 
     if ($isAjaxRequest) {
+        if ($operationId !== '') {
+            $stmtOk = $pdo->prepare("UPDATE resultados_sync_operaciones SET estado = 'aplicado', cotizacion_id = ? WHERE operation_id = ?");
+            $stmtOk->execute([$cotizacion_id ?: null, $operationId]);
+        }
         $sendJson([
             'success' => true,
             'message' => $_SESSION['mensaje'] ?? 'Resultados guardados correctamente.',
@@ -1636,12 +1756,21 @@ if (!empty($examenes) && is_array($examenes)) {
     }
 
     if ($stayOnForm && $cotizacion_id) {
+        if ($operationId !== '') {
+            $stmtOk = $pdo->prepare("UPDATE resultados_sync_operaciones SET estado = 'aplicado', cotizacion_id = ? WHERE operation_id = ?");
+            $stmtOk->execute([$cotizacion_id ?: null, $operationId]);
+        }
         header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
     } else {
+        if ($operationId !== '') {
+            $stmtOk = $pdo->prepare("UPDATE resultados_sync_operaciones SET estado = 'aplicado', cotizacion_id = ? WHERE operation_id = ?");
+            $stmtOk->execute([$cotizacion_id ?: null, $operationId]);
+        }
         header("Location: dashboard.php?vista=cotizaciones");
     }
     exit;
 } else {
+    $markSyncError();
     if ($isAjaxRequest) {
         $sendJson([
             'success' => false,
@@ -1649,5 +1778,22 @@ if (!empty($examenes) && is_array($examenes)) {
         ], 400);
     }
     echo "Error: No se recibieron datos válidos.";
+}
+} catch (Throwable $e) {
+    $markSyncError();
+    if ($isAjaxRequest) {
+        $sendJson([
+            'success' => false,
+            'message' => 'Error al guardar resultados: ' . $e->getMessage(),
+        ], 500);
+    }
+    $_SESSION['mensaje'] = 'Error al guardar resultados: ' . $e->getMessage();
+    $_SESSION['mensaje_tipo'] = 'danger';
+    if ($stayOnForm && $cotizacion_id) {
+        header("Location: dashboard.php?vista=formulario&cotizacion_id=" . urlencode((string)$cotizacion_id));
+    } else {
+        header("Location: dashboard.php?vista=cotizaciones");
+    }
+    exit;
 }
 ?>

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config/operacion_context.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../config/currency.php';
 
@@ -13,6 +14,8 @@ $isAnulada = false;
 $hayCajaAbierta = false;
 $currencyCfg = currency_get_config($pdo);
 $currencySymbol = (string)($currencyCfg['symbol'] ?? 'S/');
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : ['es_sis' => false];
+$esSisCotizacion = false;
 
 try {
     $stmtTbl = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cajas'");
@@ -31,6 +34,7 @@ if ($idCotizacion) {
     $stmt = $pdo->prepare("SELECT * FROM cotizaciones WHERE id = ?");
     $stmt->execute([$idCotizacion]);
     $cotizacion = $stmt->fetch(PDO::FETCH_ASSOC);
+    $esSisCotizacion = ((int)($cotizacion['es_sis'] ?? 0) === 1);
     $isAnulada = !empty($cotizacion['estado_pago']) && strtolower((string)$cotizacion['estado_pago']) === 'anulada';
     $stmtPagos = $pdo->prepare("SELECT SUM(monto) AS total_pagado FROM pagos WHERE id_cotizacion = ?");
     $stmtPagos->execute([$idCotizacion]);
@@ -39,6 +43,7 @@ if ($idCotizacion) {
     $saldo = max(0, $saldoReal);
     $isPagada = ($saldoReal <= 0);
 }
+$bloquearCobroSis = !empty($operacionContext['es_sis']) || $esSisCotizacion;
 ?>
 <style>
     :root {
@@ -176,7 +181,7 @@ if ($idCotizacion) {
                 <i class="bi bi-credit-card me-2"></i>
                 Gestión de Pagos - Cotización #<?= htmlspecialchars($idCotizacion) ?>
             </h2>
-            <button type="button" class="toggle-edit" onclick="toggleEditTotal()" <?= ($isPagada || $isAnulada) ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
+            <button type="button" class="toggle-edit" onclick="toggleEditTotal()" <?= ($isPagada || $isAnulada || $bloquearCobroSis) ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : '' ?>>
                 <i class="bi bi-pencil-square me-1"></i>
                 Modificar Monto Total
             </button>
@@ -186,6 +191,11 @@ if ($idCotizacion) {
                 <div class="alert alert-danger alert-modern">
                     <i class="bi bi-x-octagon me-2"></i>
                     Esta cotización está anulada. No se permiten nuevos pagos ni cambios de monto.
+                </div>
+            <?php elseif ($bloquearCobroSis || $msg === 'sis_sin_cobro'): ?>
+                <div class="alert alert-warning alert-modern">
+                    <i class="bi bi-shield-check me-2"></i>
+                    Esta atención fue registrada como SIS. No se procesan cobros, copagos ni ajustes de total en este modo.
                 </div>
             <?php elseif ($msg == "error"): ?>
                 <?php
@@ -244,7 +254,7 @@ if ($idCotizacion) {
             <?php if ($cotizacion): ?>
                 
                 <!-- Formulario para modificar monto total -->
-                <div class="editable-total" id="editTotalSection" style="display: none;">
+                <div class="editable-total" id="editTotalSection" style="display: none;<?= $bloquearCobroSis ? 'display:none;' : '' ?>">
                     <h5 class="mb-3">
                         <i class="bi bi-currency-dollar me-2"></i>
                         Modificar Monto Total de la Cotización
@@ -316,7 +326,7 @@ if ($idCotizacion) {
                 </div>
 
                 <!-- Formulario de pago -->
-                <?php if ($saldo > 0 && $hayCajaAbierta && !$isAnulada): ?>
+                <?php if ($saldo > 0 && $hayCajaAbierta && !$isAnulada && !$bloquearCobroSis): ?>
                     <form method="post" action="dashboard.php?action=pago_cotizacion_guardar" class="p-4" id="formPago">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($idCotizacion) ?>">
                         
@@ -386,7 +396,7 @@ if ($idCotizacion) {
                             </div>
                         </div>
                     </form>
-                <?php elseif ($saldo > 0 && !$hayCajaAbierta && !$isAnulada): ?>
+                <?php elseif ($saldo > 0 && !$hayCajaAbierta && !$isAnulada && !$bloquearCobroSis): ?>
                     <div class="payment-info text-center">
                         <i class="bi bi-safe2 display-4 text-warning mb-3"></i>
                         <h4 class="text-warning">Caja cerrada</h4>

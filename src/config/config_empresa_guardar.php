@@ -1,13 +1,14 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/ui_theme.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Obtener la fila actual de config_empresa
-$stmt = $pdo->query("SELECT * FROM config_empresa LIMIT 1");
-$empresa = $stmt->fetch(PDO::FETCH_ASSOC);
-$id = $empresa ? $empresa['id'] : null;
+$empresaCfgId = (int)($_POST['empresa_cfg_id'] ?? 0);
+$empresa = ui_theme_fetch_company_config($pdo, $empresaCfgId > 0 ? $empresaCfgId : null);
+$empresa = is_array($empresa) ? $empresa : [];
+$id = !empty($empresa['id']) ? (int)$empresa['id'] : null;
 
 // Recoge los datos del formulario
 // ...existing code...
@@ -18,6 +19,23 @@ $direccion = trim($_POST['direccion'] ?? '');
 $email     = trim($_POST['email'] ?? '');
 $telefono  = trim($_POST['telefono'] ?? '');
 $celular   = trim($_POST['celular'] ?? '');
+$has_modo_operativo_input = array_key_exists('modo_operativo', $_POST);
+$has_portal_publico_enable_input = array_key_exists('portal_publico_enable_present', $_POST)
+    || array_key_exists('portal_publico_enable', $_POST);
+$has_operation_settings_input = $has_modo_operativo_input || $has_portal_publico_enable_input;
+
+$modo_operativo = null;
+if ($has_modo_operativo_input) {
+    $modo_operativo = strtoupper(trim((string)($_POST['modo_operativo'] ?? 'PARTICULAR')));
+    if (!in_array($modo_operativo, ['PARTICULAR', 'SIS', 'MIXTO'], true)) {
+        $modo_operativo = 'PARTICULAR';
+    }
+}
+
+$portal_publico_enable = null;
+if ($has_portal_publico_enable_input) {
+    $portal_publico_enable = isset($_POST['portal_publico_enable']) ? 1 : 0;
+}
 
 $moneda_codigo = strtoupper(trim((string)($_POST['moneda_codigo'] ?? 'PEN')));
 if ($moneda_codigo === '') {
@@ -44,21 +62,146 @@ if ($moneda_separador_decimal === $moneda_separador_miles) {
     $moneda_separador_miles = ',';
 }
 
-// Mapa (embed/src) opcional
-$maps_embed = trim($_POST['maps_embed'] ?? '');
-if ($maps_embed !== '' && stripos($maps_embed, '<iframe') !== false) {
-    if (preg_match('/src\s*=\s*"([^"]+)"/i', $maps_embed, $m)) {
-        $maps_embed = trim($m[1]);
+$normalizeMapsEmbed = static function (string $value): string {
+    $v = trim($value);
+    if ($v !== '' && stripos($v, '<iframe') !== false) {
+        if (preg_match('/src\s*=\s*"([^"]+)"/i', $v, $m)) {
+            $v = trim((string)$m[1]);
+        }
     }
-}
-if ($maps_embed !== '' && !preg_match('~^https?://www\.google\.com/maps/(embed\?pb=|q=|search/)~i', $maps_embed)) {
+    return $v;
+};
+
+$normalizePhoneDigits = static function (string $value): string {
+    return preg_replace('/\D+/', '', trim($value)) ?? '';
+};
+
+$extractPhonesFromItem = static function (array $item) use ($normalizePhoneDigits): array {
+    $phones = [];
+
+    if (isset($item['telefonos'])) {
+        if (is_array($item['telefonos'])) {
+            foreach ($item['telefonos'] as $tel) {
+                $rawTel = trim((string)$tel);
+                if ($rawTel === '') {
+                    continue;
+                }
+                $norm = $normalizePhoneDigits($rawTel);
+                if ($norm === '' || isset($phones[$norm])) {
+                    continue;
+                }
+                $phones[$norm] = $rawTel;
+            }
+        } elseif (is_string($item['telefonos'])) {
+            $chunks = array_map('trim', explode(',', $item['telefonos']));
+            foreach ($chunks as $rawTel) {
+                if ($rawTel === '') {
+                    continue;
+                }
+                $norm = $normalizePhoneDigits($rawTel);
+                if ($norm === '' || isset($phones[$norm])) {
+                    continue;
+                }
+                $phones[$norm] = $rawTel;
+            }
+        }
+    }
+
+    $rawCel = trim((string)($item['celular'] ?? ''));
+    if ($rawCel !== '') {
+        $normCel = $normalizePhoneDigits($rawCel);
+        if ($normCel !== '' && !isset($phones[$normCel])) {
+            $phones = [$normCel => $rawCel] + $phones;
+        }
+    }
+
+    return array_values($phones);
+};
+
+// Compatibilidad: si un cliente antiguo aun envia maps_embed directo, lo aceptamos como fallback.
+$maps_embed_legacy = $normalizeMapsEmbed((string)($_POST['maps_embed'] ?? ''));
+if ($maps_embed_legacy !== '' && !preg_match('~^https?://www\.google\.com/maps/(embed\?pb=|q=|search/)~i', $maps_embed_legacy)) {
     $_SESSION['msg'] = 'El mapa debe ser un enlace válido de Google Maps (ideal: src del iframe /maps/embed?pb=...).';
     header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
     exit;
 }
 
+$ubicacionesJsonRaw = trim((string)($_POST['ubicaciones_json'] ?? ''));
+$ubicaciones = [];
+if ($ubicacionesJsonRaw !== '') {
+    $decoded = json_decode($ubicacionesJsonRaw, true);
+    if (!is_array($decoded)) {
+        $_SESSION['msg'] = 'El campo de ubicaciones debe ser JSON válido.';
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos' . ($id ? '&empresa_cfg_id=' . (int)$id : ''));
+        exit;
+    }
+
+    foreach ($decoded as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $nombreUbicacion = trim((string)($item['nombre'] ?? ''));
+        $direccionUbicacion = trim((string)($item['direccion'] ?? ''));
+        $telefonosUbicacion = $extractPhonesFromItem($item);
+        $celularUbicacion = !empty($telefonosUbicacion) ? (string)$telefonosUbicacion[0] : '';
+        $mapaUbicacion = $normalizeMapsEmbed((string)($item['maps_embed'] ?? ''));
+
+        if ($mapaUbicacion !== '' && !preg_match('~^https?://www\.google\.com/maps/(embed\?pb=|q=|search/)~i', $mapaUbicacion)) {
+            $_SESSION['msg'] = 'Cada mapa de ubicación debe ser un enlace válido de Google Maps.';
+            header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos' . ($id ? '&empresa_cfg_id=' . (int)$id : ''));
+            exit;
+        }
+
+        if ($nombreUbicacion === '' && $direccionUbicacion === '' && $celularUbicacion === '' && $mapaUbicacion === '') {
+            continue;
+        }
+
+        $ubicaciones[] = [
+            'nombre' => $nombreUbicacion,
+            'direccion' => $direccionUbicacion,
+            'celular' => $celularUbicacion,
+            'telefonos' => $telefonosUbicacion,
+            'maps_embed' => $mapaUbicacion,
+        ];
+    }
+}
+
+if (empty($ubicaciones) && ($direccion !== '' || $maps_embed_legacy !== '')) {
+    $telefonoFallback = trim((string)$celular);
+    $telefonosFallback = [];
+    if ($telefonoFallback !== '') {
+        $telefonosFallback[] = $telefonoFallback;
+    }
+    $ubicaciones[] = [
+        'nombre' => 'Sede principal',
+        'direccion' => $direccion,
+        'celular' => $telefonoFallback,
+        'telefonos' => $telefonosFallback,
+        'maps_embed' => $maps_embed_legacy,
+    ];
+}
+
+// El mapa principal en config_empresa se sincroniza con la primera sede con mapa.
+$maps_embed = '';
+foreach ($ubicaciones as $ubItem) {
+    if (!is_array($ubItem)) {
+        continue;
+    }
+    $mapaItem = trim((string)($ubItem['maps_embed'] ?? ''));
+    if ($mapaItem !== '') {
+        $maps_embed = $mapaItem;
+        break;
+    }
+}
+if ($maps_embed === '') {
+    $maps_embed = $maps_embed_legacy;
+}
+
 $has_maps_embed = false;
 $has_currency_columns = false;
+$has_operation_columns = false;
+$has_ubicaciones_json = false;
+$has_logo_fondo_navbar = false;
 try {
     $chk = $pdo->query("SHOW COLUMNS FROM config_empresa LIKE 'maps_embed'");
     $has_maps_embed = (bool)$chk->fetch(PDO::FETCH_ASSOC);
@@ -77,9 +220,34 @@ try {
         && in_array('moneda_decimales', $colsMap, true)
         && in_array('moneda_separador_decimal', $colsMap, true)
         && in_array('moneda_separador_miles', $colsMap, true);
+    $has_operation_columns = in_array('modo_operativo', $colsMap, true)
+        && in_array('portal_publico_enable', $colsMap, true);
+    $has_ubicaciones_json = in_array('ubicaciones_json', $colsMap, true);
+    $has_logo_fondo_navbar = in_array('logo_fondo_navbar', $colsMap, true);
+
+    if (!$has_ubicaciones_json) {
+        try {
+            $pdo->exec("ALTER TABLE config_empresa ADD COLUMN ubicaciones_json TEXT NULL AFTER maps_embed");
+            $has_ubicaciones_json = true;
+        } catch (Throwable $e) {
+            $has_ubicaciones_json = false;
+        }
+    }
+
+    if (!$has_logo_fondo_navbar) {
+        try {
+            $pdo->exec("ALTER TABLE config_empresa ADD COLUMN logo_fondo_navbar VARCHAR(20) NULL DEFAULT '#ffffff' AFTER color_texto");
+            $has_logo_fondo_navbar = true;
+        } catch (Throwable $e) {
+            $has_logo_fondo_navbar = false;
+        }
+    }
 } catch (Exception $e) {
     $has_maps_embed = false;
     $has_currency_columns = false;
+    $has_operation_columns = false;
+    $has_ubicaciones_json = false;
+    $has_logo_fondo_navbar = false;
 }
 
 // Validación básica
@@ -149,6 +317,25 @@ $migrateLegacyAssetToUploads = function (string $storedPath, string $targetRelat
 
 $logo = $migrateLegacyAssetToUploads((string)$logo, 'uploads/empresa/logo_empresa.png');
 $firma = $migrateLegacyAssetToUploads((string)$firma, 'uploads/empresa/firma.png');
+
+$quitarLogo = isset($_POST['quitar_logo']) && (string)$_POST['quitar_logo'] === '1';
+$quitarFirma = isset($_POST['quitar_firma']) && (string)$_POST['quitar_firma'] === '1';
+
+if ($quitarLogo) {
+    $logoAbsPath = $resolveStoredAbsolutePath((string)$logo);
+    if (is_file($logoAbsPath)) {
+        @unlink($logoAbsPath);
+    }
+    $logo = '';
+}
+
+if ($quitarFirma) {
+    $firmaAbsPath = $resolveStoredAbsolutePath((string)$firma);
+    if (is_file($firmaAbsPath)) {
+        @unlink($firmaAbsPath);
+    }
+    $firma = '';
+}
 
 $describeUploadError = function (int $code): string {
     switch ($code) {
@@ -263,11 +450,15 @@ if ($nuevaFirma) {
     $firma = '../' . ltrim($nuevaFirma, '/');
 }
 // Colores y textos
-$color_principal  = trim($_POST['color_principal'] ?? '#0d6efd');
-$color_secundario = trim($_POST['color_secundario'] ?? '#f8f9fa');
-$color_footer     = trim($_POST['color_footer'] ?? '#343a40');
-$color_botones    = trim($_POST['color_botones'] ?? '#198754');
-$color_texto      = trim($_POST['color_texto'] ?? '#212529');
+$color_principal  = trim($_POST['color_principal'] ?? '#1f4f82');
+$color_secundario = trim($_POST['color_secundario'] ?? '#e9f3fb');
+$color_footer     = trim($_POST['color_footer'] ?? '#173a60');
+$color_botones    = trim($_POST['color_botones'] ?? '#2f74bd');
+$color_texto      = trim($_POST['color_texto'] ?? '#1c2a3b');
+$logo_fondo_navbar = strtolower(trim((string)($_POST['logo_fondo_navbar'] ?? '#ffffff')));
+if (!preg_match('/^#[0-9a-f]{6}$/i', $logo_fondo_navbar)) {
+    $logo_fondo_navbar = '#ffffff';
+}
 $tamano_letra     = trim($_POST['tamano_letra'] ?? '1rem');
 $frase_promocion  = trim($_POST['frase_promocion'] ?? '');
 $oferta_mes       = trim($_POST['oferta_mes'] ?? '');
@@ -373,6 +564,10 @@ try {
             $sql .= ", maps_embed=?";
             $params[] = $maps_embed;
         }
+        if ($has_ubicaciones_json) {
+            $sql .= ", ubicaciones_json=?";
+            $params[] = json_encode($ubicaciones, JSON_UNESCAPED_UNICODE);
+        }
 
         if ($has_currency_columns) {
             $sql .= ", moneda_codigo=?, moneda_simbolo=?, moneda_posicion=?, moneda_decimales=?, moneda_separador_decimal=?, moneda_separador_miles=?";
@@ -384,15 +579,45 @@ try {
             $params[] = $moneda_separador_miles;
         }
 
+        if ($has_operation_columns) {
+            $modoOperativoSql = $modo_operativo;
+            if ($modoOperativoSql === null) {
+                $modoOperativoSql = strtoupper(trim((string)($empresa['modo_operativo'] ?? 'PARTICULAR')));
+                if (!in_array($modoOperativoSql, ['PARTICULAR', 'SIS', 'MIXTO'], true)) {
+                    $modoOperativoSql = 'PARTICULAR';
+                }
+            }
+            $portalPublicoSql = $portal_publico_enable;
+            if ($portalPublicoSql === null) {
+                $portalPublicoSql = ((int)($empresa['portal_publico_enable'] ?? 1) === 1) ? 1 : 0;
+            }
+
+            $sql .= ", modo_operativo=?, portal_publico_enable=?";
+            $params[] = $modoOperativoSql;
+            $params[] = $portalPublicoSql;
+        }
+
         $sql .= ",
-            color_principal=?, color_secundario=?, color_footer=?, color_botones=?, color_texto=?, tamano_letra=?,
+            color_principal=?, color_secundario=?, color_footer=?, color_botones=?, color_texto=?";
+
+        if ($has_logo_fondo_navbar) {
+            $sql .= ", logo_fondo_navbar=?";
+        }
+
+        $sql .= ", tamano_letra=?,
             frase_promocion=?, oferta_mes=?,
             imagenes_carrusel=?, imagenes_institucionales=?, servicios=?, testimonios=?, redes_sociales=?,
             menu_inicio=?, menu_servicios=?, menu_testimonios=?, menu_contacto=?
             WHERE id=?";
 
         $params = array_merge($params, [
-            $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto, $tamano_letra,
+            $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto,
+        ]);
+        if ($has_logo_fondo_navbar) {
+            $params[] = $logo_fondo_navbar;
+        }
+        $params = array_merge($params, [
+            $tamano_letra,
             $frase_promocion, $oferta_mes,
             json_encode($imagenes_carrusel, JSON_UNESCAPED_UNICODE),
             json_encode($imagenes_institucionales, JSON_UNESCAPED_UNICODE),
@@ -417,6 +642,10 @@ try {
             $cols[] = 'maps_embed';
             $vals[] = $maps_embed;
         }
+        if ($has_ubicaciones_json) {
+            $cols[] = 'ubicaciones_json';
+            $vals[] = json_encode($ubicaciones, JSON_UNESCAPED_UNICODE);
+        }
         if ($has_currency_columns) {
             $cols[] = 'moneda_codigo';
             $cols[] = 'moneda_simbolo';
@@ -431,14 +660,32 @@ try {
             $vals[] = $moneda_separador_decimal;
             $vals[] = $moneda_separador_miles;
         }
+        if ($has_operation_columns && $has_operation_settings_input) {
+            $cols[] = 'modo_operativo';
+            $cols[] = 'portal_publico_enable';
+            $vals[] = $modo_operativo ?? 'PARTICULAR';
+            $vals[] = ($portal_publico_enable === null) ? 1 : (int)$portal_publico_enable;
+        }
         $cols = array_merge($cols, [
-            'color_principal', 'color_secundario', 'color_footer', 'color_botones', 'color_texto', 'tamano_letra',
+            'color_principal', 'color_secundario', 'color_footer', 'color_botones', 'color_texto'
+        ]);
+        $vals = array_merge($vals, [
+            $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto
+        ]);
+
+        if ($has_logo_fondo_navbar) {
+            $cols[] = 'logo_fondo_navbar';
+            $vals[] = $logo_fondo_navbar;
+        }
+
+        $cols = array_merge($cols, [
+            'tamano_letra',
             'frase_promocion', 'oferta_mes',
             'imagenes_carrusel', 'imagenes_institucionales', 'servicios', 'testimonios', 'redes_sociales',
             'menu_inicio', 'menu_servicios', 'menu_testimonios', 'menu_contacto'
         ]);
         $vals = array_merge($vals, [
-            $color_principal, $color_secundario, $color_footer, $color_botones, $color_texto, $tamano_letra,
+            $tamano_letra,
             $frase_promocion, $oferta_mes,
             json_encode($imagenes_carrusel, JSON_UNESCAPED_UNICODE),
             json_encode($imagenes_institucionales, JSON_UNESCAPED_UNICODE),
@@ -453,10 +700,18 @@ try {
         $stmt->execute($vals);
         $_SESSION['msg'] = 'Datos de la empresa registrados correctamente.';
     }
-    header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+    $redirect = BASE_URL . 'dashboard.php?vista=config_empresa_datos';
+    if ($id) {
+        $redirect .= '&empresa_cfg_id=' . (int)$id;
+    }
+    header('Location: ' . $redirect);
     exit;
 } catch (Exception $e) {
     $_SESSION['msg'] = 'Error al guardar: ' . $e->getMessage();
-    header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+    $redirect = BASE_URL . 'dashboard.php?vista=config_empresa_datos';
+    if ($id) {
+        $redirect .= '&empresa_cfg_id=' . (int)$id;
+    }
+    header('Location: ' . $redirect);
     exit;
 }

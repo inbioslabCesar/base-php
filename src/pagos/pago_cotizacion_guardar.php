@@ -1,8 +1,18 @@
 <?php
+require_once __DIR__ . '/../config/operacion_context.php';
 require_once __DIR__ . '/../conexion/conexion.php';
 
 $idCotizacion = $_POST['id'] ?? null;
 $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+$operacionContext = function_exists('app_operacion_context') ? app_operacion_context($pdo) : ['es_sis' => false];
+
+$stmtSis = $pdo->prepare("SELECT es_sis FROM cotizaciones WHERE id = ? LIMIT 1");
+$stmtSis->execute([$idCotizacion]);
+$esSisCotizacion = ((int)($stmtSis->fetchColumn() ?? 0) === 1);
+if (!empty($operacionContext['es_sis']) || $esSisCotizacion) {
+    header("Location: dashboard.php?vista=pago_cotizacion&id=$idCotizacion&msg=sis_sin_cobro");
+    exit;
+}
 
 $cajaAbiertaId = null;
 

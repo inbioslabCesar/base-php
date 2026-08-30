@@ -1,7 +1,13 @@
+<?php
+$operacionContextRecepcionista = function_exists('app_operacion_context') && isset($pdo)
+    ? app_operacion_context($pdo)
+    : ['es_sis' => false];
+$esModoSisRecepcionista = !empty($operacionContextRecepcionista['es_sis']);
+?>
 <div class="container mt-5">
     <h1 class="mb-4"><i class="bi bi-person-badge"></i> ¡Bienvenido, Recepcionista!</h1>
     <div class="alert alert-info mb-4">
-        Aquí podrás gestionar tus cotizaciones, clientes y consultar la contabilidad del día.
+        Aquí podrás gestionar tus cotizaciones, clientes<?= $esModoSisRecepcionista ? '' : ' y consultar la contabilidad del día' ?>.
     </div>
     <div class="row g-3">
         <div class="col-md-4 d-grid">
@@ -14,11 +20,13 @@
                 <i class="bi bi-person-plus"></i> Crear Cliente
             </a>
         </div>
+        <?php if (!$esModoSisRecepcionista): ?>
         <div class="col-md-4 d-grid">
             <a href="dashboard.php?vista=contabilidad" class="btn btn-dark btn-lg">
                 <i class="bi bi-cash-stack"></i> Contabilidad
             </a>
         </div>
+        <?php endif; ?>
     </div>
     <div class="mt-5 text-muted text-center">
         <i class="bi bi-info-circle"></i> Próximamente tendrás más funcionalidades aquí.

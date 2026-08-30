@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 $esEdicion = isset($_GET['id']);
 $convenio = [
@@ -37,8 +38,8 @@ function normalizarDominioEmpresa(string $dominio): string {
     return $dominio;
 }
 
-$stmtDom = $pdo->query("SELECT dominio FROM config_empresa LIMIT 1");
-$dominioEmpresa = (string)($stmtDom->fetchColumn() ?: '');
+$empresaCfg = ui_theme_fetch_company_config($pdo);
+$dominioEmpresa = is_array($empresaCfg) ? (string)($empresaCfg['dominio'] ?? '') : '';
 $dominioEmpresa = normalizarDominioEmpresa($dominioEmpresa !== '' ? $dominioEmpresa : (string)($_SERVER['HTTP_HOST'] ?? ''));
 if ($dominioEmpresa === '') {
     $dominioEmpresa = 'ejemplo.com';

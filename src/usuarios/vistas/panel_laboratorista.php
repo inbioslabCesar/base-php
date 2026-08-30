@@ -1,3 +1,16 @@
+<?php
+require_once __DIR__ . '/../../conexion/conexion.php';
+require_once __DIR__ . '/../funciones/laboratorio_turnos.php';
+
+$usuarioTurnoId = (int)($_SESSION['usuario_id'] ?? 0);
+laboratorio_turnos_asegurar_esquema($pdo);
+$turnoActual = laboratorio_turno_abierto_por_usuario($pdo, $usuarioTurnoId);
+
+$turnoAbierto = !empty($turnoActual);
+$turnoAbiertoEn = $turnoAbierto && !empty($turnoActual['abierto_en'])
+  ? date('d/m/Y H:i', strtotime((string)$turnoActual['abierto_en']))
+  : '';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -118,6 +131,30 @@
       letter-spacing: 0.3px;
       text-shadow: 0 2px 8px rgba(0, 206, 201, 0.07);
     }
+    .turno-box {
+      margin: 0.5rem 0 1.2rem 0;
+      border-radius: 16px;
+      border: 1px solid #dbeafe;
+      background: #f8fbff;
+      padding: 0.95rem;
+      text-align: left;
+    }
+    .turno-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 0.2rem 0.7rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .turno-badge.abierto {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .turno-badge.cerrado {
+      background: #fee2e2;
+      color: #991b1b;
+    }
   </style>
 </head>
 <body>
@@ -150,6 +187,27 @@
         </svg>
       </div>
       <div class="welcome">Panel exclusivo para Laboratoristas</div>
+      <div class="turno-box">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <strong>Control de turno</strong>
+          <span class="turno-badge <?= $turnoAbierto ? 'abierto' : 'cerrado' ?>">
+            <?= $turnoAbierto ? 'Turno abierto' : 'Sin turno abierto' ?>
+          </span>
+        </div>
+        <?php if ($turnoAbierto): ?>
+          <div class="small text-muted mb-2">Apertura: <?= htmlspecialchars($turnoAbiertoEn) ?></div>
+          <form method="post" action="dashboard.php?action=cerrar_turno_laboratorio" class="d-flex gap-2 align-items-center">
+            <input type="text" name="observacion_cierre" class="form-control form-control-sm" placeholder="Observación de cierre (opcional)">
+            <button type="submit" class="btn btn-sm btn-danger">Cerrar turno</button>
+          </form>
+        <?php else: ?>
+          <div class="small text-muted mb-2">Debes abrir turno para guardar resultados de exámenes.</div>
+          <form method="post" action="dashboard.php?action=abrir_turno_laboratorio" class="d-flex gap-2 align-items-center">
+            <input type="text" name="observacion_apertura" class="form-control form-control-sm" placeholder="Observación de apertura (opcional)">
+            <button type="submit" class="btn btn-sm btn-success">Abrir turno</button>
+          </form>
+        <?php endif; ?>
+      </div>
       <h2>¡Bienvenido!</h2>
       <p>
         Aquí puedes gestionar y editar los resultados de exámenes de laboratorio de manera eficiente y segura.<br>

@@ -1,14 +1,30 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../config/currency.php';
+require_once __DIR__ . '/../../usuarios/funciones/usuarios_privilegios.php';
 $modoCotizaciones = strtolower(trim((string)($modoCotizaciones ?? 'activas')));
 $soloAnuladas = ($modoCotizaciones === 'anuladas');
 $rolActualCot = strtolower(trim((string)($_SESSION['rol'] ?? '')));
 $puedeAnularCot = ($rolActualCot === 'admin');
+$privilegiosCot = usuarios_privilegios_usuario_actual($pdo);
+$puedeCompararResultados = ($rolActualCot === 'admin') || !empty($privilegiosCot['resultados_comparar']) || !empty($privilegiosCot['resultados_ver']);
+$puedeEditarResultados = ($rolActualCot === 'admin') || !empty($privilegiosCot['resultados_editar']);
+$puedeEditarCotizaciones = ($rolActualCot === 'admin') || !empty($privilegiosCot['cotizaciones_editar']);
+$esModoSisCot = !empty($esModoSis ?? false);
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(\PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(\PDO::FETCH_ASSOC);
 $currencyCfg = currency_get_config($pdo);
 ?>
+<?php if ($esModoSisCot): ?>
+<style>
+    #tablaCotizaciones th.col-total,
+    #tablaCotizaciones td.col-total,
+    #tablaCotizaciones th.col-estado-pago,
+    #tablaCotizaciones td.col-estado-pago {
+        display: none !important;
+    }
+</style>
+<?php endif; ?>
 <style>
 .btn-cotizacion-accion {
     margin-right: 0.25rem;
@@ -37,6 +53,25 @@ $currencyCfg = currency_get_config($pdo);
     border-radius: 10px;
     border: 1.5px solid #90caf9;
     font-size: 1rem;
+}
+.cotizaciones-filter-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.cotizaciones-main-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+.cotizaciones-main-actions .btn {
+    min-width: 160px;
+}
+.cotizaciones-slow-network {
+    min-width: 260px;
+    max-width: 420px;
 }
 .alerta-resumen-cotizaciones {
     display: flex;
@@ -107,6 +142,21 @@ $currencyCfg = currency_get_config($pdo);
     opacity: 1;
 }
 @media (max-width: 768px) {
+    .cotizaciones-filter-actions {
+        align-items: stretch;
+    }
+    .cotizaciones-main-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+    .cotizaciones-main-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
+    .cotizaciones-slow-network {
+        width: 100%;
+        max-width: none;
+    }
     .table-responsive { display: none; }
     .cards-container { display: block; }
     .mobile-pagination-cotizaciones {
@@ -224,6 +274,15 @@ $currencyCfg = currency_get_config($pdo);
             </select>
         </div>
         <div class="col-md-2 col-sm-6 mb-2">
+            <label class="form-label">👨‍🔬 Usuario resultados</label>
+            <select id="filtroUsuarioResultados" class="form-select">
+                <option value="">Todos</option>
+                <option value="unico">Único</option>
+                <option value="multiple">Múltiples</option>
+                <option value="sin_asignar">Sin asignar</option>
+            </select>
+        </div>
+        <div class="col-md-2 col-sm-6 mb-2">
             <label class="form-label">📅 Fecha desde</label>
             <input type="date" id="filtroFechaDesde" class="form-control">
         </div>
@@ -231,8 +290,18 @@ $currencyCfg = currency_get_config($pdo);
             <label class="form-label">📅 Fecha hasta</label>
             <input type="date" id="filtroFechaHasta" class="form-control">
         </div>
-        <div class="col-md-2 col-sm-12 d-flex align-items-end mb-2">
-            <button id="btnLimpiarFiltros" class="btn btn-outline-secondary w-100" type="button"><i class="bi bi-x-circle"></i> Limpiar</button>
+        <div class="col-12 mb-2">
+            <div class="cotizaciones-filter-actions">
+                <div class="form-check form-switch cotizaciones-slow-network w-100 bg-white rounded px-3 py-2 border">
+                    <input class="form-check-input" type="checkbox" id="modoRedLentaToggle">
+                    <label class="form-check-label fw-semibold" for="modoRedLentaToggle">Modo red lenta</label>
+                    <div class="small text-muted">Reduce auto-recargas para conexiones inestables.</div>
+                </div>
+                <div class="cotizaciones-main-actions">
+                    <button id="btnLimpiarFiltros" class="btn btn-outline-secondary" type="button"><i class="bi bi-x-circle"></i> Limpiar</button>
+                    <button id="btnActualizarAhora" class="btn btn-primary" type="button"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -261,10 +330,16 @@ $currencyCfg = currency_get_config($pdo);
                         <th>Paciente</th>
                         <th>DNI</th>
                         <th>Fecha</th>
-                        <th>Total</th>
+                        <?php if (!$esModoSisCot): ?>
                         <th>Referencia</th>
+                        <?php endif; ?>
+                        <?php if (!$esModoSisCot): ?>
+                        <th>Total</th>
                         <th>Estado Pago</th>
+                        <?php endif; ?>
                         <th>Estado Examen</th>
+                        <th>Usuario resultados</th>
+                        <th>Servicio</th>
                         <th>Rol Creador</th>
                         <th>Acciones</th>
                     </tr>
@@ -331,12 +406,45 @@ const cantidadSeleccionadas = document.getElementById('cantidadSeleccionadas');
 const confirmarPagoMasivo = document.getElementById('confirmarPagoMasivo');
 const selectAll = document.getElementById('selectAllCotizaciones');
 const puedeAnularCotizacion = <?= $puedeAnularCot ? 'true' : 'false' ?>;
+const puedeCompararResultados = <?= $puedeCompararResultados ? 'true' : 'false' ?>;
+const puedeEditarResultados = <?= $puedeEditarResultados ? 'true' : 'false' ?>;
+const puedeEditarCotizaciones = <?= $puedeEditarCotizaciones ? 'true' : 'false' ?>;
 const modoCotizaciones = '<?= $soloAnuladas ? 'anuladas' : 'activas' ?>';
 const soloAnuladas = <?= $soloAnuladas ? 'true' : 'false' ?>;
+const esModoSisCot = <?= $esModoSisCot ? 'true' : 'false' ?>;
 let filtroAlertaEstado = '';
 const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
     ? window.formatMoney(value)
     : `S/ ${Number(value || 0).toFixed(2)}`;
+const MAX_SELECT_ALL_LENGTH = 5000;
+let resumenAlertasXhr = null;
+let resumenAlertasTimer = null;
+let filtrosReloadTimer = null;
+const SLOW_NETWORK_KEY = 'cotizaciones_slow_network_mode';
+let isSlowNetworkMode = false;
+
+function readSlowNetworkMode() {
+    return localStorage.getItem(SLOW_NETWORK_KEY) === '1';
+}
+
+function writeSlowNetworkMode(enabled) {
+    localStorage.setItem(SLOW_NETWORK_KEY, enabled ? '1' : '0');
+}
+
+function setSlowModeUi(enabled) {
+    const btnActualizarAhora = document.getElementById('btnActualizarAhora');
+    const toggle = document.getElementById('modoRedLentaToggle');
+    if (toggle) {
+        toggle.checked = enabled;
+    }
+    if (btnActualizarAhora) {
+        btnActualizarAhora.classList.toggle('btn-warning', enabled);
+        btnActualizarAhora.classList.toggle('btn-primary', !enabled);
+        btnActualizarAhora.innerHTML = enabled
+            ? '<i class="bi bi-wifi-off"></i> Actualizar manual'
+            : '<i class="bi bi-arrow-clockwise"></i> Actualizar';
+    }
+}
 
 function buildPdfDownloadUrl(cotizacionId) {
     return `resultados/descarga-pdf.php?cotizacion_id=${encodeURIComponent(cotizacionId)}&_ts=${Date.now()}`;
@@ -370,7 +478,10 @@ function renderEstadoExamenBadge(row) {
 }
 
 function actualizarResumenAlertas() {
-    $.ajax({
+    if (resumenAlertasXhr && typeof resumenAlertasXhr.abort === 'function') {
+        resumenAlertasXhr.abort();
+    }
+    resumenAlertasXhr = $.ajax({
         url: 'dashboard.php?action=cotizaciones_api',
         type: 'GET',
         dataType: 'json',
@@ -380,8 +491,10 @@ function actualizarResumenAlertas() {
             filtro_dni: $('#filtroDni').val(),
             filtro_empresa: $('#filtroEmpresa').val(),
             filtro_convenio: $('#filtroConvenio').val(),
+            filtro_usuario_resultados: $('#filtroUsuarioResultados').val(),
             filtro_fecha_desde: $('#filtroFechaDesde').val(),
-            filtro_fecha_hasta: $('#filtroFechaHasta').val()
+            filtro_fecha_hasta: $('#filtroFechaHasta').val(),
+            filtro_alerta: filtroAlertaEstado
         },
         success: function(resp) {
             const vencido = parseInt(resp.vencido || 0, 10);
@@ -396,8 +509,23 @@ function actualizarResumenAlertas() {
 
             $('#alertaFiltroPorVencer').text(porVencer);
             $('#alertaFiltroEnTiempo').text(enTiempo);
+        },
+        complete: function() {
+            resumenAlertasXhr = null;
         }
     });
+}
+
+function scheduleActualizarResumenAlertas(delay = 250) {
+    if (isSlowNetworkMode) {
+        return;
+    }
+    if (resumenAlertasTimer) {
+        clearTimeout(resumenAlertasTimer);
+    }
+    resumenAlertasTimer = setTimeout(function() {
+        actualizarResumenAlertas();
+    }, delay);
 }
 
 function actualizarEstadoBotonesAlerta() {
@@ -455,16 +583,19 @@ function getSeleccionGlobal() {
 
 
     $(document).ready(function() {
+    isSlowNetworkMode = readSlowNetworkMode();
+    setSlowModeUi(isSlowNetworkMode);
+
     // Forzar ajuste visual de DataTables y botones de acciones al cambiar tamaño de pantalla
     let lastIsMobile = window.innerWidth <= 768;
     $(window).on('resize', function() {
         const isMobile = window.innerWidth <= 768;
-        if (isMobile !== lastIsMobile) {
-            window.location.reload();
-        } else {
-            if ($.fn.dataTable.isDataTable('#tablaCotizaciones')) {
-                $('#tablaCotizaciones').DataTable().columns.adjust().draw(false);
-            }
+        if ($.fn.dataTable.isDataTable('#tablaCotizaciones')) {
+            $('#tablaCotizaciones').DataTable().columns.adjust().draw(false);
+        }
+        if (isMobile !== lastIsMobile && isMobile && typeof cargarCardsCotizaciones === 'function') {
+            const busquedaMovil = $('#buscadorCotizacionesMovil').val() || '';
+            cargarCardsCotizaciones(1, busquedaMovil);
         }
         lastIsMobile = isMobile;
     });
@@ -484,6 +615,7 @@ function getSeleccionGlobal() {
                     d.filtro_dni = $('#filtroDni').val();
                     d.filtro_empresa = $('#filtroEmpresa').val();
                     d.filtro_convenio = $('#filtroConvenio').val();
+                    d.filtro_usuario_resultados = $('#filtroUsuarioResultados').val();
                     d.filtro_fecha_desde = $('#filtroFechaDesde').val();
                     d.filtro_fecha_hasta = $('#filtroFechaHasta').val();
                     d.filtro_alerta = filtroAlertaEstado;
@@ -515,12 +647,7 @@ function getSeleccionGlobal() {
                 },
                 { "data": "dni" },
                 { "data": "fecha" },
-                {
-                    "data": "total",
-                    "render": function(data) {
-                        return formatMoneySafe(data);
-                    }
-                },
+                <?php if (!$esModoSisCot): ?>
                 {
                     "data": "referencia",
                     "render": function(data, type, row) {
@@ -546,6 +673,14 @@ function getSeleccionGlobal() {
                         }
                     }
                 },
+                <?php endif; ?>
+                <?php if (!$esModoSisCot): ?>
+                {
+                    "data": "total",
+                    "render": function(data) {
+                        return formatMoneySafe(data);
+                    }
+                },
                 {
                     "data": null,
                     "render": function(data, type, row) {
@@ -565,31 +700,60 @@ function getSeleccionGlobal() {
                         }
                     }
                 },
+                <?php endif; ?>
+                { "data": null, "render": function(row) { return renderEstadoExamenBadge(row); } },
                 {
                     "data": null,
-                    "render": function(row) {
-                        return renderEstadoExamenBadge(row);
+                    "render": function(data, type, row) {
+                        const tipo = (row.resultados_usuario_tipo || 'sin_asignar');
+                        const nombre = (row.resultados_usuario_nombre || '').trim();
+                        const total = parseInt(row.resultados_usuario_total || 0, 10);
+                        if (tipo === 'unico' && nombre) {
+                            return `<span class='badge bg-primary'>${nombre}</span>`;
+                        }
+                        if (tipo === 'multiple' && total > 1) {
+                            return `<span class='badge bg-warning text-dark'>Múltiples (${total})</span>`;
+                        }
+                        return `<span class='text-muted'>—</span>`;
                     }
                 },
-                { "data": "rol_creador" },
+                {
+                    "data": "nombre_servicio",
+                    "render": function(data) {
+                        return data ? `<span class='badge bg-info text-dark'>${data}</span>` : '<span class="text-muted">—</span>';
+                    }
+                },
+                { "data": null,
+                    "render": function(data, type, row) {
+                        const nombre = (row.nombre_creador || '').trim();
+                        const rol = row.rol_creador || '';
+                        return nombre ? `${nombre}<br><small class="text-muted">${rol}</small>` : rol;
+                    }
+                },
                 {
                     "data": null,
                     "orderable": false,
                     "render": function(data, type, row) {
                         let acciones = '';
                         acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm btn-cotizacion-accion' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
-                        if (parseInt(row.id_cliente || 0, 10) > 0) {
+                        if (puedeCompararResultados && parseInt(row.id_cliente || 0, 10) > 0) {
                             acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id_cliente}' class='btn btn-secondary btn-sm btn-cotizacion-accion' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
                         }
-                        if (!soloAnuladas) {
+                        if (!soloAnuladas && puedeEditarCotizaciones) {
                             acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
                         }
                         if (row.modificada == 1) {
                             acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modificada</span>`;
                         }
                         if (!soloAnuladas) {
-                            acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
-                            acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+                            if (puedeEditarResultados) {
+                                acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+                            }
+                            if (parseInt(row.es_sis || 0, 10) !== 1) {
+                                acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+                            } else {
+                                acciones += `<span class='badge bg-success text-white ms-1' title='Atención SIS'><i class='bi bi-shield-check'></i> SIS</span>`;
+                            }
                         }
                         if (!soloAnuladas && puedeAnularCotizacion) {
                             acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
@@ -625,25 +789,71 @@ function getSeleccionGlobal() {
             localStorage.setItem('cotizaciones_restore_pending', '1');
         });
 
-        // Recargar tabla al cambiar cualquier filtro
-        $('#filtroDni, #filtroEmpresa, #filtroConvenio, #filtroFechaDesde, #filtroFechaHasta').on('change keyup', function() {
-            tabla.ajax.reload();
-            actualizarResumenAlertas();
+        // Recargar tabla al cambiar filtros (debounce para evitar tormenta de requests)
+        const recargarTablaConResumen = function() {
+            tabla.ajax.reload(null, false);
+            if (isSlowNetworkMode) {
+                actualizarResumenAlertas();
+            } else {
+                scheduleActualizarResumenAlertas();
+            }
+        };
+        $('#filtroDni').on('keyup', function() {
+            if (isSlowNetworkMode) {
+                return;
+            }
+            if (filtrosReloadTimer) {
+                clearTimeout(filtrosReloadTimer);
+            }
+            filtrosReloadTimer = setTimeout(recargarTablaConResumen, 300);
+        });
+        $('#filtroEmpresa, #filtroConvenio, #filtroUsuarioResultados, #filtroFechaDesde, #filtroFechaHasta').on('change', function() {
+            if (isSlowNetworkMode) {
+                return;
+            }
+            recargarTablaConResumen();
         });
         // Limpiar filtros
         $('#btnLimpiarFiltros').on('click', function() {
             $('#filtroDni').val('');
             $('#filtroEmpresa').val('');
             $('#filtroConvenio').val('');
+            $('#filtroUsuarioResultados').val('');
             $('#filtroFechaDesde').val('');
             $('#filtroFechaHasta').val('');
             filtroAlertaEstado = '';
             actualizarEstadoBotonesAlerta();
             tabla.ajax.reload();
-            actualizarResumenAlertas();
+            if (isSlowNetworkMode) {
+                actualizarResumenAlertas();
+            } else {
+                scheduleActualizarResumenAlertas();
+            }
         });
         $('#btnBuscarCotizaciones, #btnLimpiarCotizaciones').on('click', function() {
             tabla.ajax.reload();
+            if (isSlowNetworkMode) {
+                actualizarResumenAlertas();
+            } else {
+                scheduleActualizarResumenAlertas();
+            }
+        });
+
+        $('#btnActualizarAhora').on('click', function() {
+            tabla.ajax.reload(null, false);
+            actualizarResumenAlertas();
+            if (window.innerWidth < 768 && typeof cargarCardsCotizaciones === 'function') {
+                const busquedaMovil = $('#buscadorCotizacionesMovil').val() || '';
+                cargarCardsCotizaciones(1, busquedaMovil);
+            }
+        });
+
+        $('#modoRedLentaToggle').on('change', function() {
+            isSlowNetworkMode = !!this.checked;
+            writeSlowNetworkMode(isSlowNetworkMode);
+            setSlowModeUi(isSlowNetworkMode);
+            tabla.ajax.reload(null, false);
+            actualizarResumenAlertas();
         });
 
         $('.alerta-circle').on('click', function() {
@@ -655,6 +865,11 @@ function getSeleccionGlobal() {
                 cargarCardsCotizaciones(1, busquedaMovil);
             } else {
                 tabla.ajax.reload();
+            }
+            if (isSlowNetworkMode) {
+                actualizarResumenAlertas();
+            } else {
+                scheduleActualizarResumenAlertas();
             }
         });
 
@@ -673,6 +888,7 @@ function getSeleccionGlobal() {
                 length: seleccionadas.length,
                 start: 0,
                 draw: 1,
+                lite: 1,
                 modo: modoCotizaciones
             },
             success: function(resp) {
@@ -736,9 +952,10 @@ function getSeleccionGlobal() {
                     filtro_empresa: filtroEmpresa,
                     filtro_convenio: filtroConvenio,
                     filtro_dni: filtroDni,
-                    length: 10000,
+                    length: MAX_SELECT_ALL_LENGTH,
                     start: 0,
                     draw: 1,
+                    lite: 1,
                     modo: modoCotizaciones
                 },
                 success: function(resp) {
@@ -765,7 +982,6 @@ function getSeleccionGlobal() {
             selectAll.checked = seleccionadas.length > 0;
             restaurarSeleccionManual();
             actualizarTotal();
-            actualizarResumenAlertas();
         });
 
         // Actualizar datos del modal al abrirlo
@@ -822,7 +1038,11 @@ function getSeleccionGlobal() {
         });
 
         actualizarEstadoBotonesAlerta();
-        actualizarResumenAlertas();
+        if (isSlowNetworkMode) {
+            actualizarResumenAlertas();
+        } else {
+            scheduleActualizarResumenAlertas(100);
+        }
     });
     </script>
 
@@ -875,6 +1095,7 @@ function actualizarTotalMovil() {
                 length: seleccionadas.length,
                 start: 0,
                 draw: 1,
+                lite: 1,
                 modo: modoCotizaciones
             },
             success: function(resp) {
@@ -945,18 +1166,24 @@ function renderCotizacionCard(row) {
     // Acciones (todas como en escritorio)
     let acciones = '';
     acciones += `<a href='dashboard.php?vista=detalle_cotizacion&id=${row.id}' class='btn btn-info btn-sm btn-cotizacion-accion' title='Ver cotización'><i class='bi bi-eye'></i></a>`;
-    if ((parseInt(row.id_cliente || 0, 10)) > 0) {
+    if (puedeCompararResultados && (parseInt(row.id_cliente || 0, 10)) > 0) {
         acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id_cliente}' class='btn btn-secondary btn-sm btn-cotizacion-accion' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
     }
-    if (!soloAnuladas) {
+    if (!soloAnuladas && puedeEditarCotizaciones) {
         acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}&edit=1' class='btn btn-dark btn-sm btn-cotizacion-accion' title='Editar cotización'><i class='bi bi-file-earmark-medical'></i></a>`;
     }
     if (row.modificada == 1) {
         acciones += `<span class='badge bg-warning text-dark ms-1' title='Cotización modificada'><i class='bi bi-pencil'></i> Modif.</span>`;
     }
     if (!soloAnuladas) {
-        acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
-        acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+        if (puedeEditarResultados) {
+            acciones += `<a href='dashboard.php?vista=formulario&cotizacion_id=${row.id}' class='btn btn-primary btn-sm btn-cotizacion-accion' title='Editar o agregar resultados'><i class='bi bi-pencil-square'></i></a>`;
+        }
+        if (parseInt(row.es_sis || 0, 10) !== 1) {
+            acciones += `<a href='dashboard.php?vista=pago_cotizacion&id=${row.id}' class='btn btn-warning btn-sm btn-cotizacion-accion' title='Registrar pago'><i class='bi bi-cash-coin'></i></a>`;
+        } else {
+            acciones += `<span class='badge bg-success text-white ms-1' title='Atención SIS'><i class='bi bi-shield-check'></i> SIS</span>`;
+        }
     }
     if (!soloAnuladas && puedeAnularCotizacion) {
         acciones += `<button type='button' class='btn btn-danger btn-sm btn-cotizacion-accion' title='Anular cotización' onclick='solicitarAnulacionCotizacion(${row.id})'><i class='bi bi-x-octagon'></i></button>`;
@@ -973,11 +1200,19 @@ function renderCotizacionCard(row) {
         </div>
         <div class='info-item'><span class='info-label'>DNI</span><span class='info-value'>${row.dni || ''}</span></div>
         <div class='info-item'><span class='info-label'>Fecha</span><span class='info-value'>${row.fecha || ''}</span></div>
-        <div class='info-item'><span class='info-label'>Total</span><span class='info-value'>${formatMoneySafe(parseFloat(row.total) || 0)}</span></div>
-        <div class='info-item'><span class='info-label'>Referencia</span><span class='info-value'>${referenciaBadge}</span></div>
-        <div class='info-item'><span class='info-label'>Estado Pago</span><span class='info-value'>${estadoPago}</span></div>
+        ${esModoSisCot ? '' : `<div class='info-item'><span class='info-label'>Referencia</span><span class='info-value'>${referenciaBadge}</span></div>`}
+        ${esModoSisCot ? '' : `<div class='info-item'><span class='info-label'>Total</span><span class='info-value'>${formatMoneySafe(parseFloat(row.total) || 0)}</span></div>`}
+        ${esModoSisCot ? '' : `<div class='info-item'><span class='info-label'>Estado Pago</span><span class='info-value'>${estadoPago}</span></div>`}
         <div class='info-item'><span class='info-label'>Estado Examen</span><span class='info-value'>${estadoExamen}</span></div>
-        <div class='info-item'><span class='info-label'>Rol Creador</span><span class='info-value'>${row.rol_creador || ''}</span></div>
+        <div class='info-item'><span class='info-label'>Usuario resultados</span><span class='info-value'>${(() => {
+            const tipo = (row.resultados_usuario_tipo || 'sin_asignar');
+            const nombre = (row.resultados_usuario_nombre || '').trim();
+            const total = parseInt(row.resultados_usuario_total || 0, 10);
+            if (tipo === 'unico' && nombre) return `<span class='badge bg-primary'>${nombre}</span>`;
+            if (tipo === 'multiple' && total > 1) return `<span class='badge bg-warning text-dark'>Múltiples (${total})</span>`;
+            return `<span class='text-muted'>—</span>`;
+        })()}</span></div>
+        <div class='info-item'><span class='info-label'>Creado por</span><span class='info-value'>${((row.nombre_creador || '').trim() || row.rol_creador || '')} <small class="text-muted">${(row.nombre_creador || '').trim() ? '· ' + (row.rol_creador || '') : ''}</small></span></div>
         <div class='cotizacion-selector-row'>
             <input type='checkbox' class='cotizacion-checkbox-movil' data-id='${row.id}' data-saldo='${parseFloat(row.saldo) || 0}' ${checked}>
             <label class='mb-0'>Seleccionar</label>
@@ -997,6 +1232,7 @@ function cargarCardsCotizaciones(pagina = 1, busqueda = '') {
         filtro_dni: $('#filtroDni').val(),
         filtro_empresa: $('#filtroEmpresa').val(),
         filtro_convenio: $('#filtroConvenio').val(),
+        filtro_usuario_resultados: $('#filtroUsuarioResultados').val(),
         filtro_fecha_desde: $('#filtroFechaDesde').val(),
         filtro_fecha_hasta: $('#filtroFechaHasta').val(),
         filtro_alerta: filtroAlertaEstado,
@@ -1019,7 +1255,7 @@ function cargarCardsCotizaciones(pagina = 1, busqueda = '') {
                 renderPaginacionCotizacionesMovil(1, 1, busqueda);
             }
             actualizarTotalMovil();
-            actualizarResumenAlertas();
+            scheduleActualizarResumenAlertas();
         },
         error: function() {
             document.getElementById('cardsCotizacionesAjax').innerHTML = '<div class="alert alert-danger">Error al cargar las cotizaciones.</div>';
@@ -1060,10 +1296,12 @@ $(document).on('change', '#selectAllCotizacionesMovil', function() {
                 filtro_fecha_hasta: filtroFechaHasta,
                 filtro_empresa: filtroEmpresa,
                 filtro_convenio: filtroConvenio,
+                filtro_usuario_resultados: $('#filtroUsuarioResultados').val(),
                 filtro_dni: filtroDni,
-                length: 10000,
+                length: MAX_SELECT_ALL_LENGTH,
                 start: 0,
                 draw: 1,
+                lite: 1,
                 modo: modoCotizaciones
             },
             success: function(resp) {
@@ -1115,6 +1353,9 @@ $(document).on('change', '#selectAllCotizacionesMovil', function() {
         const btnClear = document.getElementById('btnClearCotizacionesMovil');
         if (buscador) {
             buscador.addEventListener('input', function(e) {
+                if (isSlowNetworkMode) {
+                    return;
+                }
                 cargarSiMovilCotizaciones(true);
             });
         }
@@ -1126,6 +1367,9 @@ $(document).on('change', '#selectAllCotizacionesMovil', function() {
         }
         // Filtros avanzados: recargar cards al cambiar filtros
         $('#filtroDni, #filtroEmpresa, #filtroConvenio, #filtroFechaDesde, #filtroFechaHasta').on('change keyup', function() {
+            if (isSlowNetworkMode) {
+                return;
+            }
             cargarSiMovilCotizaciones(true);
         });
         // Selección de cards

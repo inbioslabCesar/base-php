@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 $ruc = $_POST['ruc'] ?? '';
 $sinRuc = !empty($_POST['sin_ruc']);
@@ -37,8 +38,8 @@ function normalizarDominioEmpresa(string $dominio): string {
 }
 
 function obtenerDominioEmpresa(PDO $pdo): string {
-    $stmt = $pdo->query('SELECT dominio FROM config_empresa LIMIT 1');
-    $dominio = (string)($stmt->fetchColumn() ?: '');
+    $cfg = ui_theme_fetch_company_config($pdo);
+    $dominio = is_array($cfg) ? (string)($cfg['dominio'] ?? '') : '';
     $dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
     return $dominio !== '' ? $dominio : 'ejemplo.com';
 }
