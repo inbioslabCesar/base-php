@@ -32,12 +32,15 @@ $sexo              = $_POST['sexo'] ?? '';
 $fecha_nacimiento  = $_POST['fecha_nacimiento'] ?? null;
 $estado            = $_POST['estado'] ?? 'activo';
 $descuento         = $_POST['descuento'] ?? null;
+$usar_precio_convenio = isset($_POST['usar_precio_convenio']) ? 1 : 0;
 $procedencia       = trim($_POST['procedencia'] ?? '');
 $rol_creador       = $_SESSION['rol'] ?? 'desconocido';
 $operationId       = trim((string)($_POST['offline_operation_id'] ?? ''));
 $isOfflineSync     = isset($_POST['offline_sync']) && (string)$_POST['offline_sync'] === '1';
 $acceptHeader      = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
 $expectsJson       = $isOfflineSync || strpos($acceptHeader, 'application/json') !== false;
+$contextEmpresaId  = isset($_POST['id_empresa_contexto']) ? (int)$_POST['id_empresa_contexto'] : 0;
+$contextConvenioId = isset($_POST['id_convenio_contexto']) ? (int)$_POST['id_convenio_contexto'] : 0;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     if ($expectsJson) {
@@ -70,10 +73,39 @@ function cliente_has_column(PDO $pdo, string $column): bool {
     return $cache[$column];
 }
 
+function asociarClienteAEmpresa(PDO $pdo, int $empresaId, int $clienteId): void {
+    if ($empresaId <= 0 || $clienteId <= 0) {
+        return;
+    }
+    $stmtCheck = $pdo->prepare('SELECT 1 FROM empresa_cliente WHERE empresa_id = ? AND cliente_id = ? LIMIT 1');
+    $stmtCheck->execute([$empresaId, $clienteId]);
+    if (!$stmtCheck->fetchColumn()) {
+        $stmtIns = $pdo->prepare('INSERT INTO empresa_cliente (empresa_id, cliente_id) VALUES (?, ?)');
+        $stmtIns->execute([$empresaId, $clienteId]);
+    }
+}
+
+function asociarClienteAConvenio(PDO $pdo, int $convenioId, int $clienteId): void {
+    if ($convenioId <= 0 || $clienteId <= 0) {
+        return;
+    }
+    $stmtCheck = $pdo->prepare('SELECT 1 FROM convenio_cliente WHERE convenio_id = ? AND cliente_id = ? LIMIT 1');
+    $stmtCheck->execute([$convenioId, $clienteId]);
+    if (!$stmtCheck->fetchColumn()) {
+        $stmtIns = $pdo->prepare('INSERT INTO convenio_cliente (convenio_id, cliente_id) VALUES (?, ?)');
+        $stmtIns->execute([$convenioId, $clienteId]);
+    }
+}
+
 // Nuevos campos para empresa/convenio y tipo_registro
 $empresa_nombre   = $_SESSION['empresa_nombre'] ?? null;
 $convenio_nombre = $_SESSION['convenio_nombre'] ?? null;
 $tipo_registro   = 'cliente'; // Valor por defecto
+$rolesRegistroCentral = ['admin', 'recepcionista', 'laboratorista'];
+
+if (in_array((string)($_SESSION['rol'] ?? ''), $rolesRegistroCentral, true)) {
+    $tipo_registro = 'central';
+}
 
 if ($_SESSION['rol'] === 'empresa' && isset($_SESSION['empresa_nombre'])) {
     $empresa_nombre = $_SESSION['empresa_nombre'];
@@ -82,6 +114,23 @@ if ($_SESSION['rol'] === 'empresa' && isset($_SESSION['empresa_nombre'])) {
 if ($_SESSION['rol'] === 'convenio' && isset($_SESSION['convenio_nombre'])) {
     $convenio_nombre = $_SESSION['convenio_nombre'];
     $tipo_registro = 'convenio';
+}
+
+if ($contextEmpresaId > 0) {
+    $stmtEmpresaNombre = $pdo->prepare('SELECT nombre_comercial FROM empresas WHERE id = ? LIMIT 1');
+    $stmtEmpresaNombre->execute([$contextEmpresaId]);
+    $empresaNombreContexto = (string)($stmtEmpresaNombre->fetchColumn() ?: '');
+    if ($empresaNombreContexto !== '') {
+        $empresa_nombre = $empresaNombreContexto;
+    }
+}
+if ($contextConvenioId > 0) {
+    $stmtConvenioNombre = $pdo->prepare('SELECT nombre FROM convenios WHERE id = ? LIMIT 1');
+    $stmtConvenioNombre->execute([$contextConvenioId]);
+    $convenioNombreContexto = (string)($stmtConvenioNombre->fetchColumn() ?: '');
+    if ($convenioNombreContexto !== '') {
+        $convenio_nombre = $convenioNombreContexto;
+    }
 }
 
 // Validación de requeridos
@@ -294,6 +343,11 @@ try {
         $tipo_registro
     ];
 
+    if (cliente_has_column($pdo, 'usar_precio_convenio')) {
+        $cols[] = 'usar_precio_convenio';
+        $vals[] = $usar_precio_convenio;
+    }
+
     if (cliente_has_column($pdo, 'razon_social')) {
         $cols[] = 'razon_social';
         $vals[] = $razon_social !== '' ? mb_convert_case($razon_social, MB_CASE_TITLE, 'UTF-8') : null;
@@ -316,6 +370,32 @@ try {
 
     $id_cliente_nuevo = $pdo->lastInsertId();
 
+    $mensajeRegistro = 'Cliente registrado correctamente.';
+    $vistaRedirect = 'clientes';
+
+    if ($_SESSION['rol'] === 'empresa' && isset($_SESSION['empresa_id'])) {
+        asociarClienteAEmpresa($pdo, (int)$_SESSION['empresa_id'], (int)$id_cliente_nuevo);
+        $mensajeRegistro = 'Cliente registrado y asociado correctamente.';
+        $vistaRedirect = 'clientes_empresa';
+    }
+    if ($_SESSION['rol'] === 'convenio' && isset($_SESSION['convenio_id'])) {
+        asociarClienteAConvenio($pdo, (int)$_SESSION['convenio_id'], (int)$id_cliente_nuevo);
+        $mensajeRegistro = 'Cliente registrado y asociado correctamente.';
+        $vistaRedirect = 'clientes_convenio';
+    }
+
+    $rolSesion = (string)($_SESSION['rol'] ?? '');
+    if (in_array($rolSesion, $rolesRegistroCentral, true)) {
+        if ($contextEmpresaId > 0) {
+            asociarClienteAEmpresa($pdo, $contextEmpresaId, (int)$id_cliente_nuevo);
+            $mensajeRegistro = 'Cliente registrado y asociado a la empresa seleccionada.';
+        }
+        if ($contextConvenioId > 0) {
+            asociarClienteAConvenio($pdo, $contextConvenioId, (int)$id_cliente_nuevo);
+            $mensajeRegistro = 'Cliente registrado y asociado al convenio seleccionado.';
+        }
+    }
+
     if ($operationId !== '') {
         $stmtOk = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'aplicado', cliente_id = ? WHERE operation_id = ?");
         $stmtOk->execute([(int)$id_cliente_nuevo, $operationId]);
@@ -328,28 +408,12 @@ try {
             'ok' => true,
             'duplicate' => false,
             'cliente_id' => (int)$id_cliente_nuevo,
-            'message' => 'Cliente registrado correctamente'
+            'message' => $mensajeRegistro
         ]);
     }
 
-    // Asociación automática y redirección según rol
-    if ($_SESSION['rol'] === 'empresa' && isset($_SESSION['empresa_id'])) {
-        $stmt = $pdo->prepare("INSERT INTO empresa_cliente (empresa_id, cliente_id) VALUES (?, ?)");
-        $stmt->execute([$_SESSION['empresa_id'], $id_cliente_nuevo]);
-        $_SESSION['msg'] = 'Cliente registrado y asociado correctamente.';
-        header('Location: ../dashboard.php?vista=clientes_empresa');
-        exit;
-    }
-    if ($_SESSION['rol'] === 'convenio' && isset($_SESSION['convenio_id'])) {
-        $stmt = $pdo->prepare("INSERT INTO convenio_cliente (convenio_id, cliente_id) VALUES (?, ?)");
-        $stmt->execute([$_SESSION['convenio_id'], $id_cliente_nuevo]);
-        $_SESSION['msg'] = 'Cliente registrado y asociado correctamente.';
-        header('Location: ../dashboard.php?vista=clientes_convenio');
-        exit;
-    }
-
-    $_SESSION['msg'] = 'Cliente registrado correctamente.';
-    header('Location: ../dashboard.php?vista=clientes');
+    $_SESSION['msg'] = $mensajeRegistro;
+    header('Location: ../dashboard.php?vista=' . $vistaRedirect);
     exit;
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {

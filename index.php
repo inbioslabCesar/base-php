@@ -116,6 +116,24 @@ $menu_servicios    = $config_empresa['menu_servicios'] ?? 'Servicios';
 $menu_testimonios  = $config_empresa['menu_testimonios'] ?? 'Testimonios';
 $menu_contacto     = $config_empresa['menu_contacto'] ?? 'Contacto';
 
+$analisisFrecuentesPublicos = [];
+try {
+    $stmtFrecuentes = $pdo->query("SELECT
+            e.id,
+            COALESCE(NULLIF(TRIM(e.nombre), ''), CONCAT('Examen #', e.id)) AS nombre,
+            COALESCE(e.precio_publico, 0) AS precio_publico,
+            COUNT(cd.id) AS frecuencia
+        FROM examenes e
+        LEFT JOIN cotizaciones_detalle cd ON cd.id_examen = e.id
+        WHERE e.vigente = 1
+        GROUP BY e.id, e.nombre, e.precio_publico
+        ORDER BY frecuencia DESC, nombre ASC
+        LIMIT 8");
+    $analisisFrecuentesPublicos = $stmtFrecuentes ? $stmtFrecuentes->fetchAll(PDO::FETCH_ASSOC) : [];
+} catch (Throwable $e) {
+    $analisisFrecuentesPublicos = [];
+}
+
 $logoRel = ltrim((string)$logo, '/');
 $logoRel = preg_replace('#^\.\./+#', '', $logoRel);
 // BASE_URL suele terminar en /src/; para recursos publicos usamos la base del sitio.
@@ -146,6 +164,168 @@ $protocolo = (!$isLocalHost) ? 'https' : ($esHttps ? 'https' : 'http');
 $dominio   = $protocolo . '://' . $hostHeader;
 $canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
 
+$promoWebActivaFlag = (int)($config_empresa['promo_web_activa'] ?? 0) === 1;
+$promoWebPorcentaje = (float)($config_empresa['promo_web_porcentaje'] ?? 0);
+if ($promoWebPorcentaje < 0) {
+    $promoWebPorcentaje = 0;
+}
+if ($promoWebPorcentaje > 100) {
+    $promoWebPorcentaje = 100;
+}
+$promoWebAplicarCarrito = (int)($config_empresa['promo_web_aplicar_carrito'] ?? 0) === 1;
+$promoWebMensaje = trim((string)($config_empresa['promo_web_mensaje'] ?? ''));
+if ($promoWebMensaje === '') {
+    $promoWebMensaje = 'Cotiza desde la web y accede a un descuento especial.';
+}
+$promoWebInicio = trim((string)($config_empresa['promo_web_fecha_inicio'] ?? ''));
+$promoWebFin = trim((string)($config_empresa['promo_web_fecha_fin'] ?? ''));
+$hoyYmd = date('Y-m-d');
+$promoVigente = true;
+if ($promoWebInicio !== '' && strcmp($hoyYmd, $promoWebInicio) < 0) {
+    $promoVigente = false;
+}
+if ($promoWebFin !== '' && strcmp($hoyYmd, $promoWebFin) > 0) {
+    $promoVigente = false;
+}
+$promoWebActiva = $promoWebActivaFlag && $promoVigente && $promoWebPorcentaje > 0;
+
+$shareTitle = trim((string)($config_empresa['share_preview_titulo'] ?? ''));
+if ($shareTitle === '') {
+    $shareTitle = $nombre_empresa . ' | Laboratorio Clínico';
+}
+
+$shareDescription = trim((string)($config_empresa['share_preview_descripcion'] ?? ''));
+if ($shareDescription === '') {
+    if ($promoWebActiva) {
+        $shareDescription = 'Cotiza desde la web y accede a ' . rtrim(rtrim(number_format($promoWebPorcentaje, 2, '.', ''), '0'), '.') . '% de descuento.';
+    } elseif (!empty($oferta_mes)) {
+        $shareDescription = (string)$oferta_mes;
+    } else {
+        $shareDescription = 'Resultados confiables con atención rápida y profesional.';
+    }
+}
+
+$sharePreviewDefaultRel = 'uploads/empresa/share-preview-default.svg';
+$configuredShareImageRaw = trim((string)($config_empresa['share_preview_imagen'] ?? ''));
+$configuredShareImageLower = strtolower($configuredShareImageRaw);
+$configuredShareImageResolved = $configuredShareImageRaw;
+if ($configuredShareImageLower === '@logo') {
+    $configuredShareImageResolved = (string)$logo;
+} elseif ($configuredShareImageLower === '@institucional') {
+    $configuredShareImageResolved = !empty($imagenes_institucionales[0]) ? (string)$imagenes_institucionales[0] : '';
+} elseif ($configuredShareImageLower === '@default') {
+    $configuredShareImageResolved = $sharePreviewDefaultRel;
+}
+
+$shareImageCandidates = [
+    $configuredShareImageResolved,
+    !empty($imagenes_institucionales[0]) ? (string)$imagenes_institucionales[0] : '',
+    (string)$logo,
+    $sharePreviewDefaultRel,
+];
+
+$isUsableImageCandidate = static function (string $candidate): bool {
+    $v = trim($candidate);
+    if ($v === '') {
+        return false;
+    }
+    if (preg_match('~^https?://~i', $v) || strpos($v, '//') === 0) {
+        return true;
+    }
+    if (strpos($v, 'data:') === 0) {
+        return false;
+    }
+
+    $normalized = str_replace('\\', '/', $v);
+    $normalized = ltrim($normalized, '/');
+    $normalized = preg_replace('#^(\./|\.\./)+#', '', $normalized);
+    if ($normalized === '') {
+        return false;
+    }
+
+    $paths = [
+        __DIR__ . '/' . $normalized,
+        __DIR__ . '/src/' . $normalized,
+    ];
+    foreach ($paths as $path) {
+        if (is_file($path)) {
+            return true;
+        }
+    }
+    return false;
+};
+
+$rawShareImage = '';
+foreach ($shareImageCandidates as $candidate) {
+    if ($isUsableImageCandidate((string)$candidate)) {
+        $rawShareImage = (string)$candidate;
+        break;
+    }
+}
+
+$toAbsoluteUrl = static function (string $pathOrUrl) use ($dominio): string {
+    $v = trim($pathOrUrl);
+    if ($v === '') {
+        return '';
+    }
+    if (preg_match('~^https?://~i', $v)) {
+        return $v;
+    }
+    if (strpos($v, '//') === 0) {
+        return 'https:' . $v;
+    }
+    $normalized = str_replace('\\', '/', $v);
+    $normalized = preg_replace('#^(\./|\.\./)+#', '', $normalized);
+    return rtrim($dominio, '/') . '/' . ltrim($normalized, '/');
+};
+
+$resolveLocalAbsolutePath = static function (string $pathOrUrl): string {
+    $v = trim($pathOrUrl);
+    if ($v === '' || preg_match('~^https?://~i', $v) || strpos($v, '//') === 0 || strpos($v, 'data:') === 0) {
+        return '';
+    }
+    $normalized = str_replace('\\', '/', $v);
+    $normalized = ltrim($normalized, '/');
+    $normalized = preg_replace('#^(\./|\.\./)+#', '', $normalized);
+    if ($normalized === '') {
+        return '';
+    }
+
+    $paths = [
+        __DIR__ . '/' . $normalized,
+        __DIR__ . '/src/' . $normalized,
+    ];
+
+    foreach ($paths as $path) {
+        if (is_file($path)) {
+            return $path;
+        }
+    }
+    return '';
+};
+
+$appendVersionToUrl = static function (string $url, string $localPath): string {
+    if ($url === '' || $localPath === '' || !is_file($localPath)) {
+        return $url;
+    }
+    $mtime = @filemtime($localPath);
+    if (!$mtime) {
+        return $url;
+    }
+    $sep = (strpos($url, '?') !== false) ? '&' : '?';
+    return $url . $sep . 'v=' . (int)$mtime;
+};
+
+$shareImage = $toAbsoluteUrl($rawShareImage);
+if ($shareImage === '') {
+    $shareImage = $toAbsoluteUrl($sharePreviewDefaultRel);
+}
+$shareImageLocalPath = $resolveLocalAbsolutePath($rawShareImage);
+if ($shareImageLocalPath === '') {
+    $shareImageLocalPath = $resolveLocalAbsolutePath($sharePreviewDefaultRel);
+}
+$shareImage = $appendVersionToUrl($shareImage, $shareImageLocalPath);
+
 $pwaBasePath = $siteBasePath;
 $pwaManifestHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/manifest.php';
 $pwaServiceWorkerHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/sw.js';
@@ -163,6 +343,10 @@ if (!in_array($portalPublicoEstilo, ['clasico', 'premium_a', 'premium_b'], true)
 
 $vistaPublica = isset($_GET['vista']) ? trim((string)$_GET['vista']) : '';
 $promoIdPublico = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($vistaPublica === 'cotizar_publico') {
+    require __DIR__ . '/src/public/cotizador_publico.php';
+    exit;
+}
 if ($vistaPublica === 'detalle_promocion_publico' && $promoIdPublico > 0) {
     if ($portalPublicoEstilo === 'premium_a') {
         require __DIR__ . '/src/public/detalle_promocion_premium.php';
@@ -203,6 +387,17 @@ if ($portalPublicoEstilo === 'premium_b') {
     <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="es_PE">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($shareImage, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($shareImage, ENT_QUOTES, 'UTF-8') ?>">
     <meta name="theme-color" content="<?= htmlspecialchars($color_principal, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="manifest" href="<?= htmlspecialchars($pwaManifestHref, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -576,6 +771,8 @@ if ($portalPublicoEstilo === 'premium_b') {
         if (isset($_GET['vista'])) {
             if ($_GET['vista'] === 'detalle_promocion_publico' && isset($_GET['id'])) {
                 include 'src/promociones/detalle_promocion_publico.php';
+            } elseif ($_GET['vista'] === 'cotizar_publico') {
+                include 'src/public/cotizador_publico.php';
             } elseif ($_GET['vista'] === 'otra_vista') {
                 include 'src/otra_vista.php';
             } else {

@@ -210,6 +210,35 @@ if (!function_exists('normalizar_ruta_empresa')) {
          }, 3000);
      });
  </script>
+
+ <section class="py-4">
+     <div class="container">
+         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+             <h3 class="mb-0" style="color:<?= htmlspecialchars($color_principal) ?>;">Análisis más frecuentes</h3>
+             <a href="index.php?vista=cotizar_publico" class="btn btn-sm btn-outline-primary">Ver todos y cotizar</a>
+         </div>
+         <div class="row g-2">
+             <?php if (!empty($analisisFrecuentesPublicos)): ?>
+                 <?php foreach ($analisisFrecuentesPublicos as $analisis): ?>
+                     <div class="col-12 col-md-6 col-lg-4">
+                         <a href="index.php?vista=cotizar_publico&examen_id=<?= (int)($analisis['id'] ?? 0) ?>" class="text-decoration-none">
+                             <div class="card shadow-sm h-100">
+                                 <div class="card-body bg-white text-dark">
+                                     <div class="fw-semibold mb-1"><?= htmlspecialchars((string)($analisis['nombre'] ?? 'Examen clínico')) ?></div>
+                                 </div>
+                             </div>
+                         </a>
+                     </div>
+                 <?php endforeach; ?>
+             <?php else: ?>
+                 <div class="col-12">
+                     <div class="alert alert-light border mb-0">Aún no hay análisis destacados. Revisa el cotizador completo.</div>
+                 </div>
+             <?php endif; ?>
+         </div>
+     </div>
+ </section>
+
  <!-- TESTIMONIOS EN CARDS -->
  <section id="testimonios" class="py-5">
      <div class="container">

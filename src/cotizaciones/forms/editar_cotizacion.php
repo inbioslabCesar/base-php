@@ -172,6 +172,76 @@ function clientesHasColumn(PDO $pdo, string $column): bool {
     return $cache[$column];
 }
 
+function empresasHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM empresas LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
+}
+
+function conveniosHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM convenios LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
+}
+
+function examenesHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $stmt = $pdo->prepare('SHOW COLUMNS FROM examenes LIKE ?');
+        $stmt->execute([$column]);
+        $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
+}
+
+function asegurarAsociacionClienteContexto(PDO $pdo, string $tipoUsuario, ?int $empresaId, ?int $convenioId, int $clienteId): void {
+    if ($clienteId <= 0) {
+        return;
+    }
+
+    if ($tipoUsuario === 'empresa' && !empty($empresaId)) {
+        $stmtCheck = $pdo->prepare('SELECT 1 FROM empresa_cliente WHERE empresa_id = ? AND cliente_id = ? LIMIT 1');
+        $stmtCheck->execute([(int)$empresaId, $clienteId]);
+        if (!$stmtCheck->fetchColumn()) {
+            $stmtIns = $pdo->prepare('INSERT INTO empresa_cliente (empresa_id, cliente_id) VALUES (?, ?)');
+            $stmtIns->execute([(int)$empresaId, $clienteId]);
+        }
+        return;
+    }
+
+    if ($tipoUsuario === 'convenio' && !empty($convenioId)) {
+        $stmtCheck = $pdo->prepare('SELECT 1 FROM convenio_cliente WHERE convenio_id = ? AND cliente_id = ? LIMIT 1');
+        $stmtCheck->execute([(int)$convenioId, $clienteId]);
+        if (!$stmtCheck->fetchColumn()) {
+            $stmtIns = $pdo->prepare('INSERT INTO convenio_cliente (convenio_id, cliente_id) VALUES (?, ?)');
+            $stmtIns->execute([(int)$convenioId, $clienteId]);
+        }
+    }
+}
+
 function servicioTieneProfesionalesActivos(PDO $pdo, int $servicioId): bool {
     if ($servicioId <= 0) {
         return false;
@@ -212,6 +282,16 @@ function obtenerProfesionalSolicitanteValido(PDO $pdo, int $servicioId, int $pro
     } catch (Throwable $e) {
         return null;
     }
+}
+
+if (in_array($rol_creador, ['admin', 'recepcionista', 'laboratorista'], true)) {
+    asegurarAsociacionClienteContexto(
+        $pdo,
+        (string)$tipo_usuario,
+        $id_empresa !== null ? (int)$id_empresa : null,
+        $id_convenio !== null ? (int)$id_convenio : null,
+        (int)$id_cliente
+    );
 }
 
 $wantsFacturaParticular = ($tipo_usuario === 'cliente' && $emitir_comprobante === 1 && $tipo_comprobante_cliente === 'factura');
@@ -305,6 +385,31 @@ if ($esAtencionSis) {
     $descuento = 0;
 }
 
+$usarPrecioConvenio = 0;
+if ($rol_creador === 'empresa' && !empty($id_empresa) && empresasHasColumn($pdo, 'usar_precio_convenio')) {
+    $stmtModo = $pdo->prepare("SELECT usar_precio_convenio FROM empresas WHERE id = ?");
+    $stmtModo->execute([$id_empresa]);
+    $usarPrecioConvenio = (int)($stmtModo->fetchColumn() ?: 0);
+} elseif ($rol_creador === 'convenio' && !empty($id_convenio) && conveniosHasColumn($pdo, 'usar_precio_convenio')) {
+    $stmtModo = $pdo->prepare("SELECT usar_precio_convenio FROM convenios WHERE id = ?");
+    $stmtModo->execute([$id_convenio]);
+    $usarPrecioConvenio = (int)($stmtModo->fetchColumn() ?: 0);
+} elseif ($tipo_usuario === 'empresa' && !empty($id_empresa) && empresasHasColumn($pdo, 'usar_precio_convenio')) {
+    $stmtModo = $pdo->prepare("SELECT usar_precio_convenio FROM empresas WHERE id = ?");
+    $stmtModo->execute([$id_empresa]);
+    $usarPrecioConvenio = (int)($stmtModo->fetchColumn() ?: 0);
+} elseif ($tipo_usuario === 'convenio' && !empty($id_convenio) && conveniosHasColumn($pdo, 'usar_precio_convenio')) {
+    $stmtModo = $pdo->prepare("SELECT usar_precio_convenio FROM convenios WHERE id = ?");
+    $stmtModo->execute([$id_convenio]);
+    $usarPrecioConvenio = (int)($stmtModo->fetchColumn() ?: 0);
+} elseif ($id_cliente && clientesHasColumn($pdo, 'usar_precio_convenio')) {
+    $stmtModo = $pdo->prepare("SELECT usar_precio_convenio FROM clientes WHERE id = ?");
+    $stmtModo->execute([$id_cliente]);
+    $usarPrecioConvenio = (int)($stmtModo->fetchColumn() ?: 0);
+}
+
+$hasPrecioConvenioExamen = examenesHasColumn($pdo, 'precio_convenio');
+
 // Procesar cada examen y calcular totales
 $total = 0;
 $total_bruto = 0;
@@ -314,7 +419,11 @@ for ($i = 0; $i < count($examenes); $i++) {
     $examen_id = (int)$examenes[$i];
     $cantidad = (int)$cantidades[$i];
 
-    $stmt = $pdo->prepare("SELECT nombre, precio_publico FROM examenes WHERE id = ?");
+    if ($hasPrecioConvenioExamen) {
+        $stmt = $pdo->prepare("SELECT nombre, precio_publico, precio_convenio FROM examenes WHERE id = ?");
+    } else {
+        $stmt = $pdo->prepare("SELECT nombre, precio_publico, NULL AS precio_convenio FROM examenes WHERE id = ?");
+    }
     $stmt->execute([$examen_id]);
     $examen = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -324,7 +433,10 @@ for ($i = 0; $i < count($examenes); $i++) {
     $precio_unitario_desc = floatval($precios[$i]);
 
     // Para mostrar totales de referencia, puedes seguir usando el precio original y el descuento calculado
-    $precio_unitario = floatval($examen['precio_publico']);
+    $precio_publico = floatval($examen['precio_publico']);
+    $precio_convenio = floatval($examen['precio_convenio'] ?? 0);
+    $usarConvenioEnExamen = ($usarPrecioConvenio === 1 && $precio_convenio > 0);
+    $precio_unitario = $usarConvenioEnExamen ? $precio_convenio : ($precio_publico * (1 - ((float)$descuento / 100)));
     $subtotal_bruto = $precio_unitario * $cantidad;
 
     $subtotal = $precio_unitario_desc * $cantidad;

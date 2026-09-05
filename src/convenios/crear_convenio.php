@@ -12,6 +12,7 @@ $dni = isset($_POST['dni']) ? trim($_POST['dni']) : '';
 $sinDni = !empty($_POST['sin_dni']);
 $especialidad = isset($_POST['especialidad']) ? mb_convert_case(trim($_POST['especialidad']), MB_CASE_TITLE, "UTF-8") : '';
 $descuento = isset($_POST['descuento']) ? trim($_POST['descuento']) : null;
+$usar_precio_convenio = isset($_POST['usar_precio_convenio']) ? 1 : 0;
 $descripcion = isset($_POST['descripcion']) ? mb_convert_case(trim($_POST['descripcion']), MB_CASE_TITLE, "UTF-8") : '';
 $email = isset($_POST['email']) ? strtolower(trim($_POST['email'])) : '';
 $password = isset($_POST['password']) ? $_POST['password'] : '';
@@ -49,6 +50,17 @@ function dniExiste(PDO $pdo, string $dni): bool {
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM convenios WHERE dni = ?');
     $stmt->execute([$dni]);
     return ((int)$stmt->fetchColumn()) > 0;
+}
+
+function conveniosHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM convenios LIKE ?');
+    $stmt->execute([$column]);
+    $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$column];
 }
 
 $dni = limpiarSoloDigitos((string)$dni);
@@ -100,17 +112,34 @@ try {
     // Hash de la contraseña
     $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
-    $stmt = $pdo->prepare("INSERT INTO convenios (nombre, dni, especialidad, descuento, descripcion, email, password)
-        VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $nombre,
-        $dni,
-        $especialidad,
-        $descuento !== '' ? $descuento : null,
-        $descripcion,
-        $email,
-        $passwordHash
-    ]);
+    $hasUsarPrecioConvenio = conveniosHasColumn($pdo, 'usar_precio_convenio');
+
+    if ($hasUsarPrecioConvenio) {
+        $stmt = $pdo->prepare("INSERT INTO convenios (nombre, dni, especialidad, descuento, usar_precio_convenio, descripcion, email, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $nombre,
+            $dni,
+            $especialidad,
+            $descuento !== '' ? $descuento : null,
+            $usar_precio_convenio,
+            $descripcion,
+            $email,
+            $passwordHash
+        ]);
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO convenios (nombre, dni, especialidad, descuento, descripcion, email, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $nombre,
+            $dni,
+            $especialidad,
+            $descuento !== '' ? $descuento : null,
+            $descripcion,
+            $email,
+            $passwordHash
+        ]);
+    }
     $_SESSION['mensaje'] = "Convenio registrado exitosamente.";
 } catch (Exception $e) {
     $_SESSION['mensaje'] = "Error al registrar: " . $e->getMessage();

@@ -965,6 +965,26 @@ $inventarioInternoDisponible = $tieneTablasInventarioInterno();
 $alarmCols = $getAlarmColumnMap();
 $hasAlarmColumns = !empty($alarmCols['alarma_activa']) && !empty($alarmCols['alarma_dias']) && !empty($alarmCols['alarma_fecha_objetivo']) && !empty($alarmCols['alarma_estado']);
 $companyWhatsappNumber = $getCompanyWhatsappNumber();
+$hasFechaProcesoResultadoCol = false;
+$hasEstadoValidacionCol = false;
+$hasFechaValidacionResultadoCol = false;
+$hasValidadoPorCol = false;
+$hasCotizacionFechaProcesoInicioCol = false;
+try {
+    $hasFechaProcesoResultadoCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'fecha_proceso_en'")->fetch(PDO::FETCH_ASSOC);
+    $hasEstadoValidacionCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'estado_validacion'")->fetch(PDO::FETCH_ASSOC);
+    $hasFechaValidacionResultadoCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'fecha_validacion_en'")->fetch(PDO::FETCH_ASSOC);
+    $hasValidadoPorCol = (bool)$pdo->query("SHOW COLUMNS FROM resultados_examenes LIKE 'validado_por'")->fetch(PDO::FETCH_ASSOC);
+    $hasCotizacionFechaProcesoInicioCol = (bool)$pdo->query("SHOW COLUMNS FROM cotizaciones LIKE 'fecha_proceso_inicio'")->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    $hasFechaProcesoResultadoCol = false;
+    $hasEstadoValidacionCol = false;
+    $hasFechaValidacionResultadoCol = false;
+    $hasValidadoPorCol = false;
+    $hasCotizacionFechaProcesoInicioCol = false;
+}
+
+$cotizacionTieneProcesoGuardado = false;
 $progresoGlobal = [
     'total' => 0,
     'filled' => 0,
@@ -1601,6 +1621,11 @@ if (!empty($examenes) && is_array($examenes)) {
 
             $completoAl100 = $estaExamenCompleto($merged, $snapshotArr);
             $estadoResultado = $completoAl100 ? 'completado' : 'pendiente';
+            $setFechaProceso = $hayDatoReal ? 1 : 0;
+            $setEstadoValidacion = $hayDatoReal ? 1 : 0;
+            if ($setFechaProceso === 1) {
+                $cotizacionTieneProcesoGuardado = true;
+            }
 
             $alarmaActivaEf = $alarmaActiva;
             $alarmaDiasEf = $alarmaDias;
@@ -1611,6 +1636,18 @@ if (!empty($examenes) && is_array($examenes)) {
 
             $json_resultados = json_encode($merged, JSON_UNESCAPED_UNICODE);
             $setIdTurno = $hasTurnoColumn() ? ", id_turno = CASE WHEN :id_turno > 0 THEN :id_turno ELSE id_turno END" : '';
+            $setFechaProcesoSql = $hasFechaProcesoResultadoCol
+                ? ", fecha_proceso_en = CASE WHEN :set_fecha_proceso = 1 AND fecha_proceso_en IS NULL THEN NOW() ELSE fecha_proceso_en END"
+                : '';
+            $setEstadoValidacionSql = $hasEstadoValidacionCol
+                ? ", estado_validacion = CASE WHEN :set_estado_validacion = 1 THEN 'pendiente' WHEN estado_validacion IS NULL OR estado_validacion = '' THEN 'pendiente' ELSE estado_validacion END"
+                : '';
+            $setFechaValidacionSql = $hasFechaValidacionResultadoCol
+                ? ", fecha_validacion_en = CASE WHEN :set_estado_validacion = 1 THEN NULL ELSE fecha_validacion_en END"
+                : '';
+            $setValidadoPorSql = $hasValidadoPorCol
+                ? ", validado_por = CASE WHEN :set_estado_validacion = 1 THEN NULL ELSE validado_por END"
+                : '';
             if ($hasAlarmColumns) {
                 $setWhatsappDestino = !empty($alarmCols['alarma_whatsapp_destino']) ? ", alarma_whatsapp_destino = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 THEN :alarma_whatsapp_destino ELSE NULL END" : '';
                 $setUltimoAviso = !empty($alarmCols['alarma_ultimo_aviso']) ? ", alarma_ultimo_aviso = CASE WHEN :alarma_activa = 1 AND :alarma_dias > 0 AND alarma_ultimo_aviso IS NULL THEN NULL WHEN :alarma_activa = 0 OR :alarma_dias IS NULL OR :alarma_dias <= 0 THEN NULL ELSE alarma_ultimo_aviso END" : '';
@@ -1618,7 +1655,7 @@ if (!empty($examenes) && is_array($examenes)) {
                 $sql = "UPDATE resultados_examenes
                         SET resultados = :resultados,
                             estado = :estado_resultado,
-                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno},
+                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno}{$setFechaProcesoSql}{$setEstadoValidacionSql}{$setFechaValidacionSql}{$setValidadoPorSql},
                             alarma_activa = :alarma_activa,
                             alarma_dias = :alarma_dias,
                             alarma_fecha_objetivo = CASE
@@ -1646,6 +1683,12 @@ if (!empty($examenes) && is_array($examenes)) {
                     'alarma_whatsapp_destino' => $companyWhatsappNumber,
                     'id' => $id_resultado
                 ];
+                if ($hasFechaProcesoResultadoCol) {
+                    $paramsUpd['set_fecha_proceso'] = $setFechaProceso;
+                }
+                if ($hasEstadoValidacionCol) {
+                    $paramsUpd['set_estado_validacion'] = $setEstadoValidacion;
+                }
                 if ($hasTurnoColumn()) {
                     $paramsUpd['id_turno'] = $id_turno_activo;
                 }
@@ -1656,7 +1699,7 @@ if (!empty($examenes) && is_array($examenes)) {
                 $sql = "UPDATE resultados_examenes
                         SET resultados = :resultados,
                             estado = :estado_resultado,
-                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno}
+                            id_laboratorista = CASE WHEN :id_laboratorista > 0 THEN :id_laboratorista ELSE id_laboratorista END{$setIdTurno}{$setFechaProcesoSql}{$setEstadoValidacionSql}{$setFechaValidacionSql}{$setValidadoPorSql}
                         WHERE id = :id";
                 $paramsUpd = [
                     'resultados' => $json_resultados,
@@ -1664,6 +1707,12 @@ if (!empty($examenes) && is_array($examenes)) {
                     'id_laboratorista' => $id_laboratorista_responsable,
                     'id' => $id_resultado
                 ];
+                if ($hasFechaProcesoResultadoCol) {
+                    $paramsUpd['set_fecha_proceso'] = $setFechaProceso;
+                }
+                if ($hasEstadoValidacionCol) {
+                    $paramsUpd['set_estado_validacion'] = $setEstadoValidacion;
+                }
                 if ($hasTurnoColumn()) {
                     $paramsUpd['id_turno'] = $id_turno_activo;
                 }
@@ -1680,6 +1729,11 @@ if (!empty($examenes) && is_array($examenes)) {
                 }
             }
         }
+    }
+
+    if ($cotizacionTieneProcesoGuardado && $hasCotizacionFechaProcesoInicioCol && $cotizacion_id) {
+        $stmtCotProceso = $pdo->prepare("UPDATE cotizaciones SET fecha_proceso_inicio = COALESCE(fecha_proceso_inicio, NOW()) WHERE id = ?");
+        $stmtCotProceso->execute([(int)$cotizacion_id]);
     }
     
     if ($cotizacion_id && $hasOrderColumn() && is_array($exam_order) && !empty($exam_order)) {

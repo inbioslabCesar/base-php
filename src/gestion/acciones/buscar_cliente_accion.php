@@ -4,10 +4,15 @@ require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../servicios/documento_lookup.php';
 
 $dni = trim($_POST['dni'] ?? '');
+$examenId = isset($_POST['examen_id']) ? (int)$_POST['examen_id'] : 0;
 $documento = documento_lookup_normalize($dni);
 $rol = $_SESSION['rol'] ?? '';
 $empresa_id = $_SESSION['empresa_id'] ?? null;
 $convenio_id = $_SESSION['convenio_id'] ?? null;
+
+if ($examenId > 0) {
+    $_SESSION['buscar_cliente_examen_id'] = $examenId;
+}
 
 if ($documento !== '' && $rol) {
     // 1. Buscar cliente por DNI

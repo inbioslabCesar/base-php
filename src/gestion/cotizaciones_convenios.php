@@ -72,6 +72,7 @@ $saldoconvenio = 0.0;
 $pagosPorCotizacion = [];
 $porcentajePorCotizacion = [];
 $descargaAnticipadaPorCotizacion = [];
+$examenesPorCotizacion = [];
 
 if (!empty($cotizaciones)) {
     $idsCotizaciones = array_column($cotizaciones, 'id');
@@ -94,6 +95,30 @@ if (!empty($cotizaciones)) {
             if ($cotizacionIdTmp > 0) {
                 $porcentajePorCotizacion[$cotizacionIdTmp] = (int)obtenerPorcentajeResultadosCotizacion($pdo, $cotizacionIdTmp);
             }
+        }
+
+        $sqlDetalle = "SELECT id_cotizacion, id_examen, nombre_examen, cantidad, precio_unitario, subtotal
+            FROM cotizaciones_detalle
+            WHERE id_cotizacion IN ($inQuery)
+            ORDER BY id_cotizacion ASC, id ASC";
+        $stmtDetalle = $pdo->prepare($sqlDetalle);
+        $stmtDetalle->execute($idsCotizaciones);
+        $detallesRows = $stmtDetalle->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($detallesRows as $dRow) {
+            $idCot = (int)($dRow['id_cotizacion'] ?? 0);
+            if ($idCot <= 0) {
+                continue;
+            }
+            if (!isset($examenesPorCotizacion[$idCot])) {
+                $examenesPorCotizacion[$idCot] = [];
+            }
+            $nombreExamen = trim((string)($dRow['nombre_examen'] ?? ''));
+            if ($nombreExamen === '') {
+                $nombreExamen = 'Examen #' . (int)($dRow['id_examen'] ?? 0);
+            }
+            $cantidadEx = max(1, (int)($dRow['cantidad'] ?? 1));
+            $subtotalEx = number_format((float)($dRow['subtotal'] ?? 0), 2);
+            $examenesPorCotizacion[$idCot][] = $nombreExamen . ' x' . $cantidadEx . ' (S/ ' . $subtotalEx . ')';
         }
 
         // Pagos con método descarga anticipada
@@ -153,6 +178,7 @@ if (!empty($cotizaciones)) {
                 <tr>
                     <th>Código</th>
                     <th>Nombre y Apellido</th>
+                    <th>DNI</th>
                     <th>Fecha</th>
                     <th>Total</th>
                     <th>Abonado</th>
@@ -191,10 +217,19 @@ $tieneDescAnticipada = !empty($descargaAnticipadaPorCotizacion[$cotizacionId]);
 $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada))
     ? 'disabled style="pointer-events: none; opacity: 0.6;"'
     : 'target="_blank"';
+$detalleExamenes = $examenesPorCotizacion[$cotizacionId] ?? [];
+$detalleExamenesTexto = !empty($detalleExamenes)
+    ? implode("\n", $detalleExamenes)
+    : 'Sin detalle';
+$nombreCompleto = trim(((string)($cotizacion['nombre_cliente'] ?? '')) . ' ' . ((string)($cotizacion['apellido_cliente'] ?? '')));
+$nombreConDetalleExport = $nombreCompleto . "\nExamenes:\n" . $detalleExamenesTexto;
 ?>
 <tr>
     <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
-    <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
+    <td data-export="<?= htmlspecialchars($nombreConDetalleExport, ENT_QUOTES, 'UTF-8') ?>">
+        <div><?= htmlspecialchars($nombreCompleto) ?></div>
+    </td>
+    <td><?= htmlspecialchars((string)($cotizacion['dni'] ?? '')) ?></td>
     <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
     <td><span class="badge bg-info">S/ <?= number_format($total, 2) ?></span></td>
     <td><?= $badgeAbonado ?></td>
@@ -217,10 +252,23 @@ $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada)
 <?php endforeach; ?>
 <?php else: ?>
 <tr>
-    <td colspan="8" class="text-center">No hay cotizaciones registradas para el convenio.</td>
+    <td colspan="9" class="text-center">No hay cotizaciones registradas para el convenio.</td>
 </tr>
 <?php endif; ?>
 </tbody>
+            <tfoot>
+                <tr>
+                    <th>Totales:</th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th>S/ <?= number_format($totalPagadoconvenio, 2) ?></th>
+                    <th>S/ <?= number_format($saldoconvenio, 2) ?></th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </tfoot>
 </table>
 </div>
 </div>
@@ -237,17 +285,43 @@ $descargarDisabled = ($porcentaje < 100 || ($saldo > 0 && !$tieneDescAnticipada)
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script>
 $(document).ready(function() {
+    function sanitizeExportText(value) {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return $('<div>')
+            .html(String(value).replace(/<br\s*\/?>/gi, "\n"))
+            .text()
+            .replace(/\u00a0/g, ' ')
+            .trim();
+    }
+
+    function exportBodyFormatter(data, row, column, node) {
+        if (column === 1 && node) {
+            var exportValue = node.getAttribute('data-export');
+            if (exportValue) {
+                return exportValue;
+            }
+        }
+        return sanitizeExportText(data);
+    }
+
     $('#tablaCotizaciones').DataTable({
         language: {
             url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
         },
-        order: [[2, 'desc']],
+        order: [[3, 'desc']],
         dom: 'Bfrtip',
         buttons: [
             {
                 extend: 'excelHtml5',
                 text: '<i class="bi bi-file-earmark-excel"></i> Excel',
-                className: 'btn btn-success btn-sm'
+                className: 'btn btn-success btn-sm',
+                footer: true,
+                exportOptions: {
+                    columns: ':not(:last-child)',
+                    format: { body: exportBodyFormatter }
+                }
             },
             {
                 extend: 'pdfHtml5',
@@ -255,12 +329,21 @@ $(document).ready(function() {
                 className: 'btn btn-danger btn-sm',
                 orientation: 'landscape',
                 pageSize: 'A4',
-                exportOptions: { columns: ':visible' }
+                footer: true,
+                exportOptions: {
+                    columns: ':not(:last-child)',
+                    format: { body: exportBodyFormatter }
+                }
             },
             {
                 extend: 'print',
                 text: '<i class="bi bi-printer"></i> Imprimir',
-                className: 'btn btn-primary btn-sm'
+                className: 'btn btn-primary btn-sm',
+                footer: true,
+                exportOptions: {
+                    columns: ':not(:last-child)',
+                    format: { body: exportBodyFormatter }
+                }
             }
         ]
     });

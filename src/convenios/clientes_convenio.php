@@ -21,6 +21,19 @@ $formatearEdadCliente = static function (array $cliente): string {
     );
 };
 
+$resolverEtiquetaRegistro = static function (array $cliente): array {
+    $rol = strtolower(trim((string)($cliente['rol_creador'] ?? '')));
+    $tipoRegistro = strtolower(trim((string)($cliente['tipo_registro'] ?? '')));
+
+    if (in_array($rol, ['admin', 'recepcionista', 'laboratorista'], true) || $tipoRegistro === 'central') {
+        return ['Registro principal/central', 'bg-primary'];
+    }
+    if ($tipoRegistro === 'convenio') {
+        return ['Registro convenio', 'bg-info text-dark'];
+    }
+    return ['Asociado', 'bg-secondary'];
+};
+
 $id_convenio = $_SESSION['convenio_id'] ?? null;
 $rol = $_SESSION['rol'] ?? null;
 if (!$id_convenio || strtolower(trim($rol)) !== 'convenio') {
@@ -29,7 +42,7 @@ if (!$id_convenio || strtolower(trim($rol)) !== 'convenio') {
 }
 
 // Obtener IDs de clientes asociados al convenio
-$sqlClientes = "SELECT cliente_id FROM convenio_cliente WHERE convenio_id = ?";
+$sqlClientes = "SELECT DISTINCT cliente_id FROM convenio_cliente WHERE convenio_id = ?";
 $stmtClientes = $pdo->prepare($sqlClientes);
 $stmtClientes->execute([$id_convenio]);
 $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
@@ -55,11 +68,13 @@ $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
                         <th>Edad</th>
                         <th>Email</th>
                         <th>Teléfono</th>
+                        <th>Registro</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($clientes as $cliente): ?>
+                        <?php [$registroLabel, $registroBadge] = $resolverEtiquetaRegistro($cliente); ?>
                         <tr>
                             <td><?= htmlspecialchars($cliente['codigo_cliente'] ?? '') ?></td>
                             <td><?= htmlspecialchars((string)$cliente['nombre'] ?? '') ?></td>
@@ -68,6 +83,7 @@ $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
                             <td><?= htmlspecialchars($formatearEdadCliente($cliente)) ?></td>
                             <td><?= htmlspecialchars((string)$cliente['email'] ?? '') ?></td>
                             <td><?= htmlspecialchars((string)$cliente['telefono'] ?? '') ?></td>
+                            <td><span class="badge <?= htmlspecialchars($registroBadge) ?>"><?= htmlspecialchars($registroLabel) ?></span></td>
                             <td>
                                 <a href="dashboard.php?vista=form_cliente&id=<?= $cliente['id'] ?>" class="btn btn-info btn-sm" title="Editar">
                                     <i class="bi bi-pencil"></i>

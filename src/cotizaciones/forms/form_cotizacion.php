@@ -5,6 +5,20 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../../config/currency.php';
 
+function tableHasColumn(PDO $pdo, string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    $stmt = $pdo->prepare("SHOW COLUMNS FROM {$table} LIKE ?");
+    $stmt->execute([$column]);
+    $cache[$key] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$key];
+}
+
 $currencyCfg = currency_get_config($pdo);
 $currencySymbol = $currencyCfg['symbol'];
 
@@ -35,17 +49,24 @@ $sisObservacionesValor = '';
 $hasDetalleReferenciadoCols = false;
 
 // Exámenes catálogo
-$stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico FROM examenes WHERE vigente = 1 ORDER BY nombre");
+$hasExamenPrecioConvenio = tableHasColumn($pdo, 'examenes', 'precio_convenio');
+$selectPrecioConvenio = $hasExamenPrecioConvenio ? 'precio_convenio' : 'NULL AS precio_convenio';
+$stmt = $pdo->query("SELECT id, codigo, nombre, descripcion, tiempo_respuesta, preanalitica_cliente, observaciones, precio_publico, {$selectPrecioConvenio} FROM examenes WHERE vigente = 1 ORDER BY nombre");
 $examenes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $examenes_json = json_encode($examenes);
 
 // Empresas y convenios
 $empresas = [];
 $convenios = [];
+$hasEmpresaUsarPrecioConvenio = tableHasColumn($pdo, 'empresas', 'usar_precio_convenio');
+$hasConvenioUsarPrecioConvenio = tableHasColumn($pdo, 'convenios', 'usar_precio_convenio');
+$hasClienteUsarPrecioConvenio = tableHasColumn($pdo, 'clientes', 'usar_precio_convenio');
 if ($rol === 'admin' || $rol === 'recepcionista') {
-    $stmtEmp = $pdo->query("SELECT id, razon_social, nombre_comercial, descuento FROM empresas WHERE estado = 1 ORDER BY nombre_comercial");
+    $selectUsarEmp = $hasEmpresaUsarPrecioConvenio ? 'usar_precio_convenio' : '0 AS usar_precio_convenio';
+    $selectUsarConv = $hasConvenioUsarPrecioConvenio ? 'usar_precio_convenio' : '0 AS usar_precio_convenio';
+    $stmtEmp = $pdo->query("SELECT id, razon_social, nombre_comercial, descuento, {$selectUsarEmp} FROM empresas WHERE estado = 1 ORDER BY nombre_comercial");
     $empresas = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
-    $stmtConv = $pdo->query("SELECT id, nombre, descuento FROM convenios ORDER BY nombre");
+    $stmtConv = $pdo->query("SELECT id, nombre, descuento, {$selectUsarConv} FROM convenios ORDER BY nombre");
     $convenios = $stmtConv->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -210,20 +231,31 @@ try {
 
 // Descuentos
 $descuento_cliente = 0;
+$usarPrecioConvenioCliente = 0;
 if ($id_cliente) {
-    $stmtDesc = $pdo->prepare("SELECT descuento FROM clientes WHERE id = ?");
+    $selectUsarCli = $hasClienteUsarPrecioConvenio ? 'usar_precio_convenio' : '0 AS usar_precio_convenio';
+    $stmtDesc = $pdo->prepare("SELECT descuento, {$selectUsarCli} FROM clientes WHERE id = ?");
     $stmtDesc->execute([$id_cliente]);
-    $descuento_cliente = $stmtDesc->fetchColumn() ?: 0;
+    $clienteRow = $stmtDesc->fetch(PDO::FETCH_ASSOC) ?: [];
+    $descuento_cliente = (float)($clienteRow['descuento'] ?? 0);
+    $usarPrecioConvenioCliente = (int)($clienteRow['usar_precio_convenio'] ?? 0);
 }
 $descuento_empresa_convenio = 0;
+$usarPrecioConvenioSesion = 0;
 if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
-    $stmtDesc = $pdo->prepare("SELECT descuento FROM empresas WHERE id = ?");
+    $selectUsarEmp = $hasEmpresaUsarPrecioConvenio ? 'usar_precio_convenio' : '0 AS usar_precio_convenio';
+    $stmtDesc = $pdo->prepare("SELECT descuento, {$selectUsarEmp} FROM empresas WHERE id = ?");
     $stmtDesc->execute([$_SESSION['empresa_id']]);
-    $descuento_empresa_convenio = $stmtDesc->fetchColumn() ?: 0;
+    $empresaSesion = $stmtDesc->fetch(PDO::FETCH_ASSOC) ?: [];
+    $descuento_empresa_convenio = (float)($empresaSesion['descuento'] ?? 0);
+    $usarPrecioConvenioSesion = (int)($empresaSesion['usar_precio_convenio'] ?? 0);
 } elseif ($rol === 'convenio' && !empty($_SESSION['convenio_id'])) {
-    $stmtDesc = $pdo->prepare("SELECT descuento FROM convenios WHERE id = ?");
+    $selectUsarConv = $hasConvenioUsarPrecioConvenio ? 'usar_precio_convenio' : '0 AS usar_precio_convenio';
+    $stmtDesc = $pdo->prepare("SELECT descuento, {$selectUsarConv} FROM convenios WHERE id = ?");
     $stmtDesc->execute([$_SESSION['convenio_id']]);
-    $descuento_empresa_convenio = $stmtDesc->fetchColumn() ?: 0;
+    $convenioSesion = $stmtDesc->fetch(PDO::FETCH_ASSOC) ?: [];
+    $descuento_empresa_convenio = (float)($convenioSesion['descuento'] ?? 0);
+    $usarPrecioConvenioSesion = (int)($convenioSesion['usar_precio_convenio'] ?? 0);
 }
 ?>
 
@@ -825,7 +857,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                     <select id="empresa" name="id_empresa" class="form-select form-select-modern">
                                         <option value="">Seleccione empresa...</option>
                                         <?php foreach ($empresas as $emp): ?>
-                                            <option value="<?= $emp['id'] ?>" data-descuento="<?= $emp['descuento'] ?>" <?= ($isEdit && $cotizacionData['id_empresa'] == $emp['id']) ? 'selected' : '' ?>>
+                                            <option value="<?= $emp['id'] ?>" data-descuento="<?= $emp['descuento'] ?>" data-usa-precio-convenio="<?= (int)($emp['usar_precio_convenio'] ?? 0) ?>" <?= ($isEdit && $cotizacionData['id_empresa'] == $emp['id']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($emp['nombre_comercial'] ?: $emp['razon_social']) ?>
                                                 <?php if ($emp['descuento'] > 0): ?>
                                                     <span class="descuento-badge"><?= $emp['descuento'] ?>% desc.</span>
@@ -845,7 +877,7 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                     <select id="convenio" name="id_convenio" class="form-select form-select-modern">
                                         <option value="">Seleccione convenio...</option>
                                         <?php foreach ($convenios as $conv): ?>
-                                            <option value="<?= $conv['id'] ?>" data-descuento="<?= $conv['descuento'] ?>" <?= ($isEdit && $cotizacionData['id_convenio'] == $conv['id']) ? 'selected' : '' ?>>
+                                            <option value="<?= $conv['id'] ?>" data-descuento="<?= $conv['descuento'] ?>" data-usa-precio-convenio="<?= (int)($conv['usar_precio_convenio'] ?? 0) ?>" <?= ($isEdit && $cotizacionData['id_convenio'] == $conv['id']) ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($conv['nombre']) ?>
                                                 <?php if ($conv['descuento'] > 0): ?>
                                                     <span class="descuento-badge"><?= $conv['descuento'] ?>% desc.</span>
@@ -1112,7 +1144,8 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                 codigo: info ? info.codigo : '',
                                 nombre: ex.nombre_examen || (info ? info.nombre : ''),
                                 precio_unitario: precioEdicion,
-                                precio_publico: precioEdicion,
+                                precio_publico: info ? Number(info.precio_publico || 0) : precioEdicion,
+                                precio_convenio: info ? Number(info.precio_convenio || 0) : 0,
                                 cantidad: parseInt(ex.cantidad),
                                 descripcion: info ? info.descripcion : '',
                                 tiempo_respuesta: info ? info.tiempo_respuesta : '',
@@ -1199,6 +1232,10 @@ let examenesData = <?= $examenes_json ?>;
 let examenesSeleccionados = [];
 let descuentoCliente = <?= $descuento_cliente ?>;
 let descuentoActual = <?= $descuento_empresa_convenio ?: $descuento_cliente ?>;
+let usarPrecioConvenioCliente = <?= (int)$usarPrecioConvenioCliente ?>;
+let usarPrecioConvenioSesion = <?= (int)$usarPrecioConvenioSesion ?>;
+let usarPrecioConvenioActual = <?= (int)($usarPrecioConvenioSesion ?: $usarPrecioConvenioCliente) ?>;
+let examenIdPrefill = <?= isset($_GET['examen_id']) ? (int)$_GET['examen_id'] : 0 ?>;
 let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
 let hasDetalleReferenciadoCols = <?= $hasDetalleReferenciadoCols ? 'true' : 'false' ?>;
 const sisForzadoEnSistema = <?= $sisForzado ? 'true' : 'false' ?>;
@@ -1240,6 +1277,32 @@ function isSisActive() {
         return sisCheckbox.is(':checked') || sisCheckbox.is(':disabled');
     }
     return sisCotizacionInicial;
+}
+
+function resolvePrecioConvenio(examen) {
+    const precioConvenio = Number(examen?.precio_convenio ?? 0);
+    return Number.isFinite(precioConvenio) ? precioConvenio : 0;
+}
+
+function resolvePrecioPublico(examen) {
+    const precioPublico = Number(examen?.precio_publico ?? 0);
+    return Number.isFinite(precioPublico) ? precioPublico : 0;
+}
+
+function calcularPrecioPorPolitica(examen) {
+    if (isSisActive()) {
+        return 0;
+    }
+
+    const precioPublico = resolvePrecioPublico(examen);
+    const precioConvenio = resolvePrecioConvenio(examen);
+
+    // Si el perfil usa precio convenio y existe precio definido, usarlo exacto.
+    if (Number(usarPrecioConvenioActual) === 1 && precioConvenio > 0) {
+        return Number(precioConvenio.toFixed(2));
+    }
+
+    return Number(aplicarDescuento(precioPublico, descuentoActual));
 }
 
 function escapeHiddenAttr(value) {
@@ -1573,6 +1636,7 @@ function formatExamenOption(examen) {
         return examen.text;
     }
 
+    const precioDisplay = calcularPrecioPorPolitica(examenData);
     var $option = $(
         '<div class="d-flex justify-content-between align-items-center">' +
             '<div>' +
@@ -1580,7 +1644,7 @@ function formatExamenOption(examen) {
                 '<small class="text-muted">Código: ' + (examenData.codigo || 'N/A') + '</small>' +
             '</div>' +
             '<div class="text-end">' +
-                '<span class="badge bg-success">' + formatMoneySafe(isSisActive() ? 0 : examenData.precio_publico) + '</span>' +
+                '<span class="badge bg-success">' + formatMoneySafe(precioDisplay) + '</span>' +
             '</div>' +
         '</div>'
     );
@@ -1665,8 +1729,7 @@ function syncSisFields() {
             if (sisEnabled) {
                 ex.precio_unitario = 0;
             } else if (!isEdit) {
-                const precioBase = Number(ex.precio_publico ?? ex.precio_unitario ?? 0);
-                ex.precio_unitario = parseFloat(aplicarDescuento(precioBase, descuentoActual));
+                ex.precio_unitario = calcularPrecioPorPolitica(ex);
             }
         });
         renderizarLista();
@@ -1689,17 +1752,24 @@ function actualizarDescuento() {
     // Prioridad: si el usuario es empresa o convenio, usar ese descuento
     if (rolUsuario === 'empresa' || rolUsuario === 'convenio') {
         descuentoActual = <?= $descuento_empresa_convenio ?: 0 ?>;
+        usarPrecioConvenioActual = Number(usarPrecioConvenioSesion) === 1 ? 1 : 0;
     } else {
         let tipo = $('#tipoCliente').val();
         descuentoActual = 0;
+        usarPrecioConvenioActual = 0;
         if (tipo === 'empresa') {
             let desc = $('#empresa option:selected').data('descuento');
             descuentoActual = desc ? parseFloat(desc) : 0;
+            let usar = $('#empresa option:selected').attr('data-usa-precio-convenio');
+            usarPrecioConvenioActual = Number(usar) === 1 ? 1 : 0;
         } else if (tipo === 'convenio') {
             let desc = $('#convenio option:selected').data('descuento');
             descuentoActual = desc ? parseFloat(desc) : 0;
+            let usar = $('#convenio option:selected').attr('data-usa-precio-convenio');
+            usarPrecioConvenioActual = Number(usar) === 1 ? 1 : 0;
         } else if (tipo === 'cliente' || tipo === undefined) {
             descuentoActual = descuentoCliente;
+            usarPrecioConvenioActual = Number(usarPrecioConvenioCliente) === 1 ? 1 : 0;
         }
     }
     $('#descuento_aplicado').val(descuentoActual);
@@ -1715,8 +1785,7 @@ function actualizarDescuento() {
     } else {
         // En creación, sí aplicar descuento o forzar cero en SIS
         examenesSeleccionados.forEach((ex, idx) => {
-            const precioBase = Number(ex.precio_publico ?? ex.precio_unitario ?? 0);
-            ex.precio_unitario = isSisActive() ? 0 : parseFloat(aplicarDescuento(precioBase, descuentoActual));
+            ex.precio_unitario = calcularPrecioPorPolitica(ex);
         });
         renderizarLista();
     }
@@ -1739,26 +1808,35 @@ $('#buscadorExamen').select2({
 
 $('#buscadorExamen').on('select2:select', function(e) {
     let id = e.params.data.id;
+    agregarExamenPorId(id, true);
+    renderizarLista();
+    $(this).val('').trigger('change');
+});
+
+function agregarExamenPorId(id, incrementarSiExiste) {
     let examen = examenesData.find(ex => ex.id == id);
+    if (!examen) {
+        return false;
+    }
+
     let existente = examenesSeleccionados.find(ex => ex.id == id);
     if (!existente) {
-        let precioPublico = Number(examen.precio_publico);
-        let precioConDescuento = aplicarDescuento(precioPublico, descuentoActual);
+        let precioCalculado = calcularPrecioPorPolitica(examen);
         examenesSeleccionados.push({
             ...examen,
-            precio_unitario: isSisActive() ? 0 : precioConDescuento,
+            precio_unitario: precioCalculado,
             cantidad: 1,
             es_referenciado: 0,
             laboratorio_referenciado_nombre: '',
             costo_laboratorio_referenciado: 0,
             costo_logistica_extra: 0
         });
-    } else {
+    } else if (incrementarSiExiste) {
         existente.cantidad += 1;
     }
-    renderizarLista();
-    $(this).val('').trigger('change');
-});
+
+    return true;
+}
 
 // Cambiar cantidad
 $(document).on('input', '.cantidadExamen', function() {
@@ -2035,6 +2113,9 @@ function renderizarLista() {
                 ex.precio_unitario = 0;
             }
             let precio = sisActive ? 0 : parseFloat(ex.precio_unitario);
+            if (isNaN(precio) || precio < 0) {
+                precio = 0;
+            }
             let subtotal = precio * ex.cantidad;
             total += subtotal;
             let esRef = parseInt(ex.es_referenciado || 0) === 1;
@@ -2117,7 +2198,10 @@ function renderizarLista() {
     $('#totalCotizacion').text(formatMoneySafe(total));
     
     // Actualizar información de descuento
-    if (descuentoActual > 0) {
+    if (Number(usarPrecioConvenioActual) === 1) {
+        $('#descuentoInfo').removeClass('d-none');
+        $('#descuentoTexto').text('Precio convenio');
+    } else if (descuentoActual > 0) {
         $('#descuentoInfo').removeClass('d-none');
         $('#descuentoTexto').text(descuentoActual + '% desc.');
     } else {
@@ -2125,5 +2209,11 @@ function renderizarLista() {
     }
 
     syncHiddenPayloadFromSeleccion();
+}
+
+if (!isEdit && Number(examenIdPrefill) > 0) {
+    if (agregarExamenPorId(examenIdPrefill, false)) {
+        renderizarLista();
+    }
 }
 </script>

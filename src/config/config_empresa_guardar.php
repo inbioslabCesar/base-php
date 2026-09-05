@@ -37,6 +37,51 @@ if ($has_portal_publico_enable_input) {
     $portal_publico_enable = isset($_POST['portal_publico_enable']) ? 1 : 0;
 }
 
+$promo_web_activa = isset($_POST['promo_web_activa']) ? 1 : 0;
+$promo_web_porcentaje = (float)($_POST['promo_web_porcentaje'] ?? 0);
+if ($promo_web_porcentaje < 0) {
+    $promo_web_porcentaje = 0;
+}
+if ($promo_web_porcentaje > 100) {
+    $promo_web_porcentaje = 100;
+}
+$promo_web_aplicar_carrito = isset($_POST['promo_web_aplicar_carrito']) ? 1 : 0;
+$promo_web_mensaje = trim((string)($_POST['promo_web_mensaje'] ?? ''));
+if (mb_strlen($promo_web_mensaje) > 255) {
+    $promo_web_mensaje = mb_substr($promo_web_mensaje, 0, 255);
+}
+
+$normalizeDateOrNull = static function ($value): ?string {
+    $txt = trim((string)$value);
+    if ($txt === '') {
+        return null;
+    }
+    $ts = strtotime($txt);
+    if ($ts === false || $ts <= 0) {
+        return null;
+    }
+    return date('Y-m-d', $ts);
+};
+
+$promo_web_fecha_inicio = $normalizeDateOrNull($_POST['promo_web_fecha_inicio'] ?? null);
+$promo_web_fecha_fin = $normalizeDateOrNull($_POST['promo_web_fecha_fin'] ?? null);
+if ($promo_web_fecha_inicio !== null && $promo_web_fecha_fin !== null && strcmp($promo_web_fecha_fin, $promo_web_fecha_inicio) < 0) {
+    [$promo_web_fecha_inicio, $promo_web_fecha_fin] = [$promo_web_fecha_fin, $promo_web_fecha_inicio];
+}
+
+$share_preview_titulo = trim((string)($_POST['share_preview_titulo'] ?? ''));
+if (mb_strlen($share_preview_titulo) > 160) {
+    $share_preview_titulo = mb_substr($share_preview_titulo, 0, 160);
+}
+$share_preview_descripcion = trim((string)($_POST['share_preview_descripcion'] ?? ''));
+if (mb_strlen($share_preview_descripcion) > 255) {
+    $share_preview_descripcion = mb_substr($share_preview_descripcion, 0, 255);
+}
+$share_preview_imagen = trim((string)($_POST['share_preview_imagen'] ?? ''));
+if (mb_strlen($share_preview_imagen) > 600) {
+    $share_preview_imagen = mb_substr($share_preview_imagen, 0, 600);
+}
+
 $moneda_codigo = strtoupper(trim((string)($_POST['moneda_codigo'] ?? 'PEN')));
 if ($moneda_codigo === '') {
     $moneda_codigo = 'PEN';
@@ -202,6 +247,7 @@ $has_currency_columns = false;
 $has_operation_columns = false;
 $has_ubicaciones_json = false;
 $has_logo_fondo_navbar = false;
+$has_marketing_columns = false;
 try {
     $chk = $pdo->query("SHOW COLUMNS FROM config_empresa LIKE 'maps_embed'");
     $has_maps_embed = (bool)$chk->fetch(PDO::FETCH_ASSOC);
@@ -224,6 +270,15 @@ try {
         && in_array('portal_publico_enable', $colsMap, true);
     $has_ubicaciones_json = in_array('ubicaciones_json', $colsMap, true);
     $has_logo_fondo_navbar = in_array('logo_fondo_navbar', $colsMap, true);
+    $has_marketing_columns = in_array('promo_web_activa', $colsMap, true)
+        && in_array('promo_web_porcentaje', $colsMap, true)
+        && in_array('promo_web_aplicar_carrito', $colsMap, true)
+        && in_array('promo_web_mensaje', $colsMap, true)
+        && in_array('promo_web_fecha_inicio', $colsMap, true)
+        && in_array('promo_web_fecha_fin', $colsMap, true)
+        && in_array('share_preview_titulo', $colsMap, true)
+        && in_array('share_preview_descripcion', $colsMap, true)
+        && in_array('share_preview_imagen', $colsMap, true);
 
     if (!$has_ubicaciones_json) {
         try {
@@ -242,12 +297,53 @@ try {
             $has_logo_fondo_navbar = false;
         }
     }
+
+    if (!$has_marketing_columns) {
+        $alterStatements = [
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_activa TINYINT(1) NOT NULL DEFAULT 0 AFTER portal_publico_enable",
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_porcentaje DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER promo_web_activa",
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_aplicar_carrito TINYINT(1) NOT NULL DEFAULT 0 AFTER promo_web_porcentaje",
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_mensaje VARCHAR(255) NULL AFTER promo_web_aplicar_carrito",
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_fecha_inicio DATE NULL AFTER promo_web_mensaje",
+            "ALTER TABLE config_empresa ADD COLUMN promo_web_fecha_fin DATE NULL AFTER promo_web_fecha_inicio",
+            "ALTER TABLE config_empresa ADD COLUMN share_preview_titulo VARCHAR(160) NULL AFTER promo_web_fecha_fin",
+            "ALTER TABLE config_empresa ADD COLUMN share_preview_descripcion VARCHAR(255) NULL AFTER share_preview_titulo",
+            "ALTER TABLE config_empresa ADD COLUMN share_preview_imagen VARCHAR(600) NULL AFTER share_preview_descripcion",
+        ];
+
+        foreach ($alterStatements as $alterSql) {
+            try {
+                $pdo->exec($alterSql);
+            } catch (Throwable $e) {
+                // Ignorar errores por columnas existentes para mantener compatibilidad.
+            }
+        }
+
+        $stmtCols2 = $pdo->query("SHOW COLUMNS FROM config_empresa");
+        $colsRows2 = $stmtCols2 ? $stmtCols2->fetchAll(PDO::FETCH_ASSOC) : [];
+        $colsMap2 = [];
+        foreach ($colsRows2 as $colRow2) {
+            if (!empty($colRow2['Field'])) {
+                $colsMap2[] = (string)$colRow2['Field'];
+            }
+        }
+        $has_marketing_columns = in_array('promo_web_activa', $colsMap2, true)
+            && in_array('promo_web_porcentaje', $colsMap2, true)
+            && in_array('promo_web_aplicar_carrito', $colsMap2, true)
+            && in_array('promo_web_mensaje', $colsMap2, true)
+            && in_array('promo_web_fecha_inicio', $colsMap2, true)
+            && in_array('promo_web_fecha_fin', $colsMap2, true)
+            && in_array('share_preview_titulo', $colsMap2, true)
+            && in_array('share_preview_descripcion', $colsMap2, true)
+            && in_array('share_preview_imagen', $colsMap2, true);
+    }
 } catch (Exception $e) {
     $has_maps_embed = false;
     $has_currency_columns = false;
     $has_operation_columns = false;
     $has_ubicaciones_json = false;
     $has_logo_fondo_navbar = false;
+    $has_marketing_columns = false;
 }
 
 // Validación básica
@@ -438,6 +534,73 @@ $saveUpload = function (string $field, string $relativePath, string $label) use 
     return $relativePath;
 };
 
+$isImageUploadAllowed = function (string $tmpPath, string $originalName): bool {
+    $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if (!in_array($ext, ['png', 'jpg', 'jpeg', 'webp'], true)) {
+        return false;
+    }
+    if (!is_file($tmpPath)) {
+        return false;
+    }
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $mime = finfo_file($finfo, $tmpPath);
+            finfo_close($finfo);
+            if (!in_array($mime, ['image/png', 'image/jpeg', 'image/webp'], true)) {
+                return false;
+            }
+        }
+    }
+    return true;
+};
+
+$saveSharePreviewUpload = function (string $field) use ($baseDir, $describeUploadError, $isImageUploadAllowed): ?string {
+    if (!isset($_FILES[$field])) {
+        return null;
+    }
+    $file = $_FILES[$field];
+    if (!isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        $msg = $describeUploadError((int)$file['error']);
+        $_SESSION['msg'] = "Error al subir la imagen de compartido: {$msg}";
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+        exit;
+    }
+
+    $tmp = $file['tmp_name'] ?? '';
+    $name = $file['name'] ?? '';
+    if (!$isImageUploadAllowed($tmp, $name)) {
+        $_SESSION['msg'] = 'La imagen de compartido debe ser PNG, JPG, JPEG o WEBP valida.';
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+        exit;
+    }
+
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $relativeDir = 'uploads/empresa';
+    $relativePath = $relativeDir . '/share_preview_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    $destino = rtrim($baseDir, '\/') . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+    $destDir = dirname($destino);
+
+    if (!is_dir($destDir)) {
+        if (!mkdir($destDir, 0775, true) && !is_dir($destDir)) {
+            $_SESSION['msg'] = 'No se pudo crear la carpeta para la imagen de compartido.';
+            header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+            exit;
+        }
+    }
+
+    if (!move_uploaded_file($tmp, $destino)) {
+        $_SESSION['msg'] = 'Error al guardar la imagen de compartido.';
+        header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');
+        exit;
+    }
+
+    return '../' . ltrim($relativePath, '/');
+};
+
 $nuevoLogo = $saveUpload('logo', 'uploads/empresa/logo_empresa.png', 'el logo');
 if ($nuevoLogo) {
     $logo = '../' . ltrim($nuevoLogo, '/');
@@ -448,6 +611,11 @@ if ($nuevoLogo) {
 $nuevaFirma = $saveUpload('firma', 'uploads/empresa/firma.png', 'la firma');
 if ($nuevaFirma) {
     $firma = '../' . ltrim($nuevaFirma, '/');
+}
+
+$nuevaSharePreviewImagen = $saveSharePreviewUpload('share_preview_imagen_file');
+if ($nuevaSharePreviewImagen) {
+    $share_preview_imagen = $nuevaSharePreviewImagen;
 }
 // Colores y textos
 $color_principal  = trim($_POST['color_principal'] ?? '#1f4f82');
@@ -604,6 +772,10 @@ try {
             $sql .= ", logo_fondo_navbar=?";
         }
 
+        if ($has_marketing_columns) {
+            $sql .= ", promo_web_activa=?, promo_web_porcentaje=?, promo_web_aplicar_carrito=?, promo_web_mensaje=?, promo_web_fecha_inicio=?, promo_web_fecha_fin=?, share_preview_titulo=?, share_preview_descripcion=?, share_preview_imagen=?";
+        }
+
         $sql .= ", tamano_letra=?,
             frase_promocion=?, oferta_mes=?,
             imagenes_carrusel=?, imagenes_institucionales=?, servicios=?, testimonios=?, redes_sociales=?,
@@ -615,6 +787,17 @@ try {
         ]);
         if ($has_logo_fondo_navbar) {
             $params[] = $logo_fondo_navbar;
+        }
+        if ($has_marketing_columns) {
+            $params[] = (int)$promo_web_activa;
+            $params[] = (float)$promo_web_porcentaje;
+            $params[] = (int)$promo_web_aplicar_carrito;
+            $params[] = $promo_web_mensaje;
+            $params[] = $promo_web_fecha_inicio;
+            $params[] = $promo_web_fecha_fin;
+            $params[] = $share_preview_titulo;
+            $params[] = $share_preview_descripcion;
+            $params[] = $share_preview_imagen;
         }
         $params = array_merge($params, [
             $tamano_letra,
@@ -676,6 +859,19 @@ try {
         if ($has_logo_fondo_navbar) {
             $cols[] = 'logo_fondo_navbar';
             $vals[] = $logo_fondo_navbar;
+        }
+
+        if ($has_marketing_columns) {
+            $cols = array_merge($cols, [
+                'promo_web_activa', 'promo_web_porcentaje', 'promo_web_aplicar_carrito',
+                'promo_web_mensaje', 'promo_web_fecha_inicio', 'promo_web_fecha_fin',
+                'share_preview_titulo', 'share_preview_descripcion', 'share_preview_imagen'
+            ]);
+            $vals = array_merge($vals, [
+                (int)$promo_web_activa, (float)$promo_web_porcentaje, (int)$promo_web_aplicar_carrito,
+                $promo_web_mensaje, $promo_web_fecha_inicio, $promo_web_fecha_fin,
+                $share_preview_titulo, $share_preview_descripcion, $share_preview_imagen
+            ]);
         }
 
         $cols = array_merge($cols, [

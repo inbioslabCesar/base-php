@@ -73,6 +73,7 @@ $sexo           = $_POST['sexo'] ?? '';
 $fecha_nacimiento = $_POST['fecha_nacimiento'] ?? null;
 $estado         = $_POST['estado'] ?? 'activo';
 $descuento      = $_POST['descuento'] ?? null;
+$usar_precio_convenio = isset($_POST['usar_precio_convenio']) ? 1 : 0;
 
 function normalizarDominioEmpresa(string $dominio): string {
     $dominio = trim($dominio);
@@ -343,6 +344,11 @@ try {
     if (cliente_has_column($pdo, 'razon_social')) {
         $set[] = 'razon_social=?';
         $params[] = $razon_social !== '' ? mb_convert_case($razon_social, MB_CASE_TITLE, 'UTF-8') : null;
+    }
+
+    if (cliente_has_column($pdo, 'usar_precio_convenio')) {
+        $set[] = 'usar_precio_convenio=?';
+        $params[] = $usar_precio_convenio;
     }
 
     if (cliente_has_column($pdo, 'edad_referida_valor')) {

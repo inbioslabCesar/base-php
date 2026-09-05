@@ -54,6 +54,21 @@ $logo_fondo_navbar = $normalizeHexColor($empresa['logo_fondo_navbar'] ?? '') ?: 
 $tamano_letra = $empresa['tamano_letra'] ?? '1rem';
 $frase_promocion = $empresa['frase_promocion'] ?? '';
 $oferta_mes = $empresa['oferta_mes'] ?? '';
+$promo_web_activa = (int)($empresa['promo_web_activa'] ?? 0) === 1;
+$promo_web_porcentaje = (float)($empresa['promo_web_porcentaje'] ?? 0);
+if ($promo_web_porcentaje < 0) {
+    $promo_web_porcentaje = 0;
+}
+if ($promo_web_porcentaje > 100) {
+    $promo_web_porcentaje = 100;
+}
+$promo_web_aplicar_carrito = (int)($empresa['promo_web_aplicar_carrito'] ?? 0) === 1;
+$promo_web_mensaje = (string)($empresa['promo_web_mensaje'] ?? 'Cotiza desde la web y accede a un descuento especial.');
+$promo_web_fecha_inicio = trim((string)($empresa['promo_web_fecha_inicio'] ?? ''));
+$promo_web_fecha_fin = trim((string)($empresa['promo_web_fecha_fin'] ?? ''));
+$share_preview_titulo = (string)($empresa['share_preview_titulo'] ?? '');
+$share_preview_descripcion = (string)($empresa['share_preview_descripcion'] ?? '');
+$share_preview_imagen = (string)($empresa['share_preview_imagen'] ?? '');
 
 // Arrays seguros
 $imagenes_carrusel = [];
@@ -142,6 +157,57 @@ if (!is_file($firmaAbs)) {
 
 $logoUrl = $toPreviewUrl((string)$logo);
 $firmaUrl = $toPreviewUrl((string)$firma);
+$sharePreviewLogoSuggestion = $logoUrl !== '' ? $logoUrl : '../uploads/empresa/logo_empresa.png';
+$sharePreviewInstSuggestion = '';
+if (!empty($imagenes_institucionales) && is_array($imagenes_institucionales)) {
+    $firstInst = trim((string)($imagenes_institucionales[0] ?? ''));
+    if ($firstInst !== '') {
+        $sharePreviewInstSuggestion = $toPreviewUrl($firstInst);
+    }
+}
+$sharePreviewImageStored = trim((string)$share_preview_imagen);
+
+$sharePreviewFallbackTitle = trim((string)$share_preview_titulo);
+if ($sharePreviewFallbackTitle === '') {
+    $sharePreviewFallbackTitle = trim((string)($empresa['nombre'] ?? 'Laboratorio'));
+    if ($sharePreviewFallbackTitle === '') {
+        $sharePreviewFallbackTitle = 'Laboratorio';
+    }
+    $sharePreviewFallbackTitle .= ' | Laboratorio Clinico';
+}
+
+$sharePreviewFallbackDescription = trim((string)$share_preview_descripcion);
+if ($sharePreviewFallbackDescription === '') {
+    $sharePreviewFallbackDescription = trim((string)$promo_web_mensaje);
+}
+if ($sharePreviewFallbackDescription === '') {
+    $sharePreviewFallbackDescription = 'Resultados confiables con atencion rapida y profesional.';
+}
+
+$sharePreviewFallbackImage = trim((string)$share_preview_imagen);
+$sharePreviewFallbackImageLower = strtolower($sharePreviewFallbackImage);
+if ($sharePreviewFallbackImageLower === '@logo') {
+    $sharePreviewFallbackImage = $sharePreviewLogoSuggestion;
+} elseif ($sharePreviewFallbackImageLower === '@institucional') {
+    $sharePreviewFallbackImage = $sharePreviewInstSuggestion;
+} elseif ($sharePreviewFallbackImageLower === '@default') {
+    $sharePreviewFallbackImage = '../uploads/empresa/share-preview-default.svg';
+}
+if ($sharePreviewFallbackImage === '' && !empty($imagenes_institucionales) && is_array($imagenes_institucionales)) {
+    $firstInst = trim((string)($imagenes_institucionales[0] ?? ''));
+    if ($firstInst !== '') {
+        $sharePreviewFallbackImage = $firstInst;
+    }
+}
+if ($sharePreviewFallbackImage === '' && $logoUrl !== '') {
+    $sharePreviewFallbackImage = $logoUrl;
+}
+if ($sharePreviewFallbackImage === '') {
+    $sharePreviewFallbackImage = '../uploads/empresa/share-preview-default.svg';
+}
+if ($toPreviewUrl($sharePreviewFallbackImage) !== '') {
+    $sharePreviewFallbackImage = $toPreviewUrl($sharePreviewFallbackImage);
+}
 
 $ubicaciones = [];
 if (!empty($empresa['ubicaciones_json'])) {
@@ -194,7 +260,7 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
         <div class="alert alert-info"><?= htmlspecialchars($_SESSION['msg']) ?></div>
         <?php unset($_SESSION['msg']); ?>
     <?php endif; ?>
-    <form method="POST" action="<?= htmlspecialchars(BASE_URL) ?>dashboard.php?action=config_empresa_guardar" enctype="multipart/form-data" autocomplete="off">
+    <form id="configEmpresaForm" method="POST" action="<?= htmlspecialchars(BASE_URL) ?>dashboard.php?action=config_empresa_guardar" enctype="multipart/form-data" autocomplete="off">
         <input type="hidden" name="empresa_cfg_id" value="<?= (int)$empresaActualId ?>">
         <div class="row">
             <!-- Datos básicos -->
@@ -369,6 +435,100 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
                 <label for="oferta_mes" class="form-label">Oferta del mes</label>
                 <input type="text" class="form-control" id="oferta_mes" name="oferta_mes"
                     value="<?= htmlspecialchars($oferta_mes) ?>">
+            </div>
+            <div class="col-12"><hr></div>
+            <div class="col-12 mb-2">
+                <h6 class="mb-1">Promoción web y compartido</h6>
+                <small class="text-muted">Configura si la web muestra descuento, cuánto aplica y cómo se verá al compartir el link.</small>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" id="promo_web_activa" name="promo_web_activa" value="1" <?= $promo_web_activa ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="promo_web_activa">Activar promoción web</label>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label for="promo_web_porcentaje" class="form-label">Descuento (%)</label>
+                <input type="number" step="0.01" min="0" max="100" class="form-control" id="promo_web_porcentaje" name="promo_web_porcentaje" value="<?= htmlspecialchars(number_format($promo_web_porcentaje, 2, '.', '')) ?>" placeholder="10.00">
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" id="promo_web_aplicar_carrito" name="promo_web_aplicar_carrito" value="1" <?= $promo_web_aplicar_carrito ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="promo_web_aplicar_carrito">Aplicar descuento en carrito web</label>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="promo_web_fecha_inicio" class="form-label">Vigencia inicio</label>
+                <input type="date" class="form-control" id="promo_web_fecha_inicio" name="promo_web_fecha_inicio" value="<?= htmlspecialchars($promo_web_fecha_inicio) ?>">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="promo_web_fecha_fin" class="form-label">Vigencia fin</label>
+                <input type="date" class="form-control" id="promo_web_fecha_fin" name="promo_web_fecha_fin" value="<?= htmlspecialchars($promo_web_fecha_fin) ?>">
+            </div>
+            <div class="col-12 mb-3">
+                <label for="promo_web_mensaje" class="form-label">Mensaje promocional en la web</label>
+                <input type="text" class="form-control" id="promo_web_mensaje" name="promo_web_mensaje" maxlength="255" value="<?= htmlspecialchars($promo_web_mensaje) ?>" placeholder="Ej: Si cotizas desde la web accedes a 10% de descuento.">
+            </div>
+            <div class="col-12 mb-2">
+                <h6 class="mb-1">Vista previa al compartir</h6>
+                <small class="text-muted">Estos campos controlan la tarjeta de vista previa en WhatsApp, Facebook y otras apps.</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="share_preview_titulo" class="form-label">Título para compartir</label>
+                <input type="text" class="form-control" id="share_preview_titulo" name="share_preview_titulo" maxlength="160" value="<?= htmlspecialchars($share_preview_titulo) ?>" placeholder="Ej: INBIOSLAB | Cotiza online">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="share_preview_imagen" class="form-label">Imagen para compartir (URL o ruta)</label>
+                <input type="text" class="form-control" id="share_preview_imagen" name="share_preview_imagen" maxlength="600" value="<?= htmlspecialchars($share_preview_imagen) ?>" placeholder="Ej: uploads/empresa/banner-share.jpg">
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnShareUseLogo">Usar logo dinámico</button>
+                    <?php if ($sharePreviewInstSuggestion !== ''): ?>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnShareUseInst">Usar institucional dinámica</button>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="btnShareClearImage">Quitar imagen configurada</button>
+                </div>
+                <div class="form-text">Tip: los botones dinámicos guardan un modo automático y reflejan cambios futuros en logo/institucional.</div>
+            </div>
+            <div class="col-12 mb-3">
+                <label for="share_preview_descripcion" class="form-label">Descripción para compartir</label>
+                <textarea class="form-control" id="share_preview_descripcion" name="share_preview_descripcion" rows="2" maxlength="255" placeholder="Texto corto para la vista previa social."><?= htmlspecialchars($share_preview_descripcion) ?></textarea>
+            </div>
+            <div class="col-12 mb-3">
+                <label for="share_preview_imagen_file" class="form-label">Subir nueva imagen para compartir (recomendado)</label>
+                <input type="file" class="form-control" id="share_preview_imagen_file" name="share_preview_imagen_file" accept="image/png,image/jpeg,image/webp">
+                <div class="form-text">Formato recomendado: 1200x630 px. Al guardar, el sistema reemplaza la imagen de compartido actual.</div>
+            </div>
+            <div class="col-12 mb-3">
+                <div id="sharePreviewValidation" class="alert alert-secondary py-2 mb-0 small" role="status">
+                    Recomendación: usa 1200x630 px y peso menor a 1 MB para una vista previa estable en WhatsApp.
+                </div>
+            </div>
+            <div class="col-12 mb-4">
+                <div class="card border-0 shadow-sm" style="overflow:hidden; border-radius:16px;">
+                    <div class="row g-0">
+                        <div class="col-12 col-md-4" style="background:#eef2f7; min-height:190px;">
+                            <img
+                                id="sharePreviewCardImage"
+                                src="<?= htmlspecialchars($sharePreviewFallbackImage, ENT_QUOTES, 'UTF-8') ?>"
+                                alt="Imagen de vista previa"
+                                style="width:100%; height:100%; min-height:190px; object-fit:cover; display:block;"
+                            >
+                        </div>
+                        <div class="col-12 col-md-8">
+                            <div class="p-3 p-md-4">
+                                <div class="text-uppercase text-muted" style="font-size:.72rem; letter-spacing:.08em;">Vista previa social</div>
+                                <h6 id="sharePreviewCardTitle" class="mt-2 mb-2" style="font-weight:700; line-height:1.28;">
+                                    <?= htmlspecialchars($sharePreviewFallbackTitle, ENT_QUOTES, 'UTF-8') ?>
+                                </h6>
+                                <p id="sharePreviewCardDescription" class="mb-2 text-muted" style="line-height:1.35;">
+                                    <?= htmlspecialchars($sharePreviewFallbackDescription, ENT_QUOTES, 'UTF-8') ?>
+                                </p>
+                                <div class="small text-secondary" id="sharePreviewCardUrl" style="word-break:break-all;">tu-dominio.com</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <small class="text-muted d-block mt-2">La imagen y texto se actualizan en vivo. Si la imagen falla, se usa una alternativa por defecto.</small>
             </div>
             <!-- Imágenes del carrusel -->
             <div class="col-md-12 mb-3">
@@ -569,5 +729,213 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
     }
 
     renderBuilder(parseTextarea());
+})();
+
+(function () {
+    const titleInput = document.getElementById('share_preview_titulo');
+    const descInput = document.getElementById('share_preview_descripcion');
+    const imageInput = document.getElementById('share_preview_imagen');
+    const domainInput = document.getElementById('dominio');
+
+    const previewTitle = document.getElementById('sharePreviewCardTitle');
+    const previewDesc = document.getElementById('sharePreviewCardDescription');
+    const previewImg = document.getElementById('sharePreviewCardImage');
+    const previewUrl = document.getElementById('sharePreviewCardUrl');
+
+    if (!titleInput || !descInput || !imageInput || !previewTitle || !previewDesc || !previewImg || !previewUrl) {
+        return;
+    }
+
+    const fallback = {
+        title: <?= json_encode($sharePreviewFallbackTitle, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        desc: <?= json_encode($sharePreviewFallbackDescription, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>,
+        image: <?= json_encode($sharePreviewFallbackImage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
+    };
+    const logoSuggestion = <?= json_encode($sharePreviewLogoSuggestion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const instSuggestion = <?= json_encode($sharePreviewInstSuggestion, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    const initialImageStored = <?= json_encode($sharePreviewImageStored, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+
+    const uploadInput = document.getElementById('share_preview_imagen_file');
+    const btnUseLogo = document.getElementById('btnShareUseLogo');
+    const btnUseInst = document.getElementById('btnShareUseInst');
+    const btnClearImage = document.getElementById('btnShareClearImage');
+    const validationBox = document.getElementById('sharePreviewValidation');
+    const formEl = document.getElementById('configEmpresaForm');
+
+    const TARGET_RATIO = 1200 / 630;
+    const MAX_BYTES_RECOMMENDED = 1024 * 1024;
+
+    function formatBytes(bytes) {
+        const n = Number(bytes || 0);
+        if (n <= 0) {
+            return '0 KB';
+        }
+        if (n >= 1024 * 1024) {
+            return (n / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+        return Math.max(1, Math.round(n / 1024)) + ' KB';
+    }
+
+    function setValidation(message, level) {
+        if (!validationBox) {
+            return;
+        }
+        validationBox.textContent = message;
+        validationBox.classList.remove('alert-secondary', 'alert-success', 'alert-warning', 'alert-danger');
+        validationBox.classList.add(level || 'alert-secondary');
+    }
+
+    function evaluateDimensions(width, height, sizeBytes) {
+        const w = Number(width || 0);
+        const h = Number(height || 0);
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+
+        const ratio = w / h;
+        const ratioDiff = Math.abs(ratio - TARGET_RATIO);
+        const ratioOk = ratioDiff <= 0.06;
+        const minOk = w >= 600 && h >= 315;
+        const sizeKnown = Number(sizeBytes || 0) > 0;
+        const sizeOk = !sizeKnown || Number(sizeBytes) <= MAX_BYTES_RECOMMENDED;
+
+        const base = 'Imagen detectada: ' + w + 'x' + h + (sizeKnown ? (' | ' + formatBytes(sizeBytes)) : '');
+        if (ratioOk && minOk && sizeOk) {
+            setValidation(base + ' - Excelente para vista previa social.', 'alert-success');
+            return;
+        }
+
+        const notes = [];
+        if (!ratioOk) notes.push('proporción no ideal');
+        if (!minOk) notes.push('resolución baja');
+        if (!sizeOk) notes.push('peso alto');
+
+        const level = (!minOk || !sizeOk) ? 'alert-danger' : 'alert-warning';
+        setValidation(base + ' - Ajusta: ' + notes.join(', ') + '. Recomendado 1200x630 y <1 MB.', level);
+    }
+
+    function validateFromCurrentPreview() {
+        if (!previewImg) {
+            return;
+        }
+        if (previewImg.complete && previewImg.naturalWidth > 0) {
+            evaluateDimensions(previewImg.naturalWidth, previewImg.naturalHeight, 0);
+        }
+    }
+
+    function normalizeImagePath(value) {
+        const raw = String(value || '').trim();
+        if (!raw) {
+            return '';
+        }
+        const lower = raw.toLowerCase();
+        if (lower === '@logo') {
+            return logoSuggestion || fallback.image;
+        }
+        if (lower === '@institucional') {
+            return instSuggestion || fallback.image;
+        }
+        if (lower === '@default') {
+            return fallback.image;
+        }
+        if (/^(https?:)?\/\//i.test(raw) || raw.indexOf('data:') === 0 || raw.indexOf('../') === 0 || raw.indexOf('./') === 0 || raw.indexOf('/') === 0) {
+            return raw;
+        }
+        if (raw.indexOf('uploads/') === 0) {
+            return '../' + raw;
+        }
+        return raw;
+    }
+
+    function refreshPreview() {
+        const title = String(titleInput.value || '').trim() || fallback.title;
+        const desc = String(descInput.value || '').trim() || fallback.desc;
+        const imageCandidate = normalizeImagePath(imageInput.value);
+        const image = imageCandidate || fallback.image;
+        const domain = String((domainInput && domainInput.value) || '').trim();
+
+        previewTitle.textContent = title;
+        previewDesc.textContent = desc;
+        previewImg.src = image;
+        previewUrl.textContent = domain ? domain.replace(/^https?:\/\//i, '') : 'tu-dominio.com';
+    }
+
+    previewImg.addEventListener('error', function () {
+        if (previewImg.src !== fallback.image) {
+            previewImg.src = fallback.image;
+        }
+    });
+
+    if (uploadInput) {
+        uploadInput.addEventListener('change', function () {
+            const file = uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
+            if (!file) {
+                refreshPreview();
+                validateFromCurrentPreview();
+                return;
+            }
+            const blobUrl = URL.createObjectURL(file);
+            previewImg.src = blobUrl;
+            evaluateDimensions(0, 0, file.size || 0);
+        });
+    }
+
+    if (btnUseLogo) {
+        btnUseLogo.addEventListener('click', function () {
+            imageInput.value = '@logo';
+            refreshPreview();
+        });
+    }
+
+    if (btnUseInst) {
+        btnUseInst.addEventListener('click', function () {
+            imageInput.value = '@institucional';
+            refreshPreview();
+        });
+    }
+
+    if (btnClearImage) {
+        btnClearImage.addEventListener('click', function () {
+            imageInput.value = '';
+            if (uploadInput) {
+                uploadInput.value = '';
+            }
+            refreshPreview();
+        });
+    }
+
+    [titleInput, descInput, imageInput, domainInput].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', refreshPreview);
+        el.addEventListener('change', refreshPreview);
+    });
+
+    previewImg.addEventListener('load', function () {
+        const file = uploadInput && uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
+        evaluateDimensions(previewImg.naturalWidth, previewImg.naturalHeight, file ? (file.size || 0) : 0);
+    });
+
+    previewImg.addEventListener('error', function () {
+        setValidation('No se pudo cargar la imagen. Verifica URL/ruta o sube un archivo válido.', 'alert-danger');
+    });
+
+    if (formEl) {
+        formEl.addEventListener('submit', function (ev) {
+            const cls = validationBox ? Array.from(validationBox.classList) : [];
+            if (cls.indexOf('alert-danger') >= 0) {
+                const ok = window.confirm('La imagen de compartido tiene advertencias críticas (peso, resolución o carga). ¿Deseas guardar de todos modos?');
+                if (!ok) {
+                    ev.preventDefault();
+                }
+            }
+        });
+    }
+
+    if (String(initialImageStored || '').trim() === '') {
+        imageInput.value = '';
+    }
+
+    refreshPreview();
+    validateFromCurrentPreview();
 })();
 </script>

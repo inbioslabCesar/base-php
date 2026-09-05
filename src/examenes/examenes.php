@@ -78,6 +78,7 @@ function capitalizar($texto)
                     <th class="px-4 py-2 text-sm font-semibold">Área</th>
                     <th class="px-4 py-2 text-sm font-semibold">Metodología</th>
                     <th class="px-4 py-2 text-sm font-semibold">Precio Público</th>
+                    <th class="px-4 py-2 text-sm font-semibold">Precio Convenio</th>
                     <th class="px-4 py-2 text-sm font-semibold">Tiempo Respuesta</th>
                     <th class="px-4 py-2 text-sm font-semibold">Detalle</th>
                     <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
@@ -183,6 +184,7 @@ $examenes_pagina = array_slice($examenes, $inicio, $por_pagina);
                     <div class="col-6"><span class="fw-semibold text-primary">Área:</span> <span class="text-dark"><?= htmlspecialchars(capitalizar($examen['area'] ?? '')) ?></span></div>
                     <div class="col-6"><span class="fw-semibold text-primary">Metodología:</span> <span class="text-dark"><?= htmlspecialchars(capitalizar($examen['metodologia'] ?? '')) ?></span></div>
                     <div class="col-6"><span class="fw-semibold text-primary">Precio Público:</span> <span class="text-dark">S/.<?= htmlspecialchars($examen['precio_publico'] ?? '') ?></span></div>
+                    <div class="col-6"><span class="fw-semibold text-primary">Precio Convenio:</span> <span class="text-dark">S/.<?= htmlspecialchars($examen['precio_convenio'] ?? '0.00') ?></span></div>
                 </div>
                 <div class="mt-3 d-flex gap-2">
                     <?php if ($puedeEditarExamen): ?>
@@ -400,12 +402,14 @@ document.addEventListener('click', async function (e) {
         var tablaExamenes = $('#tabla-examenes').DataTable({
             serverSide: true,
             processing: true,
+            stateSave: true,
+            stateDuration: -1,
             ajax: {
                 url: 'dashboard.php?action=examenes_api',
                 type: 'GET'
             },
-            pageLength: 3,
-            lengthMenu: [[3, 5, 10], [3, 5, 10]],
+            pageLength: 100,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
             language: {
                 url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json"
             },
@@ -416,6 +420,7 @@ document.addEventListener('click', async function (e) {
                 { data: 'area', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
                 { data: 'metodologia', render: function(data) { return data ? data.charAt(0).toUpperCase() + data.slice(1) : ''; } },
                 { data: 'precio_publico', render: function(data) { return 'S/.' + data; } },
+                { data: 'precio_convenio', render: function(data) { return 'S/.' + (data === null || data === undefined || data === '' ? '0.00' : data); } },
                 { data: 'tiempo_respuesta' },
                 {
                     data: null,

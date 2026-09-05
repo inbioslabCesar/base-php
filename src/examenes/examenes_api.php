@@ -25,8 +25,22 @@ if ($start < 0) {
     $start = 0;
 }
 
+function examenesHasColumn(PDO $pdo, string $column): bool
+{
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM examenes LIKE ?');
+    $stmt->execute([$column]);
+    $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$column];
+}
+
+$hasPrecioConvenio = examenesHasColumn($pdo, 'precio_convenio');
+
 // Mapeo de columnas
-$columns = ['codigo', 'nombre', 'area', 'metodologia', 'precio_publico', 'tiempo_respuesta', 'id'];
+$columns = ['codigo', 'nombre', 'area', 'metodologia', 'precio_publico', $hasPrecioConvenio ? 'precio_convenio' : 'precio_publico', 'tiempo_respuesta', 'id'];
 $orderBy = $columns[$orderCol] ?? 'id';
 
 try {
@@ -34,8 +48,13 @@ try {
     $where = ["vigente = 1"]; // mostrar solo exámenes vigentes
     $params = [];
     if ($search !== '') {
-        $where[] = "(codigo LIKE ? OR nombre LIKE ? OR area LIKE ? OR metodologia LIKE ? OR precio_publico LIKE ? OR tiempo_respuesta LIKE ?)";
-        $params = array_fill(0, 6, "%$search%");
+        if ($hasPrecioConvenio) {
+            $where[] = "(codigo LIKE ? OR nombre LIKE ? OR area LIKE ? OR metodologia LIKE ? OR precio_publico LIKE ? OR precio_convenio LIKE ? OR tiempo_respuesta LIKE ?)";
+            $params = array_fill(0, 7, "%$search%");
+        } else {
+            $where[] = "(codigo LIKE ? OR nombre LIKE ? OR area LIKE ? OR metodologia LIKE ? OR precio_publico LIKE ? OR tiempo_respuesta LIKE ?)";
+            $params = array_fill(0, 6, "%$search%");
+        }
     }
     if ($where) {
         $sql .= " WHERE " . implode(' AND ', $where);

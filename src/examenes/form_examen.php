@@ -5,12 +5,26 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../config/config.php';
 
+function examenesTieneColumna(PDO $pdo, string $columna): bool
+{
+    static $cache = [];
+    if (array_key_exists($columna, $cache)) {
+        return $cache[$columna];
+    }
+
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM examenes LIKE ?');
+    $stmt->execute([$columna]);
+    $cache[$columna] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$columna];
+}
+
 function capitalizar($texto)
 {
     return mb_convert_case(trim($texto), MB_CASE_TITLE, "UTF-8");
 }
 
 $esEdicion = isset($_GET['id']);
+$hasPrecioConvenio = examenesTieneColumna($pdo, 'precio_convenio');
 $examen = [
     'codigo' => '',
     'nombre' => '',
@@ -24,6 +38,7 @@ $examen = [
     'tipo_tubo' => '',
     'observaciones' => '',
     'precio_publico' => '',
+    'precio_convenio' => '',
     'adicional' => '',
     'vigente' => 1
 ];
@@ -116,6 +131,14 @@ $volverExamenes = match ($rolActualExamenForm) {
             <label for="precio_publico" class="form-label">Precio Público *</label>
             <input type="number" class="form-control" id="precio_publico" name="precio_publico" min="0" step="0.01" required
                 value="<?= htmlspecialchars($examen['precio_publico'] ?? '') ?>">
+        </div>
+        <div class="mb-3">
+            <label for="precio_convenio" class="form-label">Precio Convenio</label>
+            <input type="number" class="form-control" id="precio_convenio" name="precio_convenio" min="0" step="0.01"
+                value="<?= htmlspecialchars($examen['precio_convenio'] ?? '') ?>" <?= $hasPrecioConvenio ? '' : 'disabled' ?>>
+            <?php if (!$hasPrecioConvenio): ?>
+                <small class="text-muted">Ejecuta la migración de BD para habilitar este campo.</small>
+            <?php endif; ?>
         </div>
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" id="vigente" name="vigente" value="1" <?= ($examen['vigente'] ?? 1) ? 'checked' : '' ?>>

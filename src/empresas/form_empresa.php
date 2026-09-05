@@ -14,7 +14,8 @@ $empresa = [
     'password' => '',
     'convenio' => '',
     'estado' => 'activo',
-    'descuento' => ''
+    'descuento' => '',
+    'usar_precio_convenio' => 0
 ];
 
 if ($esEdicion) {
@@ -130,6 +131,12 @@ if ($dominioEmpresa === '') {
                 <label for="descuento" class="form-label">Descuento (%)</label>
                 <input type="number" step="0.01" min="0" max="100" class="form-control" id="descuento" name="descuento"
                     value="<?= htmlspecialchars($empresa['descuento'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+            </div>
+            <div class="col-md-4 mb-3 d-flex align-items-end">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="usar_precio_convenio" name="usar_precio_convenio" value="1" <?= !empty($empresa['usar_precio_convenio']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="usar_precio_convenio">Usar precio convenio por defecto</label>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="password" class="form-label"><?= $esEdicion ? 'Nueva Contraseña' : 'Contraseña *' ?></label>

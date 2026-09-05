@@ -14,6 +14,7 @@ $representante = $_POST['representante'] ?? '';
 $convenio = $_POST['convenio'] ?? '';
 $estado = $_POST['estado'] ?? 'activo';
 $descuento = $_POST['descuento'] ?? null;
+$usar_precio_convenio = isset($_POST['usar_precio_convenio']) ? 1 : 0;
 $password = $_POST['password'] ?? '';
 
 function limpiarSoloDigitos(string $valor): string {
@@ -42,6 +43,17 @@ function obtenerDominioEmpresa(PDO $pdo): string {
     $dominio = is_array($cfg) ? (string)($cfg['dominio'] ?? '') : '';
     $dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
     return $dominio !== '' ? $dominio : 'ejemplo.com';
+}
+
+function empresasHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM empresas LIKE ?');
+    $stmt->execute([$column]);
+    $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$column];
 }
 
 $ruc = limpiarSoloDigitos((string)$ruc);
@@ -85,38 +97,77 @@ if ($id && $ruc && $razon_social && $email) {
             exit;
         }
 
+        $hasUsarPrecioConvenio = empresasHasColumn($pdo, 'usar_precio_convenio');
+
         if (!empty($password)) {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, password=?, convenio=?, estado=?, descuento=? WHERE id=?");
-            $stmt->execute([
-                $ruc,
-                mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
-                mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
-                $direccion,
-                $telefono,
-                $email,
-                mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
-                $hash,
-                $convenio,
-                $estado,
-                $descuento,
-                $id
-            ]);
+            if ($hasUsarPrecioConvenio) {
+                $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, password=?, convenio=?, estado=?, descuento=?, usar_precio_convenio=? WHERE id=?");
+                $stmt->execute([
+                    $ruc,
+                    mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
+                    mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
+                    $direccion,
+                    $telefono,
+                    $email,
+                    mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
+                    $hash,
+                    $convenio,
+                    $estado,
+                    $descuento,
+                    $usar_precio_convenio,
+                    $id
+                ]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, password=?, convenio=?, estado=?, descuento=? WHERE id=?");
+                $stmt->execute([
+                    $ruc,
+                    mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
+                    mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
+                    $direccion,
+                    $telefono,
+                    $email,
+                    mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
+                    $hash,
+                    $convenio,
+                    $estado,
+                    $descuento,
+                    $id
+                ]);
+            }
         } else {
-            $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, convenio=?, estado=?, descuento=? WHERE id=?");
-            $stmt->execute([
-                $ruc,
-                mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
-                mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
-                $direccion,
-                $telefono,
-                $email,
-                mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
-                $convenio,
-                $estado,
-                $descuento,
-                $id
-            ]);
+            if ($hasUsarPrecioConvenio) {
+                $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, convenio=?, estado=?, descuento=?, usar_precio_convenio=? WHERE id=?");
+                $stmt->execute([
+                    $ruc,
+                    mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
+                    mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
+                    $direccion,
+                    $telefono,
+                    $email,
+                    mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
+                    $convenio,
+                    $estado,
+                    $descuento,
+                    $usar_precio_convenio,
+                    $id
+                ]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE empresas SET ruc=?, razon_social=?, nombre_comercial=?, direccion=?, telefono=?, email=?, representante=?, convenio=?, estado=?, descuento=? WHERE id=?");
+                $stmt->execute([
+                    $ruc,
+                    mb_convert_case($razon_social, MB_CASE_TITLE, "UTF-8"),
+                    mb_convert_case($nombre_comercial, MB_CASE_TITLE, "UTF-8"),
+                    $direccion,
+                    $telefono,
+                    $email,
+                    mb_convert_case($representante, MB_CASE_TITLE, "UTF-8"),
+                    $convenio,
+                    $estado,
+                    $descuento,
+                    $id
+                ]);
+            }
         }
         $_SESSION['mensaje'] = "Empresa actualizada exitosamente.";
         $_SESSION['mensaje_tipo'] = "success";

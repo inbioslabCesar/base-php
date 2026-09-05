@@ -107,6 +107,13 @@ $edadHeaderPdf = EdadPacienteService::formatearEdadDetalladaDesdeValor(
     $edadTextoPdf !== '' ? $edadTextoPdf : (string)($primer_row['edad'] ?? '')
 );
 
+$fechaProcesoPdf = trim((string)($primer_row['fecha_proceso_en'] ?? ''));
+if ($fechaProcesoPdf === '') {
+    $fechaProcesoPdf = (string)($primer_row['fecha_ingreso'] ?? '');
+}
+$fechaValidacionPdf = trim((string)($primer_row['fecha_validacion_en'] ?? ''));
+$fechaCotizacionPdf = (string)($primer_row['cotizacion_fecha'] ?? '');
+
 $paciente = [
     "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
     "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
@@ -114,7 +121,10 @@ $paciente = [
     "edad"           => ($edadValorPdf !== '' ? $edadValorPdf : null),
     "edad_display"   => $edadHeaderPdf,
     "sexo"           => $primer_row['sexo'],
-    "fecha"          => $primer_row['fecha_ingreso'],
+    "fecha"          => $fechaProcesoPdf,
+    "fecha_proceso"  => $fechaProcesoPdf,
+    "fecha_validacion" => $fechaValidacionPdf,
+    "fecha_cotizacion" => $fechaCotizacionPdf,
     "id"             => $primer_row['cliente_id']
 ];
 $referencia = '';
@@ -255,7 +265,8 @@ $mostrarFilaSolicitante = ($solicitanteNombre !== '' || $solicitanteTipo !== '' 
 $mostrarFilaSeguro = !empty($tipoSeguro);
 
 // Ajuste dinamico del margen superior segun filas reales del header para evitar huecos grandes.
-$filasHeaderDatos = 4; // Paciente, DNI/Edad/Sexo, Referencia, Fecha.
+$mostrarFilaValidacion = !empty($paciente['fecha_validacion']);
+$filasHeaderDatos = 4; // Paciente, DNI/Edad/Sexo, Referencia, Fecha de proceso.
 if ($mostrarFilaProfesional) {
     $filasHeaderDatos++;
 }
@@ -263,6 +274,9 @@ if ($mostrarFilaSolicitante) {
     $filasHeaderDatos++;
 }
 if ($mostrarFilaSeguro) {
+    $filasHeaderDatos++;
+}
+if ($mostrarFilaValidacion) {
     $filasHeaderDatos++;
 }
 $headerCompacto = !$mostrarFilaProfesional && !$mostrarFilaSolicitante && !$mostrarFilaSeguro;
@@ -286,7 +300,7 @@ $qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'INBIOSLAB')
     . ' | Resultado ID: ' . ($paciente['id'] ?? '')
     . ' | Paciente: ' . ($paciente['nombre'] ?? '')
     . ' | DNI: ' . ($paciente['dni'] ?? '')
-    . ' | Fecha: ' . ($paciente['fecha'] ?? '');
+    . ' | Fecha de proceso: ' . ($paciente['fecha_proceso'] ?? '');
 $qrBase64 = '';
 try {
     if (class_exists('Endroid\\QrCode\\QrCode')) {
@@ -349,7 +363,8 @@ $headerHtml = '
         ' . $solicitanteHeaderHtml . '
         <tr><td colspan="2" style="padding:1px 6px;"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td></tr>
         ' . (!empty($tipoSeguro) ? '<tr><td colspan="2" style="padding:1px 6px;"><strong>Tipo de seguro:</strong> ' . htmlspecialchars($tipoSeguro) . '</td></tr>' : '') . '
-        <tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha:</strong> ' . htmlspecialchars($paciente['fecha']) . '</td></tr>
+        <tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha de proceso:</strong> ' . htmlspecialchars($paciente['fecha_proceso'] ?? $paciente['fecha']) . '</td></tr>
+        ' . ($mostrarFilaValidacion ? '<tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha de validación:</strong> ' . htmlspecialchars($paciente['fecha_validacion']) . '</td></tr>' : '') . '
     </table>
 ';
 $mpdf->SetHTMLHeader($headerHtml, 'O', true);

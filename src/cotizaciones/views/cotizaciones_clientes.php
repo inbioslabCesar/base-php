@@ -51,12 +51,54 @@ if ($cotizaciones) {
     }
 }
 $porcentajePorCotizacion = [];
+$examenesPorCotizacion = [];
+$totalPagadoCliente = 0.0;
+$saldoCliente = 0.0;
 if ($cotizaciones) {
     foreach ($cotizaciones as $cotizacionTmp) {
         $cotizacionIdTmp = (int)($cotizacionTmp['id'] ?? 0);
         if ($cotizacionIdTmp > 0) {
             $porcentajePorCotizacion[$cotizacionIdTmp] = (int)obtenerPorcentajeResultadosCotizacion($pdo, $cotizacionIdTmp);
         }
+    }
+
+    $idsCotizaciones = array_column($cotizaciones, 'id');
+    if ($idsCotizaciones) {
+        $inDetalle = implode(',', array_fill(0, count($idsCotizaciones), '?'));
+        $sqlDetalle = "SELECT id_cotizacion, id_examen, nombre_examen, cantidad, subtotal
+            FROM cotizaciones_detalle
+            WHERE id_cotizacion IN ($inDetalle)
+            ORDER BY id_cotizacion ASC, id ASC";
+        $stmtDetalle = $pdo->prepare($sqlDetalle);
+        $stmtDetalle->execute($idsCotizaciones);
+        $detallesRows = $stmtDetalle->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($detallesRows as $dRow) {
+            $idCot = (int)($dRow['id_cotizacion'] ?? 0);
+            if ($idCot <= 0) {
+                continue;
+            }
+            if (!isset($examenesPorCotizacion[$idCot])) {
+                $examenesPorCotizacion[$idCot] = [];
+            }
+            $nombreExamen = trim((string)($dRow['nombre_examen'] ?? ''));
+            if ($nombreExamen === '') {
+                $nombreExamen = 'Examen #' . (int)($dRow['id_examen'] ?? 0);
+            }
+            $cantidadEx = max(1, (int)($dRow['cantidad'] ?? 1));
+            $subtotalEx = money_format_local((float)($dRow['subtotal'] ?? 0), $currencyCfg);
+            $examenesPorCotizacion[$idCot][] = $nombreExamen . ' x' . $cantidadEx . ' (' . $subtotalEx . ')';
+        }
+    }
+
+    foreach ($cotizaciones as $cotizacionTmp) {
+        $cotizacionIdTmp = (int)($cotizacionTmp['id'] ?? 0);
+        if ($cotizacionIdTmp <= 0) {
+            continue;
+        }
+        $totalTmp = (float)($cotizacionTmp['total'] ?? 0);
+        $pagadoTmp = (float)($pagosPorCotizacion[$cotizacionIdTmp] ?? 0);
+        $totalPagadoCliente += $pagadoTmp;
+        $saldoCliente += max(0, $totalTmp - $pagadoTmp);
     }
 }
 ?>
@@ -83,6 +125,7 @@ if ($cotizaciones) {
                 <tr>
                     <th>Código</th>
                     <th>Nombre y Apellido</th>
+                    <th>DNI</th>
                     <th>Fecha</th>
                     <th>Total</th>
                     <th>Abonado</th>
@@ -114,10 +157,19 @@ if ($cotizaciones) {
                             $resultBadge = '<span class="badge bg-danger" title="Porcentaje de resultados: 0%">Pendiente: 0%</span>';
                         }
                         $descargarDisabled = ($saldo > 0 || $porcentaje < 100) ? 'disabled style="pointer-events: none; opacity: 0.6;"' : 'target="_blank"';
+                        $detalleExamenes = $examenesPorCotizacion[$cotizacionId] ?? [];
+                        $detalleExamenesTexto = !empty($detalleExamenes)
+                            ? implode("\n", $detalleExamenes)
+                            : 'Sin detalle';
+                        $nombreCompleto = trim(((string)($cotizacion['nombre_cliente'] ?? '')) . ' ' . ((string)($cotizacion['apellido_cliente'] ?? '')));
+                        $nombreConDetalleExport = $nombreCompleto . "\nExamenes:\n" . $detalleExamenesTexto;
                         ?>
                         <tr>
                             <td><?= htmlspecialchars($cotizacion['codigo'] ?? '') ?></td>
-                            <td><?= htmlspecialchars($cotizacion['nombre_cliente'] ?? '') . ' ' . htmlspecialchars($cotizacion['apellido_cliente'] ?? '') ?></td>
+                            <td data-export="<?= htmlspecialchars($nombreConDetalleExport, ENT_QUOTES, 'UTF-8') ?>">
+                                <div><?= htmlspecialchars($nombreCompleto) ?></div>
+                            </td>
+                            <td><?= htmlspecialchars((string)($cotizacion['dni'] ?? '')) ?></td>
                             <td><?= htmlspecialchars($cotizacion['fecha'] ?? '') ?></td>
                             <td><span class="badge bg-info"><?= htmlspecialchars(money_format_local($total, $currencyCfg)) ?></span></td>
                             <td><?= $badgeAbonado ?></td>
@@ -140,10 +192,23 @@ if ($cotizaciones) {
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="8" class="text-center">No tienes cotizaciones registradas.</td>
+                        <td colspan="9" class="text-center">No tienes cotizaciones registradas.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
+            <tfoot>
+                <tr>
+                    <th>Totales:</th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th></th>
+                    <th><?= htmlspecialchars(money_format_local($totalPagadoCliente, $currencyCfg)) ?></th>
+                    <th><?= htmlspecialchars(money_format_local($saldoCliente, $currencyCfg)) ?></th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </tfoot>
         </table>
     </div>
 </div>
@@ -159,18 +224,43 @@ if ($cotizaciones) {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
 <script>
     $(document).ready(function() {
+        function sanitizeExportText(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return $('<div>')
+                .html(String(value).replace(/<br\s*\/?>/gi, "\n"))
+                .text()
+                .replace(/\u00a0/g, ' ')
+                .trim();
+        }
+
+        function exportBodyFormatter(data, row, column, node) {
+            if (column === 1 && node) {
+                var exportValue = node.getAttribute('data-export');
+                if (exportValue) {
+                    return exportValue;
+                }
+            }
+            return sanitizeExportText(data);
+        }
+
         $('#tablaCotizaciones').DataTable({
             language: {
                 url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
             },
-            order: [[2, 'desc']],
+            order: [[3, 'desc']],
             dom: 'Bfrtip',
             buttons: [
                 {
                     extend: 'excelHtml5',
                     text: '<i class="bi bi-file-earmark-excel"></i> Excel',
                     className: 'btn btn-success btn-sm',
-                    exportOptions: { columns: ':not(:last-child)' }
+                    footer: true,
+                    exportOptions: {
+                        columns: ':not(:last-child)',
+                        format: { body: exportBodyFormatter }
+                    }
                 },
                 {
                     extend: 'pdfHtml5',
@@ -178,7 +268,21 @@ if ($cotizaciones) {
                     className: 'btn btn-danger btn-sm',
                     orientation: 'landscape',
                     pageSize: 'A4',
-                    exportOptions: { columns: ':not(:last-child)' }
+                    footer: true,
+                    exportOptions: {
+                        columns: ':not(:last-child)',
+                        format: { body: exportBodyFormatter }
+                    }
+                },
+                {
+                    extend: 'print',
+                    text: '<i class="bi bi-printer"></i> Imprimir',
+                    className: 'btn btn-primary btn-sm',
+                    footer: true,
+                    exportOptions: {
+                        columns: ':not(:last-child)',
+                        format: { body: exportBodyFormatter }
+                    }
                 }
             ]
         });

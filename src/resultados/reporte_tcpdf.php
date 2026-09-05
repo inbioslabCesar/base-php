@@ -107,7 +107,16 @@ $edadDisplay = EdadPacienteService::formatearEdadDetalladaDesdeValor(
     $edadResol['edad_texto'] ?? ($paciente['edad'] ?? '')
 );
 
-$paciente_info = "Paciente: {$paciente['nombre']} {$paciente['apellido']}   DNI: {$paciente['dni']}   Edad: {$edadDisplay}   Sexo: {$paciente['sexo']}";
+$fechaProcesoReporte = trim((string)($paciente['fecha_proceso_en'] ?? ''));
+if ($fechaProcesoReporte === '') {
+    $fechaProcesoReporte = (string)($paciente['fecha_ingreso'] ?? '');
+}
+$fechaValidacionReporte = trim((string)($paciente['fecha_validacion_en'] ?? ''));
+
+$paciente_info = "Paciente: {$paciente['nombre']} {$paciente['apellido']}   DNI: {$paciente['dni']}   Edad: {$edadDisplay}   Sexo: {$paciente['sexo']}   Fecha proceso: {$fechaProcesoReporte}";
+if ($fechaValidacionReporte !== '') {
+    $paciente_info .= "   Fecha validacion: {$fechaValidacionReporte}";
+}
 $empresa_info = "{$empresa['nombre']}\nDirección: {$empresa['direccion']}\nTel: {$empresa['telefono']} Cel: {$empresa['celular']}";
 // Clase personalizada para encabezado y pie de página
 class MYPDF extends TCPDF {

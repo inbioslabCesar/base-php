@@ -13,6 +13,7 @@ $dni = isset($_POST['dni']) ? trim($_POST['dni']) : '';
 $sinDni = !empty($_POST['sin_dni']);
 $especialidad = isset($_POST['especialidad']) ? mb_convert_case(trim($_POST['especialidad']), MB_CASE_TITLE, "UTF-8") : '';
 $descuento = isset($_POST['descuento']) ? trim($_POST['descuento']) : null;
+$usar_precio_convenio = isset($_POST['usar_precio_convenio']) ? 1 : 0;
 $descripcion = isset($_POST['descripcion']) ? mb_convert_case(trim($_POST['descripcion']), MB_CASE_TITLE, "UTF-8") : '';
 $email = isset($_POST['email']) ? strtolower(trim($_POST['email'])) : '';
 $password = isset($_POST['password']) ? $_POST['password'] : '';
@@ -43,6 +44,17 @@ function obtenerDominioEmpresa(PDO $pdo): string {
     $dominio = is_array($cfg) ? (string)($cfg['dominio'] ?? '') : '';
     $dominio = normalizarDominioEmpresa($dominio !== '' ? $dominio : (string)($_SERVER['HTTP_HOST'] ?? ''));
     return $dominio !== '' ? $dominio : 'ejemplo.com';
+}
+
+function conveniosHasColumn(PDO $pdo, string $column): bool {
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM convenios LIKE ?');
+    $stmt->execute([$column]);
+    $cache[$column] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$column];
 }
 
 $dni = limpiarSoloDigitos((string)$dni);
@@ -90,15 +102,23 @@ try {
     }
 
     // Actualizar datos básicos
-    $sql = "UPDATE convenios SET nombre = ?, dni = ?, especialidad = ?, descuento = ?, descripcion = ?, email = ?";
+    $hasUsarPrecioConvenio = conveniosHasColumn($pdo, 'usar_precio_convenio');
+    $sql = "UPDATE convenios SET nombre = ?, dni = ?, especialidad = ?, descuento = ?";
     $params = [
         $nombre,
         $dni,
         $especialidad,
-        $descuento !== '' ? $descuento : null,
-        $descripcion,
-        $email
+        $descuento !== '' ? $descuento : null
     ];
+
+    if ($hasUsarPrecioConvenio) {
+        $sql .= ", usar_precio_convenio = ?";
+        $params[] = $usar_precio_convenio;
+    }
+
+    $sql .= ", descripcion = ?, email = ?";
+    $params[] = $descripcion;
+    $params[] = $email;
 
     // Si se ingresó una nueva contraseña, actualizarla
     if (!empty($password)) {

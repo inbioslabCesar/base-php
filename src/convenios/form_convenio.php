@@ -10,7 +10,8 @@ $convenio = [
     'descuento' => '',
     'descripcion' => '',
     'email' => '',
-    'password' => ''
+    'password' => '',
+    'usar_precio_convenio' => 0
 ];
 
 if ($esEdicion) {
@@ -83,6 +84,12 @@ function capitalizar($texto) {
             <label for="descuento" class="form-label">Descuento (%)</label>
             <input type="number" class="form-control" id="descuento" name="descuento" min="0" max="100" step="0.01"
                 value="<?= htmlspecialchars($convenio['descuento'] ?? '') ?>">
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="usar_precio_convenio" name="usar_precio_convenio" value="1" <?= !empty($convenio['usar_precio_convenio']) ? 'checked' : '' ?>>
+                <label class="form-check-label" for="usar_precio_convenio">Usar precio convenio por defecto</label>
+            </div>
         </div>
         <div class="mb-3">
             <label for="descripcion" class="form-label">Descripción</label>

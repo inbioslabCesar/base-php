@@ -102,6 +102,13 @@ $edadTextoReporte = EdadPacienteService::formatearEdadDetalladaDesdeValor(
     $edadResol['edad_texto'] ?? ($primer_row['edad'] ?? '')
 );
 
+$fechaProcesoReporte = trim((string)($primer_row['fecha_proceso_en'] ?? ''));
+if ($fechaProcesoReporte === '') {
+    $fechaProcesoReporte = (string)($primer_row['fecha_ingreso'] ?? '');
+}
+$fechaValidacionReporte = trim((string)($primer_row['fecha_validacion_en'] ?? ''));
+$fechaCotizacionReporte = (string)($primer_row['cotizacion_fecha'] ?? '');
+
 $paciente = [
     "nombre"         => trim($primer_row['nombre'] . ' ' . $primer_row['apellido']),
     "codigo_cliente" => $primer_row['codigo_cliente'] ?? "",
@@ -109,7 +116,10 @@ $paciente = [
     "edad"           => ($edadValorReporte !== '' ? $edadValorReporte : null),
     "edad_display"   => $edadTextoReporte,
     "sexo"           => $primer_row['sexo'],
-    "fecha"          => $primer_row['fecha_ingreso'],
+    "fecha"          => $fechaProcesoReporte,
+    "fecha_proceso"  => $fechaProcesoReporte,
+    "fecha_validacion" => $fechaValidacionReporte,
+    "fecha_cotizacion" => $fechaCotizacionReporte,
     "id"             => $primer_row['cliente_id']
 ];
 

@@ -9,6 +9,7 @@ function mostrarCampo($etiqueta, $valor) {
 <div class="container mt-4">
     <h2><?= ucfirst(strtolower($examen['nombre'])) ?></h2>
     <p><b>Precio:</b> <?= htmlspecialchars($examen['precio_publico']) ?> </p>
+    <p><b>Precio Convenio:</b> <?= htmlspecialchars($examen['precio_convenio'] ?? '0.00') ?> </p>
     <?php mostrarCampo('Descripción', $examen['descripcion']); ?>
     <?php mostrarCampo('Área', $examen['area']); ?>
     <?php mostrarCampo('Metodología', $examen['metodologia']); ?>

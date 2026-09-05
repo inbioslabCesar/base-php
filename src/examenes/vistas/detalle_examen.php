@@ -68,6 +68,10 @@ $obs = trim($examen_detalle['observaciones'] ?? '');
                 <dd class="text-slate-800"><?= htmlspecialchars($examen_detalle['precio_publico'] ?? '', ENT_QUOTES, 'UTF-8') ?></dd>
             </div>
             <div>
+                <dt class="font-semibold text-slate-600">Precio Convenio</dt>
+                <dd class="text-slate-800"><?= htmlspecialchars($examen_detalle['precio_convenio'] ?? '0.00', ENT_QUOTES, 'UTF-8') ?></dd>
+            </div>
+            <div>
                 <dt class="font-semibold text-slate-600">Vigente</dt>
                 <dd class="text-slate-800"><?= $vigenteBadge ?></dd>
             </div>

@@ -316,6 +316,17 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
     <title><?= htmlspecialchars($nombre_empresa) ?> | Portal Premium B</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="es_PE">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Portal Premium B'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Portal Premium B'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta name="theme-color" content="<?= htmlspecialchars($color_principal, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="manifest" href="<?= htmlspecialchars($pwaManifestHref, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -429,6 +440,28 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             border-radius: 12px;
             font-weight: 700;
             padding: .7rem 1.2rem;
+        }
+
+        .btn-pb-cotizar {
+            background: #ffffff;
+            color: var(--pb-primary);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 999px;
+            font-weight: 700;
+            padding: .48rem .95rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            transition: all .2s ease;
+        }
+
+        .btn-pb-cotizar:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.75);
+            transform: translateY(-1px);
+            box-shadow: 0 11px 20px rgba(0, 0, 0, 0.22);
         }
 
         .btn-pb:hover {
@@ -715,6 +748,7 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 <div class="collapse navbar-collapse" id="pbNav">
                     <ul class="navbar-nav ms-auto align-items-lg-center">
                         <li class="nav-item"><a class="nav-link" href="#servicios">Servicios</a></li>
+                        <li class="nav-item ms-lg-1 my-2 my-lg-0"><a class="btn btn-pb-cotizar" href="index.php?vista=cotizar_publico"><i class="bi bi-stars"></i> Cotizar</a></li>
                         <li class="nav-item"><a class="nav-link" href="#promociones">Promociones</a></li>
                         <li class="nav-item"><a class="nav-link" href="#ubicaciones">Ubicaciones</a></li>
                         <li class="nav-item"><a class="nav-link" href="#contacto">Contacto</a></li>
@@ -786,6 +820,31 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                         </article>
                     </div>
                 <?php endforeach; ?>
+            </div>
+        </section>
+
+        <section id="analisis-frecuentes" class="mb-4">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <h2 class="h3 mb-0">Análisis más frecuentes</h2>
+                <a class="btn btn-sm btn-outline-primary" href="index.php?vista=cotizar_publico">Ver todos los análisis clínicos</a>
+            </div>
+            <div class="row g-3">
+                <?php if (!empty($analisisFrecuentesPublicos)): ?>
+                    <?php foreach ($analisisFrecuentesPublicos as $analisis): ?>
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <a class="text-decoration-none" href="index.php?vista=cotizar_publico&examen_id=<?= (int)($analisis['id'] ?? 0) ?>">
+                                <article class="floating-service">
+                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                        <h6 class="mb-1"><?= htmlspecialchars((string)($analisis['nombre'] ?? 'Examen clínico'), ENT_QUOTES, 'UTF-8') ?></h6>
+                                        <i class="bi bi-arrow-up-right text-primary"></i>
+                                    </div>
+                                </article>
+                            </a>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="col-12"><div class="floating-service">Aún no hay análisis destacados. Usa el cotizador completo.</div></div>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -1056,17 +1115,17 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="promoCartModalBLabel">Carrito de promociones</h5>
+                    <h5 class="modal-title" id="promoCartModalBLabel">Carrito de cotización</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="promoCartEmptyB" class="alert alert-light border">Aun no agregaste promociones.</div>
+                    <div id="promoCartEmptyB" class="alert alert-light border">Aun no agregaste items para cotizar.</div>
                     <div class="table-responsive">
                         <table class="table align-middle" id="promoCartTableB">
                             <thead>
                                 <tr>
-                                    <th>Promocion</th>
-                                    <th>Vigencia</th>
+                                    <th>Item</th>
+                                    <th>Tipo</th>
                                     <th>Precio</th>
                                     <th>Cantidad</th>
                                     <th>Subtotal</th>
@@ -1076,38 +1135,42 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                             <tbody></tbody>
                         </table>
                     </div>
-                    <div class="d-flex justify-content-end mb-3">
-                        <strong>Total: <span id="promoCartTotalB">S/ 0.00</span></strong>
+                    <div class="text-end mb-3">
+                        <div class="small text-muted">Subtotal: <span id="promoCartSubtotalB">S/ 0.00</span></div>
+                        <div class="small text-success" id="promoCartDiscountWrapB" style="display:none;">Descuento web: <span id="promoCartDiscountB">-S/ 0.00</span></div>
+                        <strong>Total referencial: <span id="promoCartTotalB">S/ 0.00</span></strong>
                     </div>
 
-                    <h6 class="mb-2">Datos para cotizacion</h6>
+                    <h6 class="mb-2">Datos para cotización</h6>
                     <div class="row g-2">
                         <div class="col-12 col-md-6">
                             <label class="form-label">Nombre del paciente</label>
                             <input type="text" class="form-control" id="cotNombreB" placeholder="Nombres y apellidos">
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label">Telefono de contacto</label>
+                            <label class="form-label">Teléfono de contacto</label>
                             <input type="text" class="form-control" id="cotTelefonoB" placeholder="9XXXXXXXX">
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label">Modalidad de toma</label>
+                            <label class="form-label">¿Dónde deseas la toma de muestra?</label>
                             <select class="form-select" id="cotModalidadB">
                                 <option value="laboratorio">En laboratorio</option>
                                 <option value="domicilio">A domicilio</option>
                             </select>
                         </div>
                         <div class="col-12 col-md-6">
-                            <label class="form-label">Fecha tentativa</label>
+                            <label class="form-label">Fecha deseada de atención</label>
                             <input type="date" class="form-control" id="cotFechaB">
+                            <small class="text-muted" id="cotFechaHintB">Selecciona la fecha en la que deseas asistir al laboratorio.</small>
                         </div>
                         <div class="col-12" id="cotDireccionWrapB" style="display:none;">
-                            <label class="form-label">Direccion para toma a domicilio</label>
-                            <input type="text" class="form-control" id="cotDireccionB" placeholder="Direccion exacta y referencia">
+                            <label class="form-label">Dirección para toma a domicilio</label>
+                            <input type="text" class="form-control" id="cotDireccionB" placeholder="Dirección exacta y referencia">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Observaciones</label>
-                            <textarea class="form-control" id="cotObsB" rows="2" placeholder="Ej: ayuno, horario preferido, referencia adicional"></textarea>
+                            <label class="form-label">¿Tienes alguna duda o indicación para el laboratorio?</label>
+                            <textarea class="form-control" id="cotObsB" rows="2" placeholder="Ej: ¿Debo ir en ayunas?, ¿puedo tomar agua?, horario ideal, otra consulta"></textarea>
+                            <small class="text-muted">Escribe aquí cualquier consulta para el laboratorio antes de agendar.</small>
                         </div>
                     </div>
                 </div>
@@ -1133,35 +1196,168 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (function () {
-            const CART_KEY = 'promo_cart_v1';
+            const CART_KEY = 'quote_items_v1';
+            const LEGACY_PROMO_KEY = 'promo_cart_v1';
+            const LEGACY_EXAM_KEY = 'exam_cart_v1';
+            const FORM_DRAFT_KEY = 'quote_contact_draft_v1';
             const WA_BASE = <?= json_encode($whatsAppHref, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
             const EMPRESA = <?= json_encode((string)$nombre_empresa, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            const DISCOUNT_ACTIVE = <?= !empty($promoWebActiva) ? 'true' : 'false' ?>;
+            const DISCOUNT_PERCENT = <?= json_encode((float)($promoWebPorcentaje ?? 0), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+            const DISCOUNT_APPLY = <?= !empty($promoWebAplicarCarrito) ? 'true' : 'false' ?>;
 
             const countEl = document.getElementById('promoCartCountB');
             const table = document.getElementById('promoCartTableB');
             const tbody = table ? table.querySelector('tbody') : null;
             const emptyEl = document.getElementById('promoCartEmptyB');
+            const subtotalEl = document.getElementById('promoCartSubtotalB');
+            const discountWrapEl = document.getElementById('promoCartDiscountWrapB');
+            const discountEl = document.getElementById('promoCartDiscountB');
             const totalEl = document.getElementById('promoCartTotalB');
 
             const modalidadEl = document.getElementById('cotModalidadB');
             const direccionWrapEl = document.getElementById('cotDireccionWrapB');
+            const fechaHintEl = document.getElementById('cotFechaHintB');
+            const nombreEl = document.getElementById('cotNombreB');
+            const telefonoEl = document.getElementById('cotTelefonoB');
+            const fechaEl = document.getElementById('cotFechaB');
+            const direccionEl = document.getElementById('cotDireccionB');
+            const obsEl = document.getElementById('cotObsB');
 
             function getCart() {
                 try {
                     const raw = localStorage.getItem(CART_KEY);
                     const parsed = raw ? JSON.parse(raw) : [];
-                    return Array.isArray(parsed) ? parsed : [];
+                    return normalizeCart(Array.isArray(parsed) ? parsed : []);
                 } catch (e) {
                     return [];
                 }
             }
 
             function setCart(items) {
-                localStorage.setItem(CART_KEY, JSON.stringify(items));
+                localStorage.setItem(CART_KEY, JSON.stringify(normalizeCart(items)));
+            }
+
+            function normalizeCart(items) {
+                const out = [];
+                const seen = new Set();
+                (Array.isArray(items) ? items : []).forEach((it) => {
+                    const rawType = String((it && it.type) || '').toLowerCase();
+                    const type = rawType === 'promocion' || rawType === 'promo' ? 'promocion' : 'examen';
+                    const key = String((it && it.key) || '').trim() || (type + ':' + String((it && it.id) || '').trim());
+                    if (!key || seen.has(key)) {
+                        return;
+                    }
+                    seen.add(key);
+                    out.push({
+                        key: key,
+                        type: type,
+                        id: String((it && it.id) || ''),
+                        title: String((it && it.title) || (type === 'promocion' ? 'Promocion' : 'Examen')),
+                        price: Number((it && it.price) || 0),
+                        qty: Math.max(1, Number((it && it.qty) || 1)),
+                        vigencia: String((it && it.vigencia) || ''),
+                        codigo: String((it && it.codigo) || ''),
+                        tiempo_respuesta: String((it && it.tiempo_respuesta) || ''),
+                        tipo_tubo: String((it && it.tipo_tubo) || '')
+                    });
+                });
+                return out;
+            }
+
+            function migrateLegacyCart() {
+                const existing = getCart();
+                if (existing.length > 0) {
+                    return;
+                }
+
+                let merged = [];
+                try {
+                    const legacyPromoRaw = localStorage.getItem(LEGACY_PROMO_KEY);
+                    const legacyPromo = legacyPromoRaw ? JSON.parse(legacyPromoRaw) : [];
+                    if (Array.isArray(legacyPromo)) {
+                        merged = merged.concat(legacyPromo.map((it) => ({
+                            key: 'promocion:' + String((it && it.id) || ''),
+                            type: 'promocion',
+                            id: String((it && it.id) || ''),
+                            title: String((it && it.title) || 'Promocion'),
+                            price: Number((it && it.price) || 0),
+                            qty: Math.max(1, Number((it && it.qty) || 1)),
+                            vigencia: String((it && it.vigencia) || '')
+                        })));
+                    }
+                } catch (e) {}
+
+                try {
+                    const legacyExamRaw = localStorage.getItem(LEGACY_EXAM_KEY);
+                    const legacyExam = legacyExamRaw ? JSON.parse(legacyExamRaw) : [];
+                    if (Array.isArray(legacyExam)) {
+                        merged = merged.concat(legacyExam.map((it) => ({
+                            key: 'examen:' + String((it && it.id) || ''),
+                            type: 'examen',
+                            id: String((it && it.id) || ''),
+                            title: String((it && it.title) || 'Examen'),
+                            price: Number((it && it.price) || 0),
+                            qty: 1,
+                            codigo: String((it && it.codigo) || ''),
+                            tiempo_respuesta: String((it && it.tiempo_respuesta) || ''),
+                            tipo_tubo: String((it && it.tipo_tubo) || '')
+                        })));
+                    }
+                } catch (e) {}
+
+                if (merged.length) {
+                    setCart(merged);
+                }
+            }
+
+            function getDraft() {
+                try {
+                    const raw = localStorage.getItem(FORM_DRAFT_KEY);
+                    const parsed = raw ? JSON.parse(raw) : {};
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch (e) {
+                    return {};
+                }
+            }
+
+            function saveDraft(data) {
+                const current = getDraft();
+                const next = Object.assign({}, current, data || {});
+                localStorage.setItem(FORM_DRAFT_KEY, JSON.stringify(next));
+            }
+
+            function readFormData() {
+                return {
+                    nombre: (nombreEl || {}).value || '',
+                    telefono: (telefonoEl || {}).value || '',
+                    modalidad: (modalidadEl || {}).value || 'laboratorio',
+                    fecha: (fechaEl || {}).value || '',
+                    direccion: (direccionEl || {}).value || '',
+                    obs: (obsEl || {}).value || ''
+                };
+            }
+
+            function applyDraft() {
+                const draft = getDraft();
+                if (nombreEl && draft.nombre) nombreEl.value = draft.nombre;
+                if (telefonoEl && draft.telefono) telefonoEl.value = draft.telefono;
+                if (modalidadEl && draft.modalidad) modalidadEl.value = draft.modalidad;
+                if (fechaEl && draft.fecha) fechaEl.value = draft.fecha;
+                if (direccionEl && draft.direccion) direccionEl.value = draft.direccion;
+                if (obsEl && draft.obs) obsEl.value = draft.obs;
             }
 
             function formatMoney(value) {
                 return 'S/ ' + (Number(value) || 0).toFixed(2);
+            }
+
+            function computeDiscount(subtotal) {
+                if (!(DISCOUNT_ACTIVE && DISCOUNT_APPLY && DISCOUNT_PERCENT > 0)) {
+                    return 0;
+                }
+                const raw = Number(subtotal || 0) * (Number(DISCOUNT_PERCENT) / 100);
+                return Math.max(0, Number(raw.toFixed(2)));
             }
 
             function render() {
@@ -1180,19 +1376,37 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                     const rowSubtotal = price * (Number(it.qty) || 0);
                     total += rowSubtotal;
                     const tr = document.createElement('tr');
+                    const isPromo = it.type === 'promocion';
+                    const tipoLabel = isPromo ? 'Promoción' : 'Examen';
+                    const tipoChip = '<span class="badge ' + (isPromo ? 'text-bg-warning' : 'text-bg-info') + '">' + tipoLabel + '</span>';
                     tr.innerHTML = '' +
-                        '<td>' + escapeHtml(it.title || 'Promocion') + '</td>' +
-                        '<td>' + escapeHtml(it.vigencia || '-') + '</td>' +
+                        '<td>' + escapeHtml(it.title || 'Item') + '</td>' +
+                        '<td>' + tipoChip + '</td>' +
                         '<td>' + (price > 0 ? formatMoney(price) : 'Por confirmar') + '</td>' +
                         '<td>' + String(Number(it.qty) || 0) + '</td>' +
                         '<td>' + formatMoney(rowSubtotal) + '</td>' +
-                        '<td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-id="' + String(it.id || '') + '">Quitar</button></td>';
+                        '<td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-key="' + escapeHtml(String(it.key || '')) + '">Quitar</button></td>';
                     tbody.appendChild(tr);
                 });
 
                 emptyEl.style.display = items.length ? 'none' : 'block';
                 table.style.display = items.length ? '' : 'none';
-                totalEl.textContent = formatMoney(total);
+                const discount = computeDiscount(total);
+                const finalTotal = Math.max(0, total - discount);
+
+                if (subtotalEl) {
+                    subtotalEl.textContent = formatMoney(total);
+                }
+                if (discountWrapEl && discountEl) {
+                    if (discount > 0) {
+                        discountWrapEl.style.display = '';
+                        discountEl.textContent = '-' + formatMoney(discount);
+                    } else {
+                        discountWrapEl.style.display = 'none';
+                        discountEl.textContent = '-' + formatMoney(0);
+                    }
+                }
+                totalEl.textContent = formatMoney(finalTotal);
             }
 
             function escapeHtml(str) {
@@ -1208,11 +1422,14 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 const items = getCart();
                 const promoId = String(payload.id || '');
                 if (!promoId) return;
-                const idx = items.findIndex((it) => String(it.id) === promoId);
+                const promoKey = 'promocion:' + promoId;
+                const idx = items.findIndex((it) => String(it.key) === promoKey);
                 if (idx >= 0) {
                     items[idx].qty = (Number(items[idx].qty) || 0) + 1;
                 } else {
                     items.push({
+                        key: promoKey,
+                        type: 'promocion',
                         id: promoId,
                         title: payload.title || 'Promocion',
                         price: Number(payload.price) || 0,
@@ -1239,9 +1456,9 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 tbody.addEventListener('click', function (ev) {
                     const target = ev.target;
                     if (!(target instanceof HTMLElement)) return;
-                    const removeId = target.getAttribute('data-remove-id');
-                    if (!removeId) return;
-                    const next = getCart().filter((it) => String(it.id) !== String(removeId));
+                    const removeKey = target.getAttribute('data-remove-key');
+                    if (!removeKey) return;
+                    const next = getCart().filter((it) => String(it.key) !== String(removeKey));
                     setCart(next);
                     render();
                 });
@@ -1258,10 +1475,23 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             if (modalidadEl && direccionWrapEl) {
                 const toggleDireccion = function () {
                     direccionWrapEl.style.display = modalidadEl.value === 'domicilio' ? '' : 'none';
+                    if (fechaHintEl) {
+                        fechaHintEl.textContent = modalidadEl.value === 'domicilio'
+                            ? 'Selecciona la fecha en la que deseas la toma de muestra a domicilio.'
+                            : 'Selecciona la fecha en la que deseas asistir al laboratorio.';
+                    }
                 };
                 modalidadEl.addEventListener('change', toggleDireccion);
                 toggleDireccion();
             }
+
+            [nombreEl, telefonoEl, modalidadEl, fechaEl, direccionEl, obsEl].forEach((el) => {
+                if (!el) return;
+                const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+                el.addEventListener(evt, function () {
+                    saveDraft(readFormData());
+                });
+            });
 
             const quoteBtn = document.getElementById('promoQuoteWhatsappB');
             if (quoteBtn) {
@@ -1276,15 +1506,20 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                         return;
                     }
 
-                    const nombre = (document.getElementById('cotNombreB') || {}).value || '';
-                    const telefono = (document.getElementById('cotTelefonoB') || {}).value || '';
-                    const modalidad = (document.getElementById('cotModalidadB') || {}).value || 'laboratorio';
-                    const fecha = (document.getElementById('cotFechaB') || {}).value || '';
-                    const direccion = (document.getElementById('cotDireccionB') || {}).value || '';
-                    const obs = (document.getElementById('cotObsB') || {}).value || '';
+                    const formData = readFormData();
+                    const nombre = formData.nombre;
+                    const telefono = formData.telefono;
+                    const modalidad = formData.modalidad;
+                    const fecha = formData.fecha;
+                    const direccion = formData.direccion;
+                    const obs = formData.obs;
+                    saveDraft(formData);
 
                     let total = 0;
-                    const lines = items.map((it, idx) => {
+                    const promoItems = items.filter((it) => it.type === 'promocion');
+                    const examItems = items.filter((it) => it.type !== 'promocion');
+
+                    const promoLines = promoItems.map((it, idx) => {
                         const price = Number(it.price) || 0;
                         const rowSubtotal = price * (Number(it.qty) || 0);
                         total += rowSubtotal;
@@ -1296,26 +1531,53 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                         return line;
                     });
 
+                    const examLines = examItems.map((it, idx) => {
+                        const price = Number(it.price) || 0;
+                        const rowSubtotal = price * (Number(it.qty) || 1);
+                        total += rowSubtotal;
+                        const extras = [];
+                        if (it.codigo) extras.push('Codigo: ' + it.codigo);
+                        if (it.tiempo_respuesta) extras.push('Tiempo: ' + it.tiempo_respuesta);
+                        if (it.tipo_tubo) extras.push('Tubo: ' + it.tipo_tubo);
+                        let line = (idx + 1) + '. ' + (it.title || 'Examen') + ' - ' + formatMoney(rowSubtotal);
+                        if (extras.length) {
+                            line += ' | ' + extras.join(' | ');
+                        }
+                        return line;
+                    });
+
                     const parts = [
-                        'Hola, deseo cotizar las siguientes promociones en ' + EMPRESA + ':',
+                        'Hola, deseo cotizar en ' + EMPRESA + ':',
                         '',
-                        'Promociones:',
-                        lines.join('\n'),
-                        '',
-                        'Total referencial: ' + formatMoney(total),
-                        '',
-                        'Datos para agendar toma de muestra:',
-                        'Paciente: ' + (nombre || 'No indicado'),
-                        'Telefono: ' + (telefono || 'No indicado'),
-                        'Modalidad: ' + (modalidad === 'domicilio' ? 'A domicilio' : 'En laboratorio'),
-                        'Fecha tentativa: ' + (fecha || 'No indicada')
                     ];
 
+                    if (promoLines.length) {
+                        parts.push('Promociones:', promoLines.join('\n'), '');
+                    }
+                    if (examLines.length) {
+                        parts.push('Examenes:', examLines.join('\n'), '');
+                    }
+
+                    const discount = computeDiscount(total);
+                    const finalTotal = Math.max(0, total - discount);
+
+                    parts.push(
+                        'Subtotal referencial: ' + formatMoney(total),
+                        (discount > 0 ? 'Descuento web (' + String(Number(DISCOUNT_PERCENT)) + '%): -' + formatMoney(discount) : 'Descuento web: No aplica'),
+                        'Total referencial: ' + formatMoney(finalTotal),
+                        '',
+                        'Datos para coordinar la atención:',
+                        'Paciente: ' + (nombre || 'No indicado'),
+                        'Teléfono: ' + (telefono || 'No indicado'),
+                        'Modalidad: ' + (modalidad === 'domicilio' ? 'A domicilio' : 'En laboratorio'),
+                        'Fecha deseada: ' + (fecha || 'No indicada')
+                    );
+
                     if (modalidad === 'domicilio') {
-                        parts.push('Direccion: ' + (direccion || 'No indicada'));
+                        parts.push('Dirección: ' + (direccion || 'No indicada'));
                     }
                     if (obs) {
-                        parts.push('Observaciones: ' + obs);
+                        parts.push('Duda o indicación: ' + obs);
                     }
                     parts.push('', 'Por favor, me brindan referencia para agendar.');
 
@@ -1332,6 +1594,8 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 });
             }
 
+            migrateLegacyCart();
+            applyDraft();
             render();
         })();
     </script>

@@ -22,6 +22,13 @@
                          <?= htmlspecialchars($menu_servicios) ?>
                      </a>
                  </li>
+                 <li class="nav-item ms-lg-2 my-2 my-lg-0">
+                     <a href="index.php?vista=cotizar_publico"
+                         class="btn btn-sm"
+                         style="background: rgba(255,255,255,0.14); color:<?= htmlspecialchars($color_navbar_texto ?? $color_texto) ?>; border:1px solid rgba(255,255,255,0.45); border-radius:999px; font-weight:700; box-shadow:0 7px 16px rgba(0,0,0,.16);">
+                         <i class="bi bi-stars me-1"></i> Cotizar
+                     </a>
+                 </li>
                  <li class="nav-item">
                      <a class="nav-link" href="#testimonios" style="color:<?= htmlspecialchars($color_navbar_texto ?? $color_texto) ?>;">
                          <?= htmlspecialchars($menu_testimonios) ?>

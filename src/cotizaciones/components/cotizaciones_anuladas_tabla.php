@@ -91,6 +91,51 @@ $(document).ready(function() {
             : `${symbol} ${formattedNumber}`;
     }
 
+    function normalizarRolCreador(rol) {
+        const raw = (rol || '').toString().trim();
+        if (!raw) return 'Sin rol';
+        return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    }
+
+    function resolverCanalCaptura(row) {
+        const rol = (row.rol_creador || '').toString().toLowerCase().trim();
+        if (rol === 'convenio') return { label: 'Canal: Portal Convenio', badge: 'bg-info text-dark' };
+        if (rol === 'empresa') return { label: 'Canal: Portal Empresa', badge: 'bg-success' };
+        if (rol === 'cliente') return { label: 'Canal: Portal Cliente', badge: 'bg-secondary' };
+        if (rol === 'recepcionista' || rol === 'admin' || rol === 'laboratorista') return { label: 'Canal: Central', badge: 'bg-dark' };
+        return { label: `Canal: ${normalizarRolCreador(rol)}`, badge: 'bg-secondary' };
+    }
+
+    function resolverContextoCotizacion(row) {
+        if (parseInt(row.id_empresa || 0, 10) > 0) {
+            return {
+                label: 'Empresa',
+                badge: 'bg-success'
+            };
+        }
+        if (parseInt(row.id_convenio || 0, 10) > 0) {
+            return {
+                label: 'Convenio',
+                badge: 'bg-info text-dark'
+            };
+        }
+        const rol = (row.rol_creador || '').toString().toLowerCase().trim();
+        if (rol === 'cliente') {
+            return { label: 'Cliente', badge: 'bg-secondary' };
+        }
+        return { label: 'Particular', badge: 'bg-secondary' };
+    }
+
+    function renderRolCreadorConOrigen(row) {
+        const rol = normalizarRolCreador(row.rol_creador || '');
+        const rolRaw = (row.rol_creador || '').toString().toLowerCase().trim();
+        if (rolRaw === 'admin' || rolRaw === 'recepcionista' || rolRaw === 'laboratorista') {
+            return `<div>${rol}</div>`;
+        }
+        const contexto = resolverContextoCotizacion(row);
+        return `<div>${rol}</div><div class="mt-1"><span class='badge ${contexto.badge}'>${contexto.label}</span></div>`;
+    }
+
     var tablaAnuladas = $('#tablaCotizacionesAnuladas').DataTable({
         serverSide: true,
         processing: true,
@@ -169,7 +214,12 @@ $(document).ready(function() {
                     return `<span class='badge bg-secondary'>Sin datos</span>`;
                 }
             },
-            { data: 'rol_creador' },
+            {
+                data: null,
+                render: function(data, type, row) {
+                    return renderRolCreadorConOrigen(row);
+                }
+            },
             {
                 data: null,
                 orderable: false,

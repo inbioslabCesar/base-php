@@ -7,6 +7,21 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $id = $_GET['id'] ?? null;
 $esEdicion = !empty($id);
+$contextEmpresaId = isset($_GET['id_empresa']) ? (int)$_GET['id_empresa'] : 0;
+$contextConvenioId = isset($_GET['id_convenio']) ? (int)$_GET['id_convenio'] : 0;
+$contextEmpresaNombre = '';
+$contextConvenioNombre = '';
+
+if ($contextEmpresaId > 0) {
+    $stmtContextEmpresa = $pdo->prepare('SELECT nombre_comercial FROM empresas WHERE id = ? LIMIT 1');
+    $stmtContextEmpresa->execute([$contextEmpresaId]);
+    $contextEmpresaNombre = (string)($stmtContextEmpresa->fetchColumn() ?: '');
+}
+if ($contextConvenioId > 0) {
+    $stmtContextConvenio = $pdo->prepare('SELECT nombre FROM convenios WHERE id = ? LIMIT 1');
+    $stmtContextConvenio->execute([$contextConvenioId]);
+    $contextConvenioNombre = (string)($stmtContextConvenio->fetchColumn() ?: '');
+}
 
 $cliente = [
     'codigo_cliente' => '',
@@ -117,6 +132,19 @@ $offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
 <div class="container mt-4">
     <h4><?= $esEdicion ? 'Editar Paciente' : 'Nuevo Paciente' ?></h4>
 
+    <?php if (!$esEdicion && ($contextEmpresaId > 0 || $contextConvenioId > 0)): ?>
+        <div class="alert alert-info">
+            Este registro quedara asociado automaticamente a
+            <?php if ($contextEmpresaId > 0): ?>
+                la empresa <strong><?= htmlspecialchars($contextEmpresaNombre !== '' ? $contextEmpresaNombre : ('#' . $contextEmpresaId)) ?></strong>
+            <?php endif; ?>
+            <?php if ($contextEmpresaId > 0 && $contextConvenioId > 0): ?> y <?php endif; ?>
+            <?php if ($contextConvenioId > 0): ?>
+                el convenio <strong><?= htmlspecialchars($contextConvenioNombre !== '' ? $contextConvenioNombre : ('#' . $contextConvenioId)) ?></strong>
+            <?php endif; ?>.
+        </div>
+    <?php endif; ?>
+
     <?php if (isset($_GET['error']) && $_GET['error'] === 'dni_duplicado'): ?>
         <div class="alert alert-danger">El DNI ingresado ya está registrado.</div>
     <?php endif; ?>
@@ -156,6 +184,10 @@ $offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
     <?php endif; ?>
 
     <form method="POST" action="clientes/<?= $esEdicion ? 'editar.php?id='.$cliente['id'] : 'crear.php' ?>" id="formClienteOffline">
+        <?php if (!$esEdicion): ?>
+            <input type="hidden" name="id_empresa_contexto" value="<?= $contextEmpresaId > 0 ? (int)$contextEmpresaId : '' ?>">
+            <input type="hidden" name="id_convenio_contexto" value="<?= $contextConvenioId > 0 ? (int)$contextConvenioId : '' ?>">
+        <?php endif; ?>
         <?php if ($esEdicion): ?>
             <input type="hidden" name="offline_base_hash" id="offline_base_hash" value="<?= htmlspecialchars($offlineBaseHash) ?>">
         <?php endif; ?>
@@ -281,6 +313,12 @@ $offlineBaseHash = $esEdicion ? cliente_conflicto_hash($cliente) : '';
             <div class="col-md-4 mb-3">
                 <label for="descuento" class="form-label">Descuento (%)</label>
                 <input type="number" class="form-control" name="descuento" id="descuento" value="<?= htmlspecialchars($cliente['descuento']) ?>" min="0" max="100">
+            </div>
+            <div class="col-md-4 mb-3 d-flex align-items-end">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="usar_precio_convenio" name="usar_precio_convenio" value="1" <?= !empty($cliente['usar_precio_convenio']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="usar_precio_convenio">Usar precio convenio por defecto</label>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="estado" class="form-label">Estado</label>

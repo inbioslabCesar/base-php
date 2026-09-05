@@ -1,0 +1,99 @@
+{
+    "date": "2026-09-01",
+    "generated_at": "2026-09-02 01:00:03",
+    "global": {
+        "total": 0,
+        "aplicado": 0,
+        "pendiente": 0,
+        "error": 0,
+        "duplicados": 0,
+        "aplicado_pct": 0,
+        "error_pct": 0,
+        "duplicado_pct": 0
+    },
+    "modules": {
+        "agenda": {
+            "table": "agenda_sync_operaciones",
+            "exists": false,
+            "total": 0,
+            "aplicado": 0,
+            "pendiente": 0,
+            "error": 0,
+            "duplicados": 0,
+            "aplicado_pct": 0,
+            "error_pct": 0,
+            "duplicado_pct": 0
+        },
+        "caja": {
+            "table": "caja_sync_operaciones",
+            "exists": false,
+            "total": 0,
+            "aplicado": 0,
+            "pendiente": 0,
+            "error": 0,
+            "duplicados": 0,
+            "aplicado_pct": 0,
+            "error_pct": 0,
+            "duplicado_pct": 0
+        },
+        "inventario": {
+            "table": "inventario_sync_operaciones",
+            "exists": false,
+            "total": 0,
+            "aplicado": 0,
+            "pendiente": 0,
+            "error": 0,
+            "duplicados": 0,
+            "aplicado_pct": 0,
+            "error_pct": 0,
+            "duplicado_pct": 0
+        },
+        "pacientes": {
+            "table": "clientes_sync_operaciones",
+            "exists": false,
+            "total": 0,
+            "aplicado": 0,
+            "pendiente": 0,
+            "error": 0,
+            "duplicados": 0,
+            "aplicado_pct": 0,
+            "error_pct": 0,
+            "duplicado_pct": 0
+        },
+        "resultados": {
+            "table": "resultados_sync_operaciones",
+            "exists": true,
+            "total": 0,
+            "aplicado": 0,
+            "pendiente": 0,
+            "error": 0,
+            "duplicados": 0,
+            "aplicado_pct": 0,
+            "error_pct": 0,
+            "duplicado_pct": 0
+        }
+    },
+    "health_flags": [
+        {
+            "kpi": "operaciones_fallidas_pct",
+            "valor": 0,
+            "objetivo": "< 1.00",
+            "ok": true,
+            "status": "SIN_DATOS"
+        },
+        {
+            "kpi": "duplicados_pct",
+            "valor": 0,
+            "objetivo": "< 0.20",
+            "ok": true,
+            "status": "SIN_DATOS"
+        },
+        {
+            "kpi": "sincronizacion_aplicada_pct",
+            "valor": 0,
+            "objetivo": ">= 95.00",
+            "ok": true,
+            "status": "SIN_DATOS"
+        }
+    ]
+}

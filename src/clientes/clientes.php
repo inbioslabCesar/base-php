@@ -250,6 +250,11 @@ function capitalize($string) {
     color: #212529;
 }
 
+.badge-registro {
+    background: linear-gradient(135deg, #6f42c1 0%, #563d7c 100%);
+    color: #fff;
+}
+
 .card-actions {
     display: flex;
     justify-content: space-between;
@@ -515,6 +520,7 @@ function capitalize($string) {
                         <th class="px-4 py-2 text-sm font-semibold">Email</th>
                         <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Teléfono</th>
                         <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Estado</th>
+                        <th class="px-4 py-2 text-sm font-semibold">Registro</th>
                         <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
                     </tr>
                 </thead>
@@ -536,6 +542,21 @@ function normalizarTexto(txt) {
         .replace(/[\u0300-\u036f]/g, '') // quita tildes y diacríticos
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function registroOrigenCliente(row) {
+    const rol = (row.rol_creador || '').toLowerCase().trim();
+    const tipoRegistro = (row.tipo_registro || '').toLowerCase().trim();
+
+    if (tipoRegistro === 'empresa') return 'Registro empresa';
+    if (tipoRegistro === 'convenio') return 'Registro convenio';
+    if (tipoRegistro === 'central' || ['admin', 'recepcionista', 'laboratorista'].includes(rol)) return 'Registro principal/central';
+    if (rol === 'cliente' || tipoRegistro === 'cliente') return 'Registro cliente';
+    return 'Asociado';
+}
+
+function badgeRegistroCliente(row) {
+    return `<span class='badge bg-primary'>${registroOrigenCliente(row)}</span>`;
 }
 function mostrarPaginaActualClientes() {
     var cards = document.querySelectorAll('.cliente-card');
@@ -667,7 +688,7 @@ $(document).ready(function() {
         "responsive": true,
         "columnDefs": [
             { "responsivePriority": 1, "targets": [2, 3, 4] },
-            { "responsivePriority": 2, "targets": [9] },
+            { "responsivePriority": 2, "targets": [10] },
             { "responsivePriority": 3, "targets": [0, 1] },
             { "targets": [7,8], "visible": false } // Oculta teléfono (7) y estado (8) en desktop
         ],
@@ -681,6 +702,13 @@ $(document).ready(function() {
             { "data": "email" },
             { "data": "telefono" },
             { "data": "estado" },
+            {
+                "data": null,
+                "orderable": false,
+                "render": function(data, type, row) {
+                    return badgeRegistroCliente(row);
+                }
+            },
             {
                 "data": null,
                 "orderable": false,
@@ -730,9 +758,10 @@ function renderClienteCard(cliente) {
     let badges = '';
     // Rol
     const rol_creador = (cliente.rol_creador || '').toLowerCase().trim();
-    const roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio'];
+    const roles_validos = ['admin', 'recepcionista', 'empresa', 'convenio', 'cliente', 'laboratorista'];
     const rol_mostrar = roles_validos.includes(rol_creador) && rol_creador !== '' ? rol_creador.charAt(0).toUpperCase() + rol_creador.slice(1) : 'Paciente';
     badges += `<span class='badge-custom badge-rol'><i class='bi bi-person-badge me-1'></i>${rol_mostrar}</span>`;
+    badges += `<span class='badge-custom badge-registro'><i class='bi bi-signpost-2 me-1'></i>${registroOrigenCliente(cliente)}</span>`;
     // Estado
     badges += `<span class='badge-custom badge-estado'><i class='bi bi-circle-fill me-1'></i>${cliente.estado || 'Activo'}</span>`;
     // Empresa

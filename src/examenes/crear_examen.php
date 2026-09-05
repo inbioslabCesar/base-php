@@ -8,6 +8,19 @@ function capitalizar($texto)
     return mb_convert_case(trim($texto), MB_CASE_TITLE, "UTF-8");
 }
 
+function examenesTieneColumna(PDO $pdo, string $columna): bool
+{
+    static $cache = [];
+    if (array_key_exists($columna, $cache)) {
+        return $cache[$columna];
+    }
+
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM examenes LIKE ?');
+    $stmt->execute([$columna]);
+    $cache[$columna] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+    return $cache[$columna];
+}
+
 function generarIdParametroUnico(array &$usados)
 {
     do {
@@ -65,8 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tipo_tubo = capitalizar($_POST['tipo_tubo'] ?? '');
     $observaciones = trim($_POST['observaciones'] ?? '');
     $precio_publico = floatval($_POST['precio_publico'] ?? 0);
+    $precio_convenio = ($_POST['precio_convenio'] ?? '') !== '' ? floatval($_POST['precio_convenio']) : null;
     $adicional = $_POST['adicional'] ?? '';
     $vigente = isset($_POST['vigente']) ? 1 : 0; 
+    $hasPrecioConvenio = examenesTieneColumna($pdo, 'precio_convenio');
 
 
     if (empty($nombre) || empty($adicional)) {
@@ -141,25 +156,48 @@ if (json_decode($adicional) === null && json_last_error() !== JSON_ERROR_NONE) {
     $adicional = $adicionalNormalizado;
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO examenes 
-            (codigo, nombre, descripcion, area, metodologia, tiempo_respuesta, preanalitica_cliente, preanalitica_referencias, tipo_muestra, tipo_tubo, observaciones, precio_publico,adicional, vigente)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)");
-        $stmt->execute([
-            $codigo,
-            $nombre,
-            $descripcion,
-            $area,
-            $metodologia,
-            $tiempo_respuesta,
-            $preanalitica_cliente,
-            $preanalitica_referencias,
-            $tipo_muestra,
-            $tipo_tubo,
-            $observaciones,
-            $precio_publico,
-            $adicional,
-            $vigente
-        ]);
+        if ($hasPrecioConvenio) {
+            $stmt = $pdo->prepare("INSERT INTO examenes 
+                (codigo, nombre, descripcion, area, metodologia, tiempo_respuesta, preanalitica_cliente, preanalitica_referencias, tipo_muestra, tipo_tubo, observaciones, precio_publico, precio_convenio, adicional, vigente)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $codigo,
+                $nombre,
+                $descripcion,
+                $area,
+                $metodologia,
+                $tiempo_respuesta,
+                $preanalitica_cliente,
+                $preanalitica_referencias,
+                $tipo_muestra,
+                $tipo_tubo,
+                $observaciones,
+                $precio_publico,
+                $precio_convenio,
+                $adicional,
+                $vigente
+            ]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO examenes 
+                (codigo, nombre, descripcion, area, metodologia, tiempo_respuesta, preanalitica_cliente, preanalitica_referencias, tipo_muestra, tipo_tubo, observaciones, precio_publico, adicional, vigente)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $codigo,
+                $nombre,
+                $descripcion,
+                $area,
+                $metodologia,
+                $tiempo_respuesta,
+                $preanalitica_cliente,
+                $preanalitica_referencias,
+                $tipo_muestra,
+                $tipo_tubo,
+                $observaciones,
+                $precio_publico,
+                $adicional,
+                $vigente
+            ]);
+        }
         $_SESSION['mensaje'] = "Examen creado correctamente.";
         if (!empty($idsRegenerados)) {
             $_SESSION['mensaje'] .= " Se normalizaron {$idsRegenerados} ID(s) de parámetros para evitar duplicados.";

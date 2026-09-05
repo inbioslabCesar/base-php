@@ -416,6 +416,51 @@ let filtroAlertaEstado = '';
 const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
     ? window.formatMoney(value)
     : `S/ ${Number(value || 0).toFixed(2)}`;
+
+function normalizarRolCreador(rol) {
+    const raw = (rol || '').toString().trim();
+    if (!raw) return 'Sin rol';
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+}
+
+function resolverCanalCaptura(row) {
+    const rol = (row.rol_creador || '').toString().toLowerCase().trim();
+    if (rol === 'convenio') return { label: 'Canal: Portal Convenio', badge: 'bg-info text-dark' };
+    if (rol === 'empresa') return { label: 'Canal: Portal Empresa', badge: 'bg-success' };
+    if (rol === 'cliente') return { label: 'Canal: Portal Cliente', badge: 'bg-secondary' };
+    if (rol === 'recepcionista' || rol === 'admin' || rol === 'laboratorista') return { label: 'Canal: Central', badge: 'bg-dark' };
+    return { label: `Canal: ${normalizarRolCreador(rol)}`, badge: 'bg-secondary' };
+}
+
+function resolverContextoCotizacion(row) {
+    if (parseInt(row.id_empresa || 0, 10) > 0) {
+        return {
+            label: 'Empresa',
+            badge: 'bg-success'
+        };
+    }
+    if (parseInt(row.id_convenio || 0, 10) > 0) {
+        return {
+            label: 'Convenio',
+            badge: 'bg-info text-dark'
+        };
+    }
+    const rol = (row.rol_creador || '').toString().toLowerCase().trim();
+    if (rol === 'cliente') {
+        return { label: 'Cliente', badge: 'bg-secondary' };
+    }
+    return { label: 'Particular', badge: 'bg-secondary' };
+}
+
+function renderRolCreadorConOrigen(row) {
+    const rol = normalizarRolCreador(row.rol_creador || '');
+    const rolRaw = (row.rol_creador || '').toString().toLowerCase().trim();
+    if (rolRaw === 'admin' || rolRaw === 'recepcionista' || rolRaw === 'laboratorista') {
+        return `<div>${rol}</div>`;
+    }
+    const contexto = resolverContextoCotizacion(row);
+    return `<div>${rol}</div><div class="mt-1"><span class='badge ${contexto.badge}'>${contexto.label}</span></div>`;
+}
 const MAX_SELECT_ALL_LENGTH = 5000;
 let resumenAlertasXhr = null;
 let resumenAlertasTimer = null;
@@ -725,9 +770,7 @@ function getSeleccionGlobal() {
                 },
                 { "data": null,
                     "render": function(data, type, row) {
-                        const nombre = (row.nombre_creador || '').trim();
-                        const rol = row.rol_creador || '';
-                        return nombre ? `${nombre}<br><small class="text-muted">${rol}</small>` : rol;
+                        return renderRolCreadorConOrigen(row);
                     }
                 },
                 {
@@ -1212,7 +1255,7 @@ function renderCotizacionCard(row) {
             if (tipo === 'multiple' && total > 1) return `<span class='badge bg-warning text-dark'>Múltiples (${total})</span>`;
             return `<span class='text-muted'>—</span>`;
         })()}</span></div>
-        <div class='info-item'><span class='info-label'>Creado por</span><span class='info-value'>${((row.nombre_creador || '').trim() || row.rol_creador || '')} <small class="text-muted">${(row.nombre_creador || '').trim() ? '· ' + (row.rol_creador || '') : ''}</small></span></div>
+        <div class='info-item'><span class='info-label'>Creado por</span><div class='info-value'>${renderRolCreadorConOrigen(row)}</div></div>
         <div class='cotizacion-selector-row'>
             <input type='checkbox' class='cotizacion-checkbox-movil' data-id='${row.id}' data-saldo='${parseFloat(row.saldo) || 0}' ${checked}>
             <label class='mb-0'>Seleccionar</label>
