@@ -37,6 +37,9 @@ if ($has_portal_publico_enable_input) {
     $portal_publico_enable = isset($_POST['portal_publico_enable']) ? 1 : 0;
 }
 
+$mostrar_fecha_ingreso_pdf = isset($_POST['mostrar_fecha_ingreso_pdf']) ? 1 : 0;
+$mostrar_fecha_validacion_pdf = isset($_POST['mostrar_fecha_validacion_pdf']) ? 1 : 0;
+
 $promo_web_activa = isset($_POST['promo_web_activa']) ? 1 : 0;
 $promo_web_porcentaje = (float)($_POST['promo_web_porcentaje'] ?? 0);
 if ($promo_web_porcentaje < 0) {
@@ -248,6 +251,7 @@ $has_operation_columns = false;
 $has_ubicaciones_json = false;
 $has_logo_fondo_navbar = false;
 $has_marketing_columns = false;
+$has_pdf_fechas_columns = false;
 try {
     $chk = $pdo->query("SHOW COLUMNS FROM config_empresa LIKE 'maps_embed'");
     $has_maps_embed = (bool)$chk->fetch(PDO::FETCH_ASSOC);
@@ -279,6 +283,8 @@ try {
         && in_array('share_preview_titulo', $colsMap, true)
         && in_array('share_preview_descripcion', $colsMap, true)
         && in_array('share_preview_imagen', $colsMap, true);
+    $has_pdf_fechas_columns = in_array('mostrar_fecha_ingreso_pdf', $colsMap, true)
+        && in_array('mostrar_fecha_validacion_pdf', $colsMap, true);
 
     if (!$has_ubicaciones_json) {
         try {
@@ -337,6 +343,31 @@ try {
             && in_array('share_preview_descripcion', $colsMap2, true)
             && in_array('share_preview_imagen', $colsMap2, true);
     }
+
+    if (!$has_pdf_fechas_columns) {
+        $alterPdfFechaStatements = [
+            "ALTER TABLE config_empresa ADD COLUMN mostrar_fecha_ingreso_pdf TINYINT(1) NOT NULL DEFAULT 1",
+            "ALTER TABLE config_empresa ADD COLUMN mostrar_fecha_validacion_pdf TINYINT(1) NOT NULL DEFAULT 1",
+        ];
+        foreach ($alterPdfFechaStatements as $alterPdfFechaSql) {
+            try {
+                $pdo->exec($alterPdfFechaSql);
+            } catch (Throwable $e) {
+                // Ignorar si ya existe para compatibilidad.
+            }
+        }
+
+        $stmtCols3 = $pdo->query("SHOW COLUMNS FROM config_empresa");
+        $colsRows3 = $stmtCols3 ? $stmtCols3->fetchAll(PDO::FETCH_ASSOC) : [];
+        $colsMap3 = [];
+        foreach ($colsRows3 as $colRow3) {
+            if (!empty($colRow3['Field'])) {
+                $colsMap3[] = (string)$colRow3['Field'];
+            }
+        }
+        $has_pdf_fechas_columns = in_array('mostrar_fecha_ingreso_pdf', $colsMap3, true)
+            && in_array('mostrar_fecha_validacion_pdf', $colsMap3, true);
+    }
 } catch (Exception $e) {
     $has_maps_embed = false;
     $has_currency_columns = false;
@@ -344,6 +375,7 @@ try {
     $has_ubicaciones_json = false;
     $has_logo_fondo_navbar = false;
     $has_marketing_columns = false;
+    $has_pdf_fechas_columns = false;
 }
 
 // Validación básica
@@ -775,6 +807,9 @@ try {
         if ($has_marketing_columns) {
             $sql .= ", promo_web_activa=?, promo_web_porcentaje=?, promo_web_aplicar_carrito=?, promo_web_mensaje=?, promo_web_fecha_inicio=?, promo_web_fecha_fin=?, share_preview_titulo=?, share_preview_descripcion=?, share_preview_imagen=?";
         }
+        if ($has_pdf_fechas_columns) {
+            $sql .= ", mostrar_fecha_ingreso_pdf=?, mostrar_fecha_validacion_pdf=?";
+        }
 
         $sql .= ", tamano_letra=?,
             frase_promocion=?, oferta_mes=?,
@@ -798,6 +833,10 @@ try {
             $params[] = $share_preview_titulo;
             $params[] = $share_preview_descripcion;
             $params[] = $share_preview_imagen;
+        }
+        if ($has_pdf_fechas_columns) {
+            $params[] = (int)$mostrar_fecha_ingreso_pdf;
+            $params[] = (int)$mostrar_fecha_validacion_pdf;
         }
         $params = array_merge($params, [
             $tamano_letra,
@@ -872,6 +911,12 @@ try {
                 $promo_web_mensaje, $promo_web_fecha_inicio, $promo_web_fecha_fin,
                 $share_preview_titulo, $share_preview_descripcion, $share_preview_imagen
             ]);
+        }
+        if ($has_pdf_fechas_columns) {
+            $cols[] = 'mostrar_fecha_ingreso_pdf';
+            $cols[] = 'mostrar_fecha_validacion_pdf';
+            $vals[] = (int)$mostrar_fecha_ingreso_pdf;
+            $vals[] = (int)$mostrar_fecha_validacion_pdf;
         }
 
         $cols = array_merge($cols, [

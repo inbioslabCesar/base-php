@@ -6,6 +6,7 @@ class ExamenesService {
     private $hasSnapshotCol = null;
     private $hasOrderCol = null;
     private $alarmCols = null;
+    private $validationCols = null;
     public function __construct($pdo) {
         $this->pdo = $pdo;
     }
@@ -69,18 +70,60 @@ class ExamenesService {
         return $this->alarmCols;
     }
 
+    private function getValidationColumnMap() {
+        if ($this->validationCols !== null) {
+            return $this->validationCols;
+        }
+
+        $cols = [
+            'estado_validacion' => false,
+            'fecha_validacion_en' => false,
+            'fecha_proceso_en' => false,
+            'id_turno' => false,
+        ];
+
+        try {
+            $stmt = $this->pdo->query("SHOW COLUMNS FROM resultados_examenes");
+            $defs = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+            $dbCols = [];
+            foreach ($defs as $def) {
+                if (!empty($def['Field'])) {
+                    $dbCols[] = (string)$def['Field'];
+                }
+            }
+            foreach ($cols as $key => $_) {
+                $cols[$key] = in_array($key, $dbCols, true);
+            }
+        } catch (\Exception $e) {
+        }
+
+        $this->validationCols = $cols;
+        return $this->validationCols;
+    }
+
     public function obtenerExamenesPorCotizacion($cotizacion_id) {
         $alarmCols = $this->getAlarmColumnMap();
+        $validationCols = $this->getValidationColumnMap();
         $selectAlarmaActiva = $alarmCols['alarma_activa'] ? 're.alarma_activa' : '0 AS alarma_activa';
         $selectAlarmaDias = $alarmCols['alarma_dias'] ? 're.alarma_dias' : 'NULL AS alarma_dias';
         $selectAlarmaFechaObjetivo = $alarmCols['alarma_fecha_objetivo'] ? 're.alarma_fecha_objetivo' : 'NULL AS alarma_fecha_objetivo';
         $selectAlarmaEstado = $alarmCols['alarma_estado'] ? 're.alarma_estado' : 'NULL AS alarma_estado';
+        $selectEstadoValidacion = $validationCols['estado_validacion'] ? 're.estado_validacion' : "'pendiente' AS estado_validacion";
+        $selectFechaValidacion = $validationCols['fecha_validacion_en'] ? 're.fecha_validacion_en' : 'NULL AS fecha_validacion_en';
+        $selectFechaProceso = $validationCols['fecha_proceso_en'] ? 're.fecha_proceso_en' : 'NULL AS fecha_proceso_en';
+        $selectIdTurno = $validationCols['id_turno'] ? 're.id_turno' : 'NULL AS id_turno';
         $orderSql = $this->hasOrderColumn()
             ? ' ORDER BY COALESCE(re.orden_impresion, 2147483647), re.id'
             : ' ORDER BY re.id';
 
         if ($this->hasSnapshotColumn()) {
-            $sql = "SELECT re.id as id_resultado, re.id_examen, re.resultados,
+            $sql = "SELECT re.id as id_resultado, re.id_cotizacion, re.id_examen, re.resultados,
+                           re.estado,
+                           re.id_laboratorista,
+                           {$selectIdTurno},
+                           {$selectEstadoValidacion},
+                           {$selectFechaValidacion},
+                           {$selectFechaProceso},
                            re.adicional_snapshot,
                            e.adicional AS adicional_examen,
                            COALESCE(re.adicional_snapshot, e.adicional) AS adicional,
@@ -98,7 +141,13 @@ class ExamenesService {
                     JOIN examenes e ON re.id_examen = e.id
                     WHERE re.id_cotizacion = :cotizacion_id" . $orderSql;
         } else {
-            $sql = "SELECT re.id as id_resultado, re.id_examen, re.resultados,
+            $sql = "SELECT re.id as id_resultado, re.id_cotizacion, re.id_examen, re.resultados,
+                           re.estado,
+                           re.id_laboratorista,
+                           {$selectIdTurno},
+                           {$selectEstadoValidacion},
+                           {$selectFechaValidacion},
+                           {$selectFechaProceso},
                            e.adicional AS adicional,
                            CASE WHEN EXISTS (
                                SELECT 1 FROM inventario_examen_recetas r

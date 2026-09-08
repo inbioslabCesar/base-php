@@ -112,6 +112,8 @@ if ($moneda_decimales < 0 || $moneda_decimales > 4) {
 }
 $moneda_separador_decimal = (string)($empresa['moneda_separador_decimal'] ?? '.');
 $moneda_separador_miles = (string)($empresa['moneda_separador_miles'] ?? ',');
+$mostrar_fecha_ingreso_pdf = !isset($empresa['mostrar_fecha_ingreso_pdf']) || (int)$empresa['mostrar_fecha_ingreso_pdf'] === 1;
+$mostrar_fecha_validacion_pdf = !isset($empresa['mostrar_fecha_validacion_pdf']) || (int)$empresa['mostrar_fecha_validacion_pdf'] === 1;
 
 $toPreviewUrl = static function (string $path): string {
     $path = trim($path);
@@ -341,6 +343,23 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
                 <label for="moneda_separador_miles" class="form-label">Sep. miles</label>
                 <input type="text" class="form-control" id="moneda_separador_miles" name="moneda_separador_miles" maxlength="1"
                     value="<?= htmlspecialchars($moneda_separador_miles) ?>">
+            </div>
+            <div class="col-12"><hr></div>
+            <div class="col-12 mb-2">
+                <h6 class="mb-1">Configuración de fechas en PDF</h6>
+                <small class="text-muted">Activa o desactiva la visualización de fechas por examen en el reporte PDF.</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="mostrar_fecha_ingreso_pdf" name="mostrar_fecha_ingreso_pdf" value="1" <?= $mostrar_fecha_ingreso_pdf ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="mostrar_fecha_ingreso_pdf">Mostrar fecha de ingreso en PDF</label>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="mostrar_fecha_validacion_pdf" name="mostrar_fecha_validacion_pdf" value="1" <?= $mostrar_fecha_validacion_pdf ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="mostrar_fecha_validacion_pdf">Mostrar fecha de validación en PDF</label>
+                </div>
             </div>
             <!-- Colores y tipografía -->
             <div class="col-md-3 mb-3">

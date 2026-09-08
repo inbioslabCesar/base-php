@@ -1532,6 +1532,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('form[action="dashboard.php?action=guardar"]');
     if (form) {
         form.addEventListener('submit', async function(e) {
+            const submitter = e.submitter || document.activeElement || null;
+            const submitterFormActionAttr = submitter && typeof submitter.getAttribute === 'function'
+                ? String(submitter.getAttribute('formaction') || '').trim()
+                : '';
+            const targetAction = submitterFormActionAttr !== ''
+                ? new URL(submitterFormActionAttr, window.location.href).toString()
+                : form.action;
+            const isGuardarAction = /[?&]action=guardar(?:&|$)/.test(String(targetAction || ''));
+
+            // Solo interceptar el flujo de guardado.
+            // Acciones como "resultados_validar" deben usar su formaction nativo.
+            if (!isGuardarAction) {
+                return;
+            }
+
             if (form.dataset.forceNativeSubmit === '1') {
                 return;
             }
@@ -1605,19 +1620,42 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
 
-            let valid = true;
-            // Ejemplo: marcar campos obligatorios
+            let requiredMissing = 0;
+            // Marcar requeridos, pero no bloquear si pertenecen a examenes no imprimibles
+            // o si el usuario decide guardar incompleto como pendiente.
             form.querySelectorAll('.form-control[required]').forEach(input => {
-                if (!input.value.trim()) {
+                if (input.disabled) {
+                    input.classList.remove('is-invalid');
+                    return;
+                }
+
+                const card = input.closest('.exam-card');
+                if (card) {
+                    const printToggle = card.querySelector('input[type="checkbox"][name*="[imprimir_examen]"]');
+                    if (printToggle && !printToggle.checked) {
+                        input.classList.remove('is-invalid');
+                        return;
+                    }
+                }
+
+                if (!String(input.value || '').trim()) {
                     input.classList.add('is-invalid');
-                    valid = false;
+                    requiredMissing += 1;
                 } else {
                     input.classList.remove('is-invalid');
                 }
             });
-            if (!valid) {
-                alert('Por favor, completa todos los campos obligatorios.');
-                return false;
+
+            if (requiredMissing > 0 && window.Swal && typeof window.Swal.fire === 'function') {
+                window.Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'warning',
+                    title: `Faltan ${requiredMissing} campos obligatorios en secciones imprimibles.`,
+                    showConfirmButton: false,
+                    timer: 2800,
+                    timerProgressBar: true,
+                });
             }
 
             if (forceIncompleteInput && forceIncompleteInput.value !== '1') {
