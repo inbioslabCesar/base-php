@@ -109,7 +109,19 @@ $pwaInstallScriptHref = ($pwaBasePath === '' ? '' : $pwaBasePath) . '/src/pwa/pw
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-    <title><?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?> | Detalle Promocion</title>
+    <title><?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?></title>
+    <link rel="canonical" href="<?= htmlspecialchars((string)($canonical ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="es_PE">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:url" content="<?= htmlspecialchars((string)($canonical ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta name="theme-color" content="<?= htmlspecialchars($color_principal, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="manifest" href="<?= htmlspecialchars($pwaManifestHref, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">

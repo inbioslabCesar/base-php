@@ -2,7 +2,7 @@
 $heroTitle = !empty($frase_promocion) ? (string)$frase_promocion : ('Bienvenido a ' . (string)$nombre_empresa);
 $heroSubtitle = !empty($oferta_mes)
     ? (string)$oferta_mes
-    : 'Resultados confiables, procesos modernos y atencion humana en cada etapa de tu diagnostico.';
+    : 'Profesionales en accion para cuidar tu salud con precision y confianza.';
 
 $serviciosData = is_array($servicios) ? $servicios : [];
 $testimoniosData = is_array($testimonios) ? $testimonios : [];
@@ -322,18 +322,18 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
     <link rel="icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" sizes="any" type="image/x-icon">
     <link rel="shortcut icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" type="image/x-icon">
     <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($logoFaviconHref, ENT_QUOTES, 'UTF-8') ?>">
-    <title><?= htmlspecialchars($nombre_empresa) ?> | Portal Premium</title>
+    <title><?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="es_PE">
-    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Portal Premium'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:url" content="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:site_name" content="<?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Portal Premium'), ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ($nombre_empresa . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta name="theme-color" content="<?= htmlspecialchars($color_principal, ENT_QUOTES, 'UTF-8') ?>">
@@ -784,8 +784,8 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                             <div class="d-flex align-items-center gap-3">
                                 <i class="bi bi-heart-pulse-fill fs-2"></i>
                                 <div>
-                                    <strong>Portal Premium Activo</strong>
-                                    <div>Experiencia visual mejorada para pacientes.</div>
+                                    <strong>Profesionales en accion</strong>
+                                    <div>Cuidamos tu salud con precision y confianza.</div>
                                 </div>
                             </div>
                         </div>
@@ -1227,6 +1227,7 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             const CART_KEY = 'quote_items_v1';
             const LEGACY_PROMO_KEY = 'promo_cart_v1';
             const LEGACY_EXAM_KEY = 'exam_cart_v1';
+            const LEGACY_MIGRATED_FLAG_KEY = 'quote_items_legacy_migrated_v1';
             const FORM_DRAFT_KEY = 'quote_contact_draft_v1';
             const WA_BASE = <?= json_encode($whatsAppHref, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
             const EMPRESA = <?= json_encode((string)$nombre_empresa, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -1294,8 +1295,13 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             }
 
             function migrateLegacyCart() {
+                if (localStorage.getItem(LEGACY_MIGRATED_FLAG_KEY) === '1') {
+                    return;
+                }
+
                 const existing = getCart();
                 if (existing.length > 0) {
+                    localStorage.setItem(LEGACY_MIGRATED_FLAG_KEY, '1');
                     return;
                 }
 
@@ -1337,6 +1343,10 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 if (merged.length) {
                     setCart(merged);
                 }
+
+                localStorage.removeItem(LEGACY_PROMO_KEY);
+                localStorage.removeItem(LEGACY_EXAM_KEY);
+                localStorage.setItem(LEGACY_MIGRATED_FLAG_KEY, '1');
             }
 
             function getDraft() {

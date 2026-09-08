@@ -107,11 +107,39 @@ $edadHeaderPdf = EdadPacienteService::formatearEdadDetalladaDesdeValor(
     $edadTextoPdf !== '' ? $edadTextoPdf : (string)($primer_row['edad'] ?? '')
 );
 
-$fechaProcesoPdf = trim((string)($primer_row['fecha_proceso_en'] ?? ''));
-if ($fechaProcesoPdf === '') {
-    $fechaProcesoPdf = (string)($primer_row['fecha_ingreso'] ?? '');
+$fechaProcesoPdf = '';
+$fechaValidacionPdf = '';
+foreach ($rows as $rowFecha) {
+    $resultadosTmp = [];
+    if (!empty($rowFecha['resultados'])) {
+        $decTmp = json_decode((string)$rowFecha['resultados'], true);
+        if (is_array($decTmp)) {
+            $resultadosTmp = $decTmp;
+        }
+    }
+    $imprimirTmp = !isset($resultadosTmp['imprimir_examen']) || (int)$resultadosTmp['imprimir_examen'] === 1;
+    if (!$imprimirTmp) {
+        continue;
+    }
+
+    if ($fechaProcesoPdf === '') {
+        $fechaProcesoPdf = trim((string)($rowFecha['fecha_proceso_en'] ?? ''));
+        if ($fechaProcesoPdf === '') {
+            $fechaProcesoPdf = (string)($rowFecha['fecha_ingreso'] ?? '');
+        }
+    }
+
+    $fv = trim((string)($rowFecha['fecha_validacion_en'] ?? ''));
+    if ($fv !== '' && ($fechaValidacionPdf === '' || strtotime($fv) > strtotime($fechaValidacionPdf))) {
+        $fechaValidacionPdf = $fv;
+    }
 }
-$fechaValidacionPdf = trim((string)($primer_row['fecha_validacion_en'] ?? ''));
+if ($fechaProcesoPdf === '') {
+    $fechaProcesoPdf = trim((string)($primer_row['fecha_proceso_en'] ?? ''));
+    if ($fechaProcesoPdf === '') {
+        $fechaProcesoPdf = (string)($primer_row['fecha_ingreso'] ?? '');
+    }
+}
 $fechaCotizacionPdf = (string)($primer_row['cotizacion_fecha'] ?? '');
 
 $paciente = [
@@ -145,6 +173,12 @@ if ($esSisCotizacion) {
     }
 }
 $empresa = obtenerDatosEmpresa($pdo);
+$mostrarFechaIngresoPdf = !isset($empresa['mostrar_fecha_ingreso_pdf']) || (int)$empresa['mostrar_fecha_ingreso_pdf'] === 1;
+$mostrarFechaValidacionPdf = !isset($empresa['mostrar_fecha_validacion_pdf']) || (int)$empresa['mostrar_fecha_validacion_pdf'] === 1;
+
+$paciente['mostrar_fecha_ingreso_pdf'] = $mostrarFechaIngresoPdf;
+$paciente['mostrar_fecha_validacion_pdf'] = $mostrarFechaValidacionPdf;
+
 $resolveEmpresaAssetPath = static function (string $storedPath): string {
     $storedPath = trim($storedPath);
     if ($storedPath === '') {
@@ -265,8 +299,11 @@ $mostrarFilaSolicitante = ($solicitanteNombre !== '' || $solicitanteTipo !== '' 
 $mostrarFilaSeguro = !empty($tipoSeguro);
 
 // Ajuste dinamico del margen superior segun filas reales del header para evitar huecos grandes.
-$mostrarFilaValidacion = !empty($paciente['fecha_validacion']);
-$filasHeaderDatos = 4; // Paciente, DNI/Edad/Sexo, Referencia, Fecha de proceso.
+$mostrarFilaProceso = $mostrarFechaIngresoPdf && !empty($paciente['fecha_proceso']);
+$filasHeaderDatos = 3; // Paciente, DNI/Edad/Sexo, Referencia.
+if ($mostrarFilaProceso) {
+    $filasHeaderDatos++;
+}
 if ($mostrarFilaProfesional) {
     $filasHeaderDatos++;
 }
@@ -274,9 +311,6 @@ if ($mostrarFilaSolicitante) {
     $filasHeaderDatos++;
 }
 if ($mostrarFilaSeguro) {
-    $filasHeaderDatos++;
-}
-if ($mostrarFilaValidacion) {
     $filasHeaderDatos++;
 }
 $headerCompacto = !$mostrarFilaProfesional && !$mostrarFilaSolicitante && !$mostrarFilaSeguro;
@@ -363,8 +397,7 @@ $headerHtml = '
         ' . $solicitanteHeaderHtml . '
         <tr><td colspan="2" style="padding:1px 6px;"><strong>Referencia:</strong> ' . htmlspecialchars($referencia) . '</td></tr>
         ' . (!empty($tipoSeguro) ? '<tr><td colspan="2" style="padding:1px 6px;"><strong>Tipo de seguro:</strong> ' . htmlspecialchars($tipoSeguro) . '</td></tr>' : '') . '
-        <tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha de proceso:</strong> ' . htmlspecialchars($paciente['fecha_proceso'] ?? $paciente['fecha']) . '</td></tr>
-        ' . ($mostrarFilaValidacion ? '<tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha de validación:</strong> ' . htmlspecialchars($paciente['fecha_validacion']) . '</td></tr>' : '') . '
+        ' . ($mostrarFilaProceso ? '<tr><td colspan="2" style="padding:1px 6px;"><strong>Fecha de proceso:</strong> ' . htmlspecialchars($paciente['fecha_proceso'] ?? $paciente['fecha']) . '</td></tr>' : '') . '
     </table>
 ';
 $mpdf->SetHTMLHeader($headerHtml, 'O', true);

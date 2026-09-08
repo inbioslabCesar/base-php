@@ -138,16 +138,16 @@ $prefillExamenId = isset($_GET['examen_id']) ? (int)$_GET['examen_id'] : 0;
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cotizar | <?= htmlspecialchars($empresaNombre, ENT_QUOTES, 'UTF-8') ?></title>
+    <title><?= htmlspecialchars($shareTitle ?? ($empresaNombre . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?></title>
     <meta property="og:type" content="website">
     <meta property="og:locale" content="es_PE">
-    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ('Cotizador | ' . $empresaNombre), ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle ?? ($empresaNombre . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:url" content="<?= htmlspecialchars($canonical ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:site_name" content="<?= htmlspecialchars($empresaNombre, ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ('Cotizador | ' . $empresaNombre), ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle ?? ($empresaNombre . ' | Laboratorio Clinico'), ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <meta name="twitter:image" content="<?= htmlspecialchars($shareImage ?? '', ENT_QUOTES, 'UTF-8') ?>">
     <link rel="icon" href="<?= htmlspecialchars($faviconDynamicHref ?? '', ENT_QUOTES, 'UTF-8') ?>" type="image/png" sizes="48x48">
@@ -632,6 +632,7 @@ $prefillExamenId = isset($_GET['examen_id']) ? (int)$_GET['examen_id'] : 0;
             const CART_KEY = 'quote_items_v1';
             const LEGACY_PROMO_KEY = 'promo_cart_v1';
             const LEGACY_EXAM_KEY = 'exam_cart_v1';
+            const LEGACY_MIGRATED_FLAG_KEY = 'quote_items_legacy_migrated_v1';
             const FORM_DRAFT_KEY = 'quote_contact_draft_v1';
             const WA_BASE = <?= json_encode($waBaseCotizador, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
             const EMPRESA = <?= json_encode($empresaNombre, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -787,8 +788,13 @@ $prefillExamenId = isset($_GET['examen_id']) ? (int)$_GET['examen_id'] : 0;
             }
 
             function migrateLegacyCart() {
+                if (localStorage.getItem(LEGACY_MIGRATED_FLAG_KEY) === '1') {
+                    return;
+                }
+
                 const existing = getCart();
                 if (existing.length > 0) {
+                    localStorage.setItem(LEGACY_MIGRATED_FLAG_KEY, '1');
                     return;
                 }
 
@@ -831,6 +837,10 @@ $prefillExamenId = isset($_GET['examen_id']) ? (int)$_GET['examen_id'] : 0;
                 if (merged.length) {
                     setCart(merged);
                 }
+
+                localStorage.removeItem(LEGACY_PROMO_KEY);
+                localStorage.removeItem(LEGACY_EXAM_KEY);
+                localStorage.setItem(LEGACY_MIGRATED_FLAG_KEY, '1');
             }
 
             function getDraft() {

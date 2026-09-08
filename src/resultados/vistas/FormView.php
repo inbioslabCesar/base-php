@@ -93,16 +93,6 @@ class FormView {
                     <i class="bi bi-file-earmark-pdf me-2"></i>
                     Descargar PDF
                 </a>
-                <button
-                    type="submit"
-                    class="btn btn-outline-primary results-action-btn-with-progress"
-                    formaction="dashboard.php?action=resultados_validar"
-                    formmethod="post"
-                    onclick="return confirm('Se validarán resultados clínicos de esta cotización. Si luego editas datos, deberán validarse nuevamente. ¿Continuar?');">
-                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">OK</span>
-                    <i class="bi bi-check2-circle me-2"></i>
-                    Validar Resultados
-                </button>
                 <button type="submit" class="save-btn js-save-submit results-action-btn-with-progress">
                     <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-save me-2"></i>
@@ -139,16 +129,6 @@ class FormView {
                     <i class="bi bi-file-earmark-pdf me-2"></i>
                     Descargar PDF
                 </a>
-                <button
-                    type="submit"
-                    class="btn btn-outline-primary results-actions-dock__btn results-action-btn-with-progress"
-                    formaction="dashboard.php?action=resultados_validar"
-                    formmethod="post"
-                    onclick="return confirm('Se validarán resultados clínicos de esta cotización. Si luego editas datos, deberán validarse nuevamente. ¿Continuar?');">
-                    <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">OK</span>
-                    <i class="bi bi-check2-circle me-2"></i>
-                    Validar Resultados
-                </button>
                 <button type="submit" class="save-btn results-actions-dock__btn js-save-submit results-action-btn-with-progress">
                     <span class="results-action-progress-circle js-results-progress-circle" aria-hidden="true">0%</span>
                     <i class="bi bi-save me-2"></i>

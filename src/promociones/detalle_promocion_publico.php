@@ -1,11 +1,39 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../conexion/conexion.php';
+require_once __DIR__ . '/../config/ui_theme.php';
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $stmt = $pdo->prepare("SELECT * FROM promociones WHERE id = ?");
 $stmt->execute([$id]);
 $promo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+$config_empresa = ui_theme_fetch_company_config($pdo);
+$nombre_empresa = trim((string)($config_empresa['nombre'] ?? 'Laboratorio'));
+if ($nombre_empresa === '') {
+    $nombre_empresa = 'Laboratorio';
+}
+
+$hostHeader = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$isLocalHost = in_array(strtolower((string)$hostHeader), ['localhost', '127.0.0.1'], true);
+$esHttps = (
+    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+    (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) ||
+    (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+);
+$protocolo = !$isLocalHost ? 'https' : ($esHttps ? 'https' : 'http');
+$dominio = $protocolo . '://' . $hostHeader;
+$canonical = $dominio . ($_SERVER['REQUEST_URI'] ?? '/');
+
+$shareTitle = trim((string)($config_empresa['share_preview_titulo'] ?? ''));
+if ($shareTitle === '') {
+    $shareTitle = $nombre_empresa . ' | Laboratorio Clinico';
+}
+
+$shareDescription = trim((string)($config_empresa['share_preview_descripcion'] ?? ''));
+if ($shareDescription === '') {
+    $shareDescription = 'Resultados confiables con atencion rapida y profesional.';
+}
 
 $siteBasePath = rtrim((string)dirname(rtrim((string)BASE_URL, '/')), '/\\');
 if ($siteBasePath === '.' || $siteBasePath === '') {
@@ -28,6 +56,41 @@ if (!empty($promo['imagen'])) {
     }
 }
 
+$sharePreviewDefaultRel = 'uploads/empresa/share-preview-default.svg';
+$configuredShareImageRaw = trim((string)($config_empresa['share_preview_imagen'] ?? ''));
+$configuredShareImageLower = strtolower($configuredShareImageRaw);
+$configuredShareImageResolved = $configuredShareImageRaw;
+if ($configuredShareImageLower === '@logo') {
+    $configuredShareImageResolved = trim((string)($config_empresa['logo'] ?? ''));
+} elseif ($configuredShareImageLower === '@default') {
+    $configuredShareImageResolved = $sharePreviewDefaultRel;
+}
+
+$toAbsoluteUrl = static function (string $pathOrUrl) use ($dominio): string {
+    $v = trim($pathOrUrl);
+    if ($v === '') {
+        return '';
+    }
+    if (preg_match('~^https?://~i', $v)) {
+        return $v;
+    }
+    if (strpos($v, '//') === 0) {
+        return 'https:' . $v;
+    }
+    $normalized = str_replace('\\', '/', $v);
+    $normalized = preg_replace('#^(\./|\.\./)+#', '', $normalized);
+    return rtrim($dominio, '/') . '/' . ltrim($normalized, '/');
+};
+
+$rawShareImage = $configuredShareImageResolved;
+if ($rawShareImage === '') {
+    $rawShareImage = trim((string)($config_empresa['logo'] ?? ''));
+}
+if ($rawShareImage === '') {
+    $rawShareImage = $sharePreviewDefaultRel;
+}
+$shareImage = $toAbsoluteUrl($rawShareImage);
+
 $fechaInicio = !empty($promo['fecha_inicio']) && strtotime((string)$promo['fecha_inicio'])
     ? date('d/m/Y', strtotime((string)$promo['fecha_inicio']))
     : '';
@@ -40,7 +103,19 @@ $fechaFin = !empty($promo['fecha_fin']) && strtotime((string)$promo['fecha_fin']
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Detalle de promoción</title>
+    <title><?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?></title>
+    <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="es_PE">
+    <meta property="og:title" content="<?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:url" content="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:image" content="<?= htmlspecialchars($shareImage, ENT_QUOTES, 'UTF-8') ?>">
+    <meta property="og:site_name" content="<?= htmlspecialchars($nombre_empresa, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($shareDescription, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="twitter:image" content="<?= htmlspecialchars($shareImage, ENT_QUOTES, 'UTF-8') ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>

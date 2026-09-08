@@ -1,6 +1,9 @@
 <?php
 // Función para armar el HTML y CSS del reporte de resultados
 function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
+    $mostrarFechaIngresoPdf = !isset($empresa['mostrar_fecha_ingreso_pdf']) || (int)$empresa['mostrar_fecha_ingreso_pdf'] === 1;
+    $mostrarFechaValidacionPdf = !isset($empresa['mostrar_fecha_validacion_pdf']) || (int)$empresa['mostrar_fecha_validacion_pdf'] === 1;
+
     // Regla unificada del sistema: coma como miles y punto como decimal.
     $toNullableFloat = function ($value) {
         if ($value === null) {
@@ -138,17 +141,22 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     $html = '<div class="titulo-reporte" style="margin:2px 0 8px 0;">Reporte de Resultados</div>';
 
     $legacyTableOpen = false;
-    $openLegacyTable = function () use (&$html, &$legacyTableOpen) {
+    $legacyHeaderRendered = false;
+    $openLegacyTable = function () use (&$html, &$legacyTableOpen, &$legacyHeaderRendered) {
         if ($legacyTableOpen) {
             return;
         }
-        $html .= '<table class="tabla-resultados"><thead><tr>';
-        $html .= '<th class="prueba">Prueba</th>';
-        $html .= '<th class="metodologia">Metodología</th>';
-        $html .= '<th class="resultado">Resultado</th>';
-        $html .= '<th class="unidades">Unidades</th>';
-        $html .= '<th class="referencia">Valores de Referencia</th>';
-        $html .= '</tr></thead><tbody>';
+        $html .= '<table class="tabla-resultados"><tbody>';
+        if (!$legacyHeaderRendered) {
+            $html .= '<tr>';
+            $html .= '<th class="prueba">Prueba</th>';
+            $html .= '<th class="metodologia">Metodología</th>';
+            $html .= '<th class="resultado">Resultado</th>';
+            $html .= '<th class="unidades">Unidades</th>';
+            $html .= '<th class="referencia">Valores de Referencia</th>';
+            $html .= '</tr>';
+            $legacyHeaderRendered = true;
+        }
         $legacyTableOpen = true;
     };
     $closeLegacyTable = function () use (&$html, &$legacyTableOpen) {
@@ -418,7 +426,97 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         return $htmlList;
     };
 
+    $formatFechaClinica = static function ($valor) {
+        $valor = trim((string)$valor);
+        if ($valor === '') {
+            return '';
+        }
+        $ts = strtotime($valor);
+        if ($ts === false) {
+            return $valor;
+        }
+        $ampm = strtolower(date('A', $ts)) === 'am' ? 'a. m.' : 'p. m.';
+        return date('d/m/Y h:i', $ts) . ' ' . $ampm;
+    };
+
+    $renderSeccionProceso = static function ($meta) use ($formatFechaClinica, $mostrarFechaIngresoPdf) {
+        if (!$mostrarFechaIngresoPdf) {
+            return '';
+        }
+        if (!is_array($meta)) {
+            return '';
+        }
+        $fechaProceso = $formatFechaClinica($meta['fecha_proceso'] ?? '');
+        if ($fechaProceso === '') {
+            return '';
+        }
+        return '<div style="display:block; width:100%; clear:both; font-size:9.6px; color:#374151; text-align:right; margin:4px 0 8px 0;">'
+            . '<strong>Fecha de ingreso:</strong> ' . htmlspecialchars($fechaProceso)
+            . '</div>';
+    };
+
+    $renderSeccionProcesoEtiqueta = static function ($meta) use ($formatFechaClinica, $mostrarFechaIngresoPdf) {
+        if (!$mostrarFechaIngresoPdf) {
+            return '';
+        }
+        if (!is_array($meta)) {
+            return '';
+        }
+        $fechaProceso = $formatFechaClinica($meta['fecha_proceso'] ?? '');
+        if ($fechaProceso === '') {
+            return '';
+        }
+        return 'Fecha de ingreso: ' . htmlspecialchars($fechaProceso);
+    };
+
+    $renderSeccionValidacion = static function ($meta) use ($formatFechaClinica, $mostrarFechaValidacionPdf) {
+        if (!$mostrarFechaValidacionPdf) {
+            return '';
+        }
+        if (!is_array($meta)) {
+            return '';
+        }
+        $estadoValidacion = strtolower(trim((string)($meta['estado_validacion'] ?? 'pendiente')));
+        $fechaValidacion = $formatFechaClinica($meta['fecha_validacion'] ?? '');
+        if ($estadoValidacion !== 'validado' || $fechaValidacion === '') {
+            return '';
+        }
+        return '<div style="display:block; width:100%; clear:both; font-size:9.6px; color:#374151; text-align:right; margin:4px 0 10px 0;">'
+            . '<strong>Fecha de validación:</strong> ' . htmlspecialchars($fechaValidacion)
+            . '</div>';
+    };
+
+    $seccionActual = null;
+    $seccionMetaPendiente = null;
+    $seccionModoPendiente = null;
+    $seccionIngresoEtiquetaPendiente = '';
     foreach ($items as $item) {
+        $seccionId = isset($item['seccion_id']) ? (int)$item['seccion_id'] : 0;
+        if ($seccionId > 0 && $seccionId !== $seccionActual) {
+            if ($seccionMetaPendiente !== null) {
+                if ($seccionModoPendiente === 'legacy') {
+                    $closeLegacyTable();
+                    $html .= $renderSeccionValidacion($seccionMetaPendiente);
+                } else {
+                    $closeLegacyTable();
+                    $html .= $renderSeccionValidacion($seccionMetaPendiente);
+                }
+            }
+
+            $seccionMetaPendiente = is_array($item['seccion_meta'] ?? null) ? $item['seccion_meta'] : [];
+            $seccionModoPendiente = (($item['tipo'] ?? '') === 'TablaV2') ? 'v2' : 'legacy';
+
+            if ($seccionModoPendiente === 'legacy') {
+                $closeLegacyTable();
+                $seccionIngresoEtiquetaPendiente = $renderSeccionProcesoEtiqueta($seccionMetaPendiente);
+            } else {
+                $closeLegacyTable();
+                $seccionIngresoEtiquetaPendiente = '';
+                $html .= $renderSeccionProceso($seccionMetaPendiente);
+            }
+            $seccionActual = $seccionId;
+        }
+
         if (($item['tipo'] ?? '') === 'TablaV2') {
             $closeLegacyTable();
 
@@ -610,7 +708,23 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             $font_style = !empty($item['cursiva']) ? 'italic' : 'normal';
             $text_align = isset($item['alineacion']) ? $item['alineacion'] : ($item['tipo'] === "Título" ? 'center' : 'left');
             $textoCabecera = trim((string)($item['nombre'] ?? $item['prueba'] ?? ''));
-            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';border-radius:6px;text-align:' . htmlspecialchars($text_align) . ';">' . htmlspecialchars($textoCabecera) . '</td></tr>';
+            $ingresoEnFila = '';
+            if ($seccionIngresoEtiquetaPendiente !== '') {
+                $ingresoEnFila = $seccionIngresoEtiquetaPendiente;
+                $seccionIngresoEtiquetaPendiente = '';
+            }
+            $contenidoCabecera = htmlspecialchars($textoCabecera);
+            $ajusteFilaIngreso = '';
+            if ($ingresoEnFila !== '') {
+                $ajusteFilaIngreso = 'padding-right:1px;';
+                $contenidoCabecera = '<table style="width:100%; border-collapse:collapse; table-layout:fixed;"><tr>'
+                    . '<td style="border:none; padding:0; text-align:left; vertical-align:middle;">' . htmlspecialchars($textoCabecera) . '</td>'
+                    . '<td style="border:none; padding:0; text-align:right; vertical-align:middle; white-space:nowrap; font-size:9.6px; color:#374151; font-weight:600;">' . $ingresoEnFila . '</td>'
+                    . '</tr></table>';
+            }
+            $html .= '<tr class="subtitulo"><td colspan="5" style="background:' . htmlspecialchars($color_fondo) . ';color:' . htmlspecialchars($color_texto) . ';font-weight:' . $font_weight . ';font-style:' . $font_style . ';border-radius:6px;text-align:' . htmlspecialchars($text_align) . ';' . $ajusteFilaIngreso . '">'
+                . $contenidoCabecera
+                . '</td></tr>';
         } elseif ($item['tipo'] === "Parámetro") {
             $openLegacyTable();
             $referencias = isset($item['referencias']) && is_array($item['referencias'])
@@ -739,6 +853,15 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                   . '<div>' . nl2br(htmlspecialchars($contenido)) . '</div>'
                   . '</td>';
             $html .= '</tr>';
+        }
+    }
+    if ($seccionMetaPendiente !== null) {
+        if ($seccionModoPendiente === 'legacy') {
+            $closeLegacyTable();
+            $html .= $renderSeccionValidacion($seccionMetaPendiente);
+        } else {
+            $closeLegacyTable();
+            $html .= $renderSeccionValidacion($seccionMetaPendiente);
         }
     }
     $closeLegacyTable();

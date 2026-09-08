@@ -384,7 +384,7 @@ if ($portalPublicoEstilo === 'premium_b') {
     <link rel="shortcut icon" href="<?= htmlspecialchars($faviconIcoHref, ENT_QUOTES, 'UTF-8') ?>" type="image/x-icon">
     <!-- Apple Touch Icon -->
     <link rel="apple-touch-icon" sizes="180x180" href="<?= htmlspecialchars($logoFaviconHref, ENT_QUOTES, 'UTF-8') ?>">
-    <title><?= htmlspecialchars($nombre_empresa) ?> | Laboratorio Clínico</title>
+    <title><?= htmlspecialchars($shareTitle, ENT_QUOTES, 'UTF-8') ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
     <meta property="og:type" content="website">

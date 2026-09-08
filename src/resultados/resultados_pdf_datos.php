@@ -165,6 +165,29 @@ function obtenerItemsResultados($pdo, $rows) {
         $adicional = $formatDef['legacy_items'];
         $resultados_json = $row['resultados'] ? json_decode($row['resultados'], true) : [];
 
+        $imprimir_examen = isset($resultados_json['imprimir_examen']) ? intval($resultados_json['imprimir_examen']) : 1;
+        if ($imprimir_examen !== 1) {
+            continue;
+        }
+
+        $fechaProcesoSeccion = trim((string)($row['fecha_proceso_en'] ?? ''));
+        if ($fechaProcesoSeccion === '') {
+            $fechaProcesoSeccion = (string)($row['fecha_ingreso'] ?? '');
+        }
+        $fechaValidacionSeccion = trim((string)($row['fecha_validacion_en'] ?? ''));
+        $estadoValidacionSeccion = strtolower(trim((string)($row['estado_validacion'] ?? 'pendiente')));
+        if (!in_array($estadoValidacionSeccion, ['pendiente', 'validado'], true)) {
+            $estadoValidacionSeccion = 'pendiente';
+        }
+
+        $metaSeccion = [
+            'id_resultado' => (int)($row['id'] ?? 0),
+            'examen' => (string)($examen['nombre_examen'] ?? ''),
+            'fecha_proceso' => $fechaProcesoSeccion,
+            'estado_validacion' => $estadoValidacionSeccion,
+            'fecha_validacion' => $fechaValidacionSeccion,
+        ];
+
         if ($isFormatV2) {
             $allCols = lab_format_v2_columns($formatDef);
             $resolvedRows = lab_format_v2_resolve_rows($allCols, lab_format_v2_rows($formatDef), is_array($resultados_json) ? $resultados_json : []);
@@ -243,14 +266,10 @@ function obtenerItemsResultados($pdo, $rows) {
                 'titulo' => (string)($examen['nombre_examen'] ?? ''),
                 'columnas' => $cols,
                 'filas' => $rowsV2,
+                'seccion_id' => (int)($row['id'] ?? 0),
+                'seccion_meta' => $metaSeccion,
             ];
             continue;
-        }
-
-        // Respetar el flag de "Imprimir" por examen: si está deshabilitado, omitir todo el examen del PDF
-        $imprimir_examen = isset($resultados_json['imprimir_examen']) ? intval($resultados_json['imprimir_examen']) : 1;
-        if ($imprimir_examen !== 1) {
-            continue; // No incluir este examen en el reporte
         }
 
         // Normaliza valores numéricos (quita comas)
@@ -458,18 +477,24 @@ function obtenerItemsResultados($pdo, $rows) {
                 $examen_items[] = array_merge($item, [
                     'prueba' => $nombre,
                     'valor' => $valor,
-                    'tipo' => 'Parámetro'
+                    'tipo' => 'Parámetro',
+                    'seccion_id' => (int)($row['id'] ?? 0),
+                    'seccion_meta' => $metaSeccion,
                 ]);
             } elseif ($entry['kind'] === 'texto') {
                 $valor = $getResultado($nombre, $item, '');
                 $examen_items[] = array_merge($item, [
                     'prueba' => $nombre,
                     'valor' => $valor,
-                    'tipo' => 'Texto Largo'
+                    'tipo' => 'Texto Largo',
+                    'seccion_id' => (int)($row['id'] ?? 0),
+                    'seccion_meta' => $metaSeccion,
                 ]);
             } else {
                 $examen_items[] = array_merge($item, [
-                    'prueba' => $nombre
+                    'prueba' => $nombre,
+                    'seccion_id' => (int)($row['id'] ?? 0),
+                    'seccion_meta' => $metaSeccion,
                 ]);
             }
         }

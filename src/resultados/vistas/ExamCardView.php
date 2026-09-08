@@ -183,6 +183,16 @@ class ExamCardView {
         }
 
         $hasReceta = ((int)($examen['has_receta'] ?? 0) === 1);
+        $estadoValidacion = strtolower(trim((string)($examen['estado_validacion'] ?? 'pendiente')));
+        if (!in_array($estadoValidacion, ['pendiente', 'validado'], true)) {
+            $estadoValidacion = 'pendiente';
+        }
+        $fechaValidacionSeccion = trim((string)($examen['fecha_validacion_en'] ?? ''));
+        $badgeValidacionClass = $estadoValidacion === 'validado' ? 'bg-success' : 'bg-warning text-dark';
+        $badgeValidacionText = $estadoValidacion === 'validado' ? 'Validado' : 'Pendiente';
+        if ($estadoValidacion === 'validado' && $fechaValidacionSeccion !== '') {
+            $badgeValidacionText .= ' ' . $fechaValidacionSeccion;
+        }
         $alarmaActiva = ((int)($examen['alarma_activa'] ?? 0) === 1);
         $alarmaDiasGuardados = isset($examen['alarma_dias']) && $examen['alarma_dias'] !== null ? (int)$examen['alarma_dias'] : null;
         $alarmaDiasSugeridos = $parseDiasDesdeTexto($examen['tiempo_respuesta'] ?? '');
@@ -317,8 +327,20 @@ class ExamCardView {
                     <i class="bi bi-clipboard-pulse me-2"></i>
                     <span><?= htmlspecialchars($examen['nombre_examen']) ?></span>
                     <span class="badge bg-danger ms-2 js-exam-progress-badge">0%</span>
+                    <span class="badge <?= htmlspecialchars($badgeValidacionClass) ?> ms-2"><?= htmlspecialchars($badgeValidacionText) ?></span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <button
+                        type="submit"
+                        class="btn btn-sm btn-outline-light"
+                        name="id_resultado"
+                        value="<?= htmlspecialchars((string)$examen['id_resultado']) ?>"
+                        formaction="dashboard.php?action=resultados_validar"
+                        formmethod="post"
+                        onclick="return confirm('Se validará solo esta sección del examen. Si luego se edita, volverá a pendiente. ¿Continuar?');"
+                        title="Validar solo esta sección">
+                        <i class="bi bi-check2-circle me-1"></i>Validar sección
+                    </button>
                     <button
                         type="button"
                         class="btn btn-sm btn-light js-update-snapshot-exam"
