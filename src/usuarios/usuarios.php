@@ -22,11 +22,9 @@ function capitalizar($texto) {
 }
 ?>
 
-<!-- Incluye CSS de Bootstrap y DataTables -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+<!-- Incluye CSS de DataTables -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
 /* Fuerza el color de fondo del encabezado de la tabla de Usuarios */
 #tabla-usuarios thead th {
@@ -53,7 +51,7 @@ function capitalizar($texto) {
     </style>
     <div class="header-section mb-3">
         <div class="p-3">
-            <h3 class="mb-0 text-white text-3xl">Lista de Usuarios</h3>
+            <h3 class="mb-0 text-white fs-3 fw-bold">Lista de Usuarios</h3>
         </div>
     </div>
         <!-- Buscador para móvil -->
@@ -131,22 +129,22 @@ function capitalizar($texto) {
     <!-- Tabla para desktop -->
     <div class="table-responsive d-none d-md-block">
         <table id="tabla-usuarios" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
-            <thead class="bg-indigo-600 text-white">
+            <thead class="text-white">
                 <tr>
-                    <th class="px-4 py-2 text-sm font-semibold">ID</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Apellido</th>
-                    <th class="px-4 py-2 text-sm font-semibold">DNI</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Sexo</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Fecha Nacimiento</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Email</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Teléfono</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Dirección</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Cargo</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Profesión</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Rol</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Estado</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
+                    <th class="fw-semibold">ID</th>
+                    <th class="fw-semibold">Nombre</th>
+                    <th class="fw-semibold">Apellido</th>
+                    <th class="fw-semibold">DNI</th>
+                    <th class="fw-semibold">Sexo</th>
+                    <th class="fw-semibold">Fecha Nacimiento</th>
+                    <th class="fw-semibold">Email</th>
+                    <th class="fw-semibold">Teléfono</th>
+                    <th class="fw-semibold">Dirección</th>
+                    <th class="fw-semibold">Cargo</th>
+                    <th class="fw-semibold">Profesión</th>
+                    <th class="fw-semibold">Rol</th>
+                    <th class="fw-semibold">Estado</th>
+                    <th class="fw-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -157,9 +155,8 @@ function capitalizar($texto) {
     </div>
 </div>
 
-<!-- Incluye JS de Bootstrap y DataTables -->
+<!-- Incluye JS de DataTables -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>

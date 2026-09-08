@@ -13,7 +13,6 @@ $stmt = $pdo->query("SELECT * FROM convenios ORDER BY id DESC");
 $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
 /* Fuerza el color de fondo del encabezado de la tabla de Convenios */
 #tabla-convenios thead th {
@@ -40,7 +39,7 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </style>
     <div class="header-section mb-3">
         <div class="p-3">
-            <h3 class="mb-0 text-white text-3xl">Convenios</h3>
+            <h3 class="mb-0 text-white fs-3 fw-bold">Convenios</h3>
         </div>
     </div>
     <?php if (!empty($_SESSION['mensaje'])): ?>
@@ -108,17 +107,17 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     <div class="table-responsive d-none d-md-block">
         <table id="tabla-convenios" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
-            <thead class="bg-indigo-600 text-white">
+            <thead class="text-white">
                 <tr>
-                    <th class="px-4 py-2 text-sm font-semibold"><input type="checkbox" id="selectAllConvenios"></th>
-                    <th class="px-4 py-2 text-sm font-semibold">ID</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
-                    <th class="px-4 py-2 text-sm font-semibold">DNI</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Especialidad</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Descuento (%)</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Descripción</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Email</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
+                    <th class="fw-semibold"><input type="checkbox" id="selectAllConvenios"></th>
+                    <th class="fw-semibold">ID</th>
+                    <th class="fw-semibold">Nombre</th>
+                    <th class="fw-semibold">DNI</th>
+                    <th class="fw-semibold">Especialidad</th>
+                    <th class="fw-semibold">Descuento (%)</th>
+                    <th class="fw-semibold">Descripción</th>
+                    <th class="fw-semibold">Email</th>
+                    <th class="fw-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -128,12 +127,10 @@ $convenios = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- DataTables y Bootstrap JS (ajusta rutas/CDN según tu proyecto) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<!-- DataTables JS/CSS locales de la vista -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>

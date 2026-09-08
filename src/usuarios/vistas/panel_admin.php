@@ -38,9 +38,6 @@ $operacionPanelAdmin = function_exists('app_operacion_context') && isset($pdo) &
 $esModoSisPanelAdmin = !empty($operacionPanelAdmin['es_sis']);
 ?>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-
 <div class="container-fluid mt-4">
     <!-- Formulario de búsqueda de paciente -->
     <div class="card mb-4 shadow-sm">

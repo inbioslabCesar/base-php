@@ -121,6 +121,23 @@ textarea.progress-missing {
     margin-bottom: 1rem;
     border-left: 4px solid #667eea;
 }
+
+.v2-curve-card {
+    background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+    border-color: #cfe2ff !important;
+}
+
+.v2-curve-canvas {
+    width: 100%;
+    display: block;
+    background: #ffffff;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+}
+
+.v2-curve-status {
+    font-weight: 600;
+}
 .parameter-label {
     font-weight: 600;
     color: #495057;

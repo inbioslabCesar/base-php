@@ -38,9 +38,9 @@ $queryExamenPrefill = $examenIdPrefill > 0 ? '&examen_id=' . $examenIdPrefill : 
             <!-- Otros datos si deseas -->
         </ul>
         <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] . $queryExamenPrefill ?>" 
-           class="btn btn-primary btn-sm" 
-           title="Cotizar">
-            <i class="bi bi-file-earmark-plus"></i> Cotizar
+              class="btn btn-success btn-sm btn-cotizar-cta-global d-inline-flex align-items-center gap-1 fw-semibold" 
+           title="Crear cotizacion">
+            <i class="bi bi-cart-plus-fill"></i> Cotizar
         </a>
         <?php unset($_SESSION['cliente_encontrado']); ?>
 

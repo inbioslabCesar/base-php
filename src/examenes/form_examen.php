@@ -201,6 +201,17 @@ $volverExamenes = match ($rolActualExamenForm) {
                 </div>
             </div>
 
+            <div class="card mb-3" id="v2ChartsSection">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Configuración de curvas</span>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="v2AddChart">Agregar curva</button>
+                </div>
+                <div class="card-body">
+                    <small class="text-muted d-block mb-2">Define qué filas alimentan la curva y en qué minuto se grafica cada resultado.</small>
+                    <div id="v2ChartsList"></div>
+                </div>
+            </div>
+
             <h5>Vista previa dinámica</h5>
             <div id="previewV2" class="border p-3 mb-3"></div>
         </div>

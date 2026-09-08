@@ -261,11 +261,261 @@ function obtenerItemsResultados($pdo, $rows) {
                 ];
             }
 
+            $resolvedRowsById = [];
+            foreach ($resolvedRows as $rowTmp) {
+                if (!is_array($rowTmp)) {
+                    continue;
+                }
+                $rowTmpId = trim((string)($rowTmp['id'] ?? ''));
+                $rowTmpType = strtolower(trim((string)($rowTmp['type'] ?? 'data')));
+                if ($rowTmpId === '' || $rowTmpType !== 'data') {
+                    continue;
+                }
+                $resolvedRowsById[$rowTmpId] = $rowTmp;
+            }
+
+            $pickRowLabel = static function (array $row, array $allCols): string {
+                $label = trim((string)($row['label'] ?? ''));
+                if ($label !== '') {
+                    return $label;
+                }
+                $cells = is_array($row['cells'] ?? null) ? $row['cells'] : [];
+                foreach ($allCols as $colTmp) {
+                    if (!is_array($colTmp)) {
+                        continue;
+                    }
+                    $colTmpId = trim((string)($colTmp['id'] ?? ''));
+                    if ($colTmpId === '') {
+                        continue;
+                    }
+                    $kindTmp = strtolower(trim((string)($colTmp['kind'] ?? 'text')));
+                    if (!in_array($kindTmp, ['text', 'reference'], true)) {
+                        continue;
+                    }
+                    $cellVal = trim((string)($cells[$colTmpId] ?? ''));
+                    if ($cellVal !== '') {
+                        return $cellVal;
+                    }
+                }
+                foreach ($cells as $cellVal) {
+                    $txt = trim((string)$cellVal);
+                    if ($txt !== '') {
+                        return $txt;
+                    }
+                }
+                return trim((string)($row['id'] ?? ''));
+            };
+
+            $parseMinutesFromLabel = static function ($text): ?float {
+                $src = strtolower(trim((string)$text));
+                if ($src === '') {
+                    return null;
+                }
+                if (strpos($src, 'basal') !== false || strpos($src, 'ayuno') !== false || $src === '0' || $src === '0 min' || $src === '0 minutos') {
+                    return 0.0;
+                }
+                if (!preg_match('/(\d+(?:[\.,]\d+)?)/', $src, $m)) {
+                    return null;
+                }
+                $value = (float)str_replace(',', '.', (string)$m[1]);
+                if (!is_finite($value)) {
+                    return null;
+                }
+                if (strpos($src, 'hora') !== false || preg_match('/\bhr?s?\b/', $src)) {
+                    return $value * 60.0;
+                }
+                return $value;
+            };
+
+            $toNullableFloat = static function ($value): ?float {
+                if ($value === null) {
+                    return null;
+                }
+                $txt = trim((string)$value);
+                if ($txt === '') {
+                    return null;
+                }
+                $norm = str_replace(',', '', $txt);
+                if (!preg_match('/^[-+]?\d+(?:\.\d+)?$/', $norm)) {
+                    return null;
+                }
+                if (!is_numeric($norm)) {
+                    return null;
+                }
+                return (float)$norm;
+            };
+
+            $unitColIds = [];
+            foreach ($allCols as $tmpCol) {
+                if (!is_array($tmpCol)) {
+                    continue;
+                }
+                $tmpId = trim((string)($tmpCol['id'] ?? ''));
+                if ($tmpId === '') {
+                    continue;
+                }
+                $tmpKind = strtolower(trim((string)($tmpCol['kind'] ?? '')));
+                $tmpLabel = strtolower(trim((string)($tmpCol['label'] ?? '')));
+                if ($tmpKind === 'unit' || $tmpId === 'unidad' || strpos($tmpId, 'unidad') !== false || strpos($tmpLabel, 'unidad') !== false) {
+                    $unitColIds[] = $tmpId;
+                }
+            }
+
+            $findPointReferences = static function (array $row, string $yColId, array $allCols): array {
+                $rowRanges = is_array($row['reference_ranges'] ?? null) ? $row['reference_ranges'] : [];
+                if (isset($rowRanges[$yColId]) && is_array($rowRanges[$yColId]) && !empty($rowRanges[$yColId])) {
+                    return $rowRanges[$yColId];
+                }
+                foreach ($allCols as $tmpCol) {
+                    if (!is_array($tmpCol)) {
+                        continue;
+                    }
+                    $kind = strtolower(trim((string)($tmpCol['kind'] ?? 'text')));
+                    if ($kind !== 'reference') {
+                        continue;
+                    }
+                    $cid = trim((string)($tmpCol['id'] ?? ''));
+                    if ($cid !== '' && isset($rowRanges[$cid]) && is_array($rowRanges[$cid]) && !empty($rowRanges[$cid])) {
+                        return $rowRanges[$cid];
+                    }
+                }
+                foreach ($rowRanges as $tmpRanges) {
+                    if (is_array($tmpRanges) && !empty($tmpRanges)) {
+                        return $tmpRanges;
+                    }
+                }
+                return [];
+            };
+
+            $pickRangeMinMax = static function (array $ranges): array {
+                foreach ($ranges as $r) {
+                    if (!is_array($r)) {
+                        continue;
+                    }
+                    $minRaw = trim((string)($r['valor_min'] ?? ''));
+                    $maxRaw = trim((string)($r['valor_max'] ?? ''));
+                    $min = null;
+                    $max = null;
+                    if ($minRaw !== '') {
+                        $normMin = str_replace(',', '', $minRaw);
+                        if (is_numeric($normMin)) {
+                            $min = (float)$normMin;
+                        }
+                    }
+                    if ($maxRaw !== '') {
+                        $normMax = str_replace(',', '', $maxRaw);
+                        if (is_numeric($normMax)) {
+                            $max = (float)$normMax;
+                        }
+                    }
+                    if ($min !== null || $max !== null) {
+                        return ['min' => $min, 'max' => $max];
+                    }
+                }
+                return ['min' => null, 'max' => null];
+            };
+
+            $curvasV2 = [];
+            $layoutRaw = is_array($formatDef['layout'] ?? null) ? $formatDef['layout'] : [];
+            $chartsRaw = is_array($layoutRaw['charts'] ?? null) ? $layoutRaw['charts'] : [];
+            foreach ($chartsRaw as $chartIndex => $chartRaw) {
+                if (!is_array($chartRaw)) {
+                    continue;
+                }
+                $chartType = strtolower(trim((string)($chartRaw['type'] ?? 'line_curve')));
+                if ($chartType !== 'line_curve') {
+                    continue;
+                }
+                $yColId = trim((string)($chartRaw['y_col_id'] ?? ''));
+                if ($yColId === '') {
+                    continue;
+                }
+                $pointsRaw = is_array($chartRaw['points'] ?? null) ? $chartRaw['points'] : [];
+                $pointsOut = [];
+                foreach ($pointsRaw as $pointRaw) {
+                    if (!is_array($pointRaw) || empty($pointRaw['enabled'])) {
+                        continue;
+                    }
+                    $rowId = trim((string)($pointRaw['row_id'] ?? ''));
+                    if ($rowId === '' || !isset($resolvedRowsById[$rowId])) {
+                        continue;
+                    }
+
+                    $rowRef = $resolvedRowsById[$rowId];
+                    $cellsRef = is_array($rowRef['cells'] ?? null) ? $rowRef['cells'] : [];
+                    $labelPoint = trim((string)($pointRaw['label'] ?? ''));
+                    if ($labelPoint === '') {
+                        $labelPoint = $pickRowLabel($rowRef, $allCols);
+                    }
+
+                    $xRaw = trim((string)($pointRaw['x_value'] ?? ''));
+                    $xValue = null;
+                    if ($xRaw !== '') {
+                        $normX = str_replace(',', '.', $xRaw);
+                        if (is_numeric($normX)) {
+                            $xValue = (float)$normX;
+                        }
+                    }
+                    if ($xValue === null) {
+                        $xValue = $parseMinutesFromLabel($labelPoint);
+                    }
+                    if ($xValue === null) {
+                        continue;
+                    }
+
+                    $yRaw = $cellsRef[$yColId] ?? '';
+                    $yValue = $toNullableFloat($yRaw);
+                    $unit = '';
+                    foreach ($unitColIds as $unitColId) {
+                        $unitTxt = trim((string)($cellsRef[$unitColId] ?? ''));
+                        if ($unitTxt !== '') {
+                            $unit = $unitTxt;
+                            break;
+                        }
+                    }
+
+                    $rangesPoint = $findPointReferences($rowRef, $yColId, $allCols);
+                    $minMax = $pickRangeMinMax($rangesPoint);
+
+                    $pointsOut[] = [
+                        'row_id' => $rowId,
+                        'label' => $labelPoint,
+                        'x' => $xValue,
+                        'y' => $yValue,
+                        'y_raw' => (string)$yRaw,
+                        'unidad' => $unit,
+                        'ref_min' => $minMax['min'],
+                        'ref_max' => $minMax['max'],
+                    ];
+                }
+
+                if (count($pointsOut) === 0) {
+                    continue;
+                }
+
+                usort($pointsOut, static function ($a, $b) {
+                    return (($a['x'] ?? 0) <=> ($b['x'] ?? 0));
+                });
+
+                $curvasV2[] = [
+                    'id' => trim((string)($chartRaw['id'] ?? 'curva_' . ($chartIndex + 1))),
+                    'label' => trim((string)($chartRaw['label'] ?? 'Curva ' . ($chartIndex + 1))),
+                    'y_col_id' => $yColId,
+                    'min_points_required' => isset($chartRaw['min_points_required']) && is_numeric($chartRaw['min_points_required'])
+                        ? max(2, min(20, (int)$chartRaw['min_points_required']))
+                        : 3,
+                    'connect_gaps' => !empty($chartRaw['connect_gaps']),
+                    'strict_units' => !array_key_exists('strict_units', $chartRaw) || !empty($chartRaw['strict_units']),
+                    'points' => $pointsOut,
+                ];
+            }
+
             $items[] = [
                 'tipo' => 'TablaV2',
                 'titulo' => (string)($examen['nombre_examen'] ?? ''),
                 'columnas' => $cols,
                 'filas' => $rowsV2,
+                'curvas_v2' => $curvasV2,
                 'seccion_id' => (int)($row['id'] ?? 0),
                 'seccion_meta' => $metaSeccion,
             ];

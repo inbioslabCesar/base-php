@@ -28,11 +28,8 @@ function capitalizar($texto)
 }
 ?>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-<script src="https://cdn.tailwindcss.com"></script>
 
 <style>
 /* Fuerza el color de fondo del encabezado de la tabla de Exámenes */
@@ -60,7 +57,7 @@ function capitalizar($texto)
     </style>
     <div class="header-section mb-3">
         <div class="p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <h3 class="mb-0 text-white text-3xl">Lista de Exámenes</h3>
+            <h3 class="mb-0 text-white fs-3 fw-bold">Lista de Exámenes</h3>
             <a href="<?= htmlspecialchars($volverPanelExamenes, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-light btn-sm shadow-sm">
                 <i class="fa fa-arrow-left me-1"></i> Volver al panel
             </a>
@@ -71,17 +68,17 @@ function capitalizar($texto)
     <?php endif; ?>
     <div class="table-responsive">
         <table id="tabla-examenes" class="table table-bordered table-striped" style="width:100%; min-width:1200px;">
-            <thead class="bg-indigo-600 text-white">
+            <thead class="text-white">
                 <tr>
-                    <th class="px-4 py-2 text-sm font-semibold">Código</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Área</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Metodología</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Precio Público</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Precio Convenio</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Tiempo Respuesta</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Detalle</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
+                    <th class="fw-semibold">Código</th>
+                    <th class="fw-semibold">Nombre</th>
+                    <th class="fw-semibold">Área</th>
+                    <th class="fw-semibold">Metodología</th>
+                    <th class="fw-semibold">Precio Público</th>
+                    <th class="fw-semibold">Precio Convenio</th>
+                    <th class="fw-semibold">Tiempo Respuesta</th>
+                    <th class="fw-semibold">Detalle</th>
+                    <th class="fw-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -351,7 +348,6 @@ document.addEventListener('click', async function (e) {
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>

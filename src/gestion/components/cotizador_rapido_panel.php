@@ -385,8 +385,8 @@ $generatedAt = date('Y-m-d H:i:s');
                                     <button type="button" class="btn btn-outline-info btn-sm btn-detalle-rapido" data-examen="<?= $examenJson ?>">
                                         <i class="bi bi-eye"></i> Ver detalle
                                     </button>
-                                    <a href="<?= $contextType === 'cliente' ? 'dashboard.php?vista=form_cotizacion&examen_id=' . (int)$ex['id'] : 'dashboard.php?vista=buscar_cliente&examen_id=' . (int)$ex['id'] ?>" class="btn btn-outline-primary btn-sm btn-cotizar-rapido">
-                                        <i class="bi bi-file-earmark-plus"></i> Cotizar
+                                    <a href="<?= $contextType === 'cliente' ? 'dashboard.php?vista=form_cotizacion&examen_id=' . (int)$ex['id'] : 'dashboard.php?vista=buscar_cliente&examen_id=' . (int)$ex['id'] ?>" class="btn btn-sm btn-cotizar-rapido btn-cotizar-cta-global">
+                                        <i class="bi bi-cart-plus-fill"></i> Cotizar
                                     </a>
                                 </div>
                             </td>

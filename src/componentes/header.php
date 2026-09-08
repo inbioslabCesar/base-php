@@ -207,6 +207,22 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
             gap: 5px;
             max-width: 340px;
         }
+
+        .btn-cotizar-cta-global {
+            background: linear-gradient(135deg, #198754 0%, #157347 100%);
+            border: 1px solid rgba(21, 115, 71, 0.9);
+            color: #fff !important;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(25, 135, 84, 0.28);
+        }
+
+        .btn-cotizar-cta-global:hover,
+        .btn-cotizar-cta-global:focus {
+            background: linear-gradient(135deg, #20a866 0%, #198754 100%);
+            border-color: #157347;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(25, 135, 84, 0.4);
+        }
         
     </style>
     <script>
@@ -278,4 +294,27 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
             padding: 6px;
             box-shadow: 0 2px 12px #667eea22;
         }
+        @media (max-width: 767.98px) {
+            .header-gradient {
+                position: sticky;
+                top: 0;
+                z-index: 1100 !important;
+                margin-bottom: 0 !important;
+                border-radius: 0 0 18px 18px;
+            }
+        }
     </style>
+    <script>
+        (function () {
+            function syncHeaderOffset() {
+                var header = document.querySelector('.header-gradient');
+                if (!header) return;
+                var height = Math.ceil(header.getBoundingClientRect().height || 0);
+                document.documentElement.style.setProperty('--app-header-offset', height + 'px');
+            }
+
+            document.addEventListener('DOMContentLoaded', syncHeaderOffset);
+            window.addEventListener('load', syncHeaderOffset);
+            window.addEventListener('resize', syncHeaderOffset);
+        })();
+    </script>

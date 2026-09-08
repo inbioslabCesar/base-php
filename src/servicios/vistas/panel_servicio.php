@@ -33,9 +33,6 @@ $stmtCountRes = $pdo->prepare("SELECT COUNT(re.id)
 $stmtCountRes->execute([$servicioId]);
 $totalResultados = (int)$stmtCountRes->fetchColumn();
 ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-
 <div class="container mt-4">
     <div class="card shadow-sm mb-4">
         <div class="card-body">

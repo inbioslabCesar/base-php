@@ -1188,9 +1188,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const v2Cards = document.querySelectorAll('.exam-card');
     v2Cards.forEach((card) => {
         const v2FormulaFields = Array.from(card.querySelectorAll('input[data-formula-v2]'));
-        if (v2FormulaFields.length === 0) {
-            return;
-        }
+        const curveCards = Array.from(card.querySelectorAll('.v2-curve-card[data-v2-curve-config]'));
 
         const normalizeNum = (raw) => {
             const s = String(raw ?? '').trim().replace(/,/g, '');
@@ -1209,6 +1207,184 @@ document.addEventListener('DOMContentLoaded', function () {
                 map.set(`${rowId}:${colId}`, f);
             });
             return map;
+        };
+
+        const drawCurveOnCanvas = (canvas, points, connectGaps) => {
+            if (!canvas || typeof canvas.getContext !== 'function') return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            const parentWidth = canvas.parentElement ? canvas.parentElement.clientWidth : 0;
+            const cssWidth = Math.max(320, Math.floor(canvas.clientWidth || parentWidth || 640));
+            const cssHeight = Math.max(180, Math.floor(canvas.clientHeight || 180));
+            canvas.width = Math.floor(cssWidth * dpr);
+            canvas.height = Math.floor(cssHeight * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            ctx.clearRect(0, 0, cssWidth, cssHeight);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+            const pad = { left: 54, right: 16, top: 12, bottom: 34 };
+            const plotW = Math.max(20, cssWidth - pad.left - pad.right);
+            const plotH = Math.max(20, cssHeight - pad.top - pad.bottom);
+
+            ctx.strokeStyle = '#dbe3ef';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(pad.left, pad.top);
+            ctx.lineTo(pad.left, pad.top + plotH);
+            ctx.lineTo(pad.left + plotW, pad.top + plotH);
+            ctx.stroke();
+
+            const valid = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+            if (valid.length < 2) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '12px Segoe UI, Arial, sans-serif';
+                ctx.fillText('Datos insuficientes para graficar', pad.left + 8, pad.top + 18);
+                return;
+            }
+
+            let minX = Math.min(...valid.map((p) => p.x));
+            let maxX = Math.max(...valid.map((p) => p.x));
+            let minY = Math.min(...valid.map((p) => p.y));
+            let maxY = Math.max(...valid.map((p) => p.y));
+
+            if (minX === maxX) {
+                minX -= 1;
+                maxX += 1;
+            }
+            if (minY === maxY) {
+                minY -= 1;
+                maxY += 1;
+            }
+
+            const yPad = (maxY - minY) * 0.12;
+            minY -= yPad;
+            maxY += yPad;
+
+            const toX = (x) => pad.left + ((x - minX) / (maxX - minX)) * plotW;
+            const toY = (y) => pad.top + (1 - ((y - minY) / (maxY - minY))) * plotH;
+
+            ctx.strokeStyle = '#cfd8e6';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            for (let i = 1; i <= 3; i++) {
+                const gy = pad.top + (plotH * i / 4);
+                ctx.moveTo(pad.left, gy);
+                ctx.lineTo(pad.left + plotW, gy);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 2;
+
+            if (connectGaps) {
+                const sorted = valid.slice().sort((a, b) => a.x - b.x);
+                ctx.beginPath();
+                sorted.forEach((p, i) => {
+                    const x = toX(p.x);
+                    const y = toY(p.y);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            } else {
+                const all = points.slice().sort((a, b) => a.x - b.x);
+                let started = false;
+                ctx.beginPath();
+                all.forEach((p) => {
+                    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+                        started = false;
+                        return;
+                    }
+                    const x = toX(p.x);
+                    const y = toY(p.y);
+                    if (!started) {
+                        ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+            }
+
+            const sortedForPoints = points.slice().sort((a, b) => a.x - b.x);
+            sortedForPoints.forEach((p) => {
+                if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+                const x = toX(p.x);
+                const y = toY(p.y);
+                ctx.fillStyle = '#0ea5e9';
+                ctx.beginPath();
+                ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.fillStyle = '#334155';
+            ctx.font = '11px Segoe UI, Arial, sans-serif';
+            const xTicks = Array.from(new Set(valid.map((p) => p.x))).sort((a, b) => a - b);
+            xTicks.forEach((tick) => {
+                const x = toX(tick);
+                ctx.fillText(String(tick), x - 10, pad.top + plotH + 16);
+            });
+
+            ctx.fillText(minY.toFixed(1), 6, pad.top + plotH);
+            ctx.fillText(maxY.toFixed(1), 6, pad.top + 10);
+        };
+
+        const renderCurves = () => {
+            if (!curveCards.length) return;
+            const map = getFieldMap();
+
+            curveCards.forEach((curveCard) => {
+                const cfgRaw = String(curveCard.getAttribute('data-v2-curve-config') || '').trim();
+                if (!cfgRaw) return;
+                let cfg;
+                try {
+                    cfg = JSON.parse(cfgRaw);
+                } catch (e) {
+                    return;
+                }
+
+                const pointsCfg = Array.isArray(cfg.points) ? cfg.points : [];
+                const points = pointsCfg.map((p) => {
+                    const rowId = String((p && p.row_id) || '').trim();
+                    const colId = String(cfg.y_col_id || '').trim();
+                    const ref = map.get(`${rowId}:${colId}`);
+                    const y = ref ? normalizeNum(ref.value) : null;
+                    const x = normalizeNum((p && p.x_value) ?? '');
+                    return {
+                        label: String((p && p.label) || rowId),
+                        x,
+                        y,
+                    };
+                }).sort((a, b) => {
+                    const ax = Number.isFinite(a.x) ? a.x : Number.POSITIVE_INFINITY;
+                    const bx = Number.isFinite(b.x) ? b.x : Number.POSITIVE_INFINITY;
+                    return ax - bx;
+                });
+
+                const validCount = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y)).length;
+                const minRequired = Number.isFinite(parseInt(cfg.min_points_required, 10)) ? parseInt(cfg.min_points_required, 10) : 3;
+                const statusEl = curveCard.querySelector('.v2-curve-status');
+                if (statusEl) {
+                    if (validCount >= minRequired) {
+                        statusEl.textContent = `Curva completa: ${validCount} punto(s) válidos.`;
+                        statusEl.classList.remove('text-warning');
+                        statusEl.classList.add('text-success');
+                    } else {
+                        statusEl.textContent = `Curva incompleta: ${validCount}/${minRequired} punto(s) válidos.`;
+                        statusEl.classList.remove('text-success');
+                        statusEl.classList.add('text-warning');
+                    }
+                }
+
+                const canvas = curveCard.querySelector('.v2-curve-canvas');
+                drawCurveOnCanvas(canvas, points, !!cfg.connect_gaps);
+            });
         };
 
         const evalV2Field = (field, map) => {
@@ -1288,15 +1464,18 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         const recalcV2 = () => {
-            const map = getFieldMap();
-            const maxPasses = Math.max(1, v2FormulaFields.length + 1);
-            for (let p = 0; p < maxPasses; p++) {
-                let changed = false;
-                v2FormulaFields.forEach((f) => {
-                    if (evalV2Field(f, map)) changed = true;
-                });
-                if (!changed) break;
+            if (v2FormulaFields.length > 0) {
+                const map = getFieldMap();
+                const maxPasses = Math.max(1, v2FormulaFields.length + 1);
+                for (let p = 0; p < maxPasses; p++) {
+                    let changed = false;
+                    v2FormulaFields.forEach((f) => {
+                        if (evalV2Field(f, map)) changed = true;
+                    });
+                    if (!changed) break;
+                }
             }
+            renderCurves();
         };
 
         const sourceInputs = card.querySelectorAll('[data-v2-row-id][data-v2-col-id]:not([data-formula-v2])');
@@ -1306,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         recalcV2();
+        window.addEventListener('resize', () => renderCurves());
     });
 
     // Cabeceras por paciente (se insertan en el snapshot al guardar)

@@ -89,8 +89,8 @@ $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
                                     <i class="bi bi-pencil"></i>
                                 </a>
                                 
-                                <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" class="btn btn-success btn-sm" title="Cotizar">
-                                    <i class="bi bi-file-earmark-plus"></i>
+                                <a href="dashboard.php?vista=form_cotizacion&id=<?= $cliente['id'] ?>" class="btn btn-sm btn-cotizar-cta-global d-inline-flex align-items-center gap-1" title="Crear cotizacion">
+                                    <i class="bi bi-cart-plus-fill"></i><span class="d-none d-lg-inline">Cotizar</span>
                                 </a>
                             </td>
                         </tr>
@@ -102,7 +102,6 @@ $clientesAsociados = $stmtClientes->fetchAll(PDO::FETCH_COLUMN);
         <div class="alert alert-warning">No hay clientes asociados a esta empresa.</div>
     <?php endif; ?>
 </div>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>

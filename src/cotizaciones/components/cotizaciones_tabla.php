@@ -72,6 +72,34 @@ $currencyCfg = currency_get_config($pdo);
 .cotizaciones-slow-network {
     min-width: 260px;
     max-width: 420px;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+}
+.cotizaciones-slow-network .form-check-input {
+    margin: 0.2rem 0 0 0;
+    float: none;
+    flex: 0 0 auto;
+}
+.cotizaciones-slow-network-copy {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+.cotizaciones-slow-network .form-check-label {
+    color: #1f3f60;
+    margin-bottom: 0.1rem;
+}
+.cotizaciones-slow-network.is-active {
+    border-color: #5b9af0 !important;
+    background: linear-gradient(135deg, #edf5ff 0%, #dbeafe 100%) !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+.cotizaciones-slow-network.is-active .form-check-label {
+    color: #0b4da2;
+}
+.cotizaciones-slow-network.is-active .small {
+    color: #335f93 !important;
 }
 .alerta-resumen-cotizaciones {
     display: flex;
@@ -292,10 +320,12 @@ $currencyCfg = currency_get_config($pdo);
         </div>
         <div class="col-12 mb-2">
             <div class="cotizaciones-filter-actions">
-                <div class="form-check form-switch cotizaciones-slow-network w-100 bg-white rounded px-3 py-2 border">
+                <div class="cotizaciones-slow-network w-100 bg-white rounded px-3 py-2 border">
                     <input class="form-check-input" type="checkbox" id="modoRedLentaToggle">
-                    <label class="form-check-label fw-semibold" for="modoRedLentaToggle">Modo red lenta</label>
-                    <div class="small text-muted">Reduce auto-recargas para conexiones inestables.</div>
+                    <div class="cotizaciones-slow-network-copy">
+                        <label class="form-check-label fw-semibold" for="modoRedLentaToggle">Modo red lenta</label>
+                        <div class="small text-muted">Reduce auto-recargas para conexiones inestables.</div>
+                    </div>
                 </div>
                 <div class="cotizaciones-main-actions">
                     <button id="btnLimpiarFiltros" class="btn btn-outline-secondary" type="button"><i class="bi bi-x-circle"></i> Limpiar</button>
@@ -479,8 +509,12 @@ function writeSlowNetworkMode(enabled) {
 function setSlowModeUi(enabled) {
     const btnActualizarAhora = document.getElementById('btnActualizarAhora');
     const toggle = document.getElementById('modoRedLentaToggle');
+    const slowNetworkBox = document.querySelector('.cotizaciones-slow-network');
     if (toggle) {
         toggle.checked = enabled;
+    }
+    if (slowNetworkBox) {
+        slowNetworkBox.classList.toggle('is-active', enabled);
     }
     if (btnActualizarAhora) {
         btnActualizarAhora.classList.toggle('btn-warning', enabled);

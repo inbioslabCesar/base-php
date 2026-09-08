@@ -96,6 +96,15 @@
   display: none;
 }
 
+#v2ChartsList .table td,
+#v2ChartsList .table th {
+  vertical-align: middle;
+}
+
+#v2ChartsList .form-check-input {
+  margin-top: 0;
+}
+
 /* Edición móvil: cada fila se muestra como bloque vertical editable */
 @media (max-width: 767.98px) {
   #form-examen {

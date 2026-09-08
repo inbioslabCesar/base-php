@@ -450,14 +450,12 @@ function capitalize($string) {
 }
 </style>
 
-<script src="https://cdn.tailwindcss.com"></script>
-
 <div class="clientes-container">
     <!-- Header Section -->
     <div class="header-section">
         <div class="d-flex justify-content-between align-items-center flex-wrap">
             <div>
-                <h3 class="mb-0 text-white text-3xl">
+                <h3 class="mb-0 text-white fs-3 fw-bold">
                     <i class="bi bi-people-fill me-2"></i>
                     Gestión de Pacientes
                 </h3>
@@ -509,19 +507,19 @@ function capitalize($string) {
     <div class="table-container">
         <div>
             <table id="tablaClientes" class="table table-modern">
-                <thead class="bg-indigo-600 text-white">
+                <thead class="text-white">
                     <tr>
-                        <th class="px-4 py-2 text-sm font-semibold">ID</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Código</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Nombre</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Apellido</th>
-                        <th class="px-4 py-2 text-sm font-semibold">DNI</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Edad</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Email</th>
-                        <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Teléfono</th>
-                        <th class="px-4 py-2 text-sm font-semibold d-none d-md-table-cell">Estado</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Registro</th>
-                        <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
+                        <th class="fw-semibold">ID</th>
+                        <th class="fw-semibold">Código</th>
+                        <th class="fw-semibold">Nombre</th>
+                        <th class="fw-semibold">Apellido</th>
+                        <th class="fw-semibold">DNI</th>
+                        <th class="fw-semibold">Edad</th>
+                        <th class="fw-semibold">Email</th>
+                        <th class="fw-semibold d-none d-md-table-cell">Teléfono</th>
+                        <th class="fw-semibold d-none d-md-table-cell">Estado</th>
+                        <th class="fw-semibold">Registro</th>
+                        <th class="fw-semibold">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -718,7 +716,7 @@ $(document).ready(function() {
                     btns += `<a href='clientes/eliminar.php?id=${row.id}' class='btn btn-danger btn-sm' title='Eliminar' onclick='return confirm(\"¿Seguro de eliminar este paciente?\");'><i class='bi bi-trash'></i></a>`;
                     btns += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${row.id}' class='btn btn-info btn-sm' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i></a>`;
                     <?php if (in_array($rol, ['admin', 'recepcionista'])): ?>
-                    btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-primary btn-sm' title='Cotizar'><i class='bi bi-file-earmark-plus'></i></a>`;
+                    btns += `<a href='dashboard.php?vista=form_cotizacion&id=${row.id}' class='btn btn-sm btn-cotizar-cta-global d-inline-flex align-items-center gap-1' title='Crear cotizacion'><i class='bi bi-cart-plus-fill'></i><span class='d-none d-lg-inline'>Cotizar</span></a>`;
                     <?php endif; ?>
                     btns += `</div>`;
                     return btns;
@@ -779,7 +777,7 @@ function renderClienteCard(cliente) {
     acciones += `<a href='dashboard.php?vista=comparar_resultados_cliente&id=${cliente.id}' class='action-btn btn-cotizar' title='Comparar resultados'><i class='bi bi-graph-up-arrow'></i>Comparar</a>`;
     acciones += `</div>`;
     if (rolUsuario === 'admin' || rolUsuario === 'recepcionista') {
-        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${cliente.id}' class='action-btn btn-cotizar' title='Crear Cotización'><i class='bi bi-file-earmark-plus me-1'></i>Cotizar</a>`;
+        acciones += `<a href='dashboard.php?vista=form_cotizacion&id=${cliente.id}' class='action-btn btn-cotizar btn-cotizar-cta-global' title='Crear Cotización'><i class='bi bi-cart-plus-fill me-1'></i>Cotizar</a>`;
     }
     return `
     <div class='cliente-card' data-nombre='${cliente.nombre || ''}' data-apellido='${cliente.apellido || ''}' data-dni='${cliente.dni || ''}'>

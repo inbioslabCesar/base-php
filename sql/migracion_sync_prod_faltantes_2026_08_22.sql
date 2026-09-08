@@ -2,7 +2,7 @@
 -- Origen: laboratorio | Destino: inbioslabstore_prod
 -- Alcance: SOLO faltantes (tablas, columnas e indices)
 SET NAMES utf8mb4;
-USE u330560936_laboratorio;
+USE u330560936_medditechbd;
 
 -- ===== TABLAS FALTANTES =====
 CREATE TABLE IF NOT EXISTS `laboratorio_turnos` (

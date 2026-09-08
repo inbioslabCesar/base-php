@@ -177,6 +177,121 @@ class ExamCardView {
             return $label;
         };
 
+        $parseMinutesFromLabel = function ($text) {
+            $src = strtolower(trim((string)$text));
+            if ($src === '') {
+                return null;
+            }
+            if (strpos($src, 'basal') !== false || strpos($src, 'ayuno') !== false || $src === '0' || $src === '0 min' || $src === '0 minutos') {
+                return 0.0;
+            }
+            if (!preg_match('/(\d+(?:[\.,]\d+)?)/', $src, $m)) {
+                return null;
+            }
+            $val = (float)str_replace(',', '.', (string)$m[1]);
+            if (!is_finite($val)) {
+                return null;
+            }
+            if (strpos($src, 'hora') !== false || preg_match('/\bhr?s?\b/', $src)) {
+                return $val * 60.0;
+            }
+            return $val;
+        };
+
+        $v2Curves = [];
+        if ($isFormatV2) {
+            $layoutRaw = is_array($formatDef['layout'] ?? null) ? $formatDef['layout'] : [];
+            $chartsRaw = is_array($layoutRaw['charts'] ?? null) ? $layoutRaw['charts'] : [];
+            $dataRowsById = [];
+            foreach ($formatRowsResolved as $rowTmp) {
+                if (!is_array($rowTmp)) {
+                    continue;
+                }
+                $rowTypeTmp = strtolower(trim((string)($rowTmp['type'] ?? 'data')));
+                $rowIdTmp = trim((string)($rowTmp['id'] ?? ''));
+                if ($rowTypeTmp !== 'data' || $rowIdTmp === '') {
+                    continue;
+                }
+                $dataRowsById[$rowIdTmp] = $rowTmp;
+            }
+
+            foreach ($chartsRaw as $idxChart => $chartRaw) {
+                if (!is_array($chartRaw)) {
+                    continue;
+                }
+                $chartType = strtolower(trim((string)($chartRaw['type'] ?? 'line_curve')));
+                if ($chartType !== 'line_curve') {
+                    continue;
+                }
+                $yColId = trim((string)($chartRaw['y_col_id'] ?? ''));
+                if ($yColId === '') {
+                    continue;
+                }
+
+                $pointsRaw = is_array($chartRaw['points'] ?? null) ? $chartRaw['points'] : [];
+                $points = [];
+                foreach ($pointsRaw as $pointRaw) {
+                    if (!is_array($pointRaw) || empty($pointRaw['enabled'])) {
+                        continue;
+                    }
+                    $rowId = trim((string)($pointRaw['row_id'] ?? ''));
+                    if ($rowId === '' || !isset($dataRowsById[$rowId])) {
+                        continue;
+                    }
+
+                    $rowRef = $dataRowsById[$rowId];
+                    $labelPoint = trim((string)($pointRaw['label'] ?? ''));
+                    if ($labelPoint === '') {
+                        $labelPoint = trim((string)$v2RowAnchor($rowRef));
+                    }
+
+                    $xRaw = trim((string)($pointRaw['x_value'] ?? ''));
+                    $xValue = null;
+                    if ($xRaw !== '') {
+                        $xNorm = str_replace(',', '.', $xRaw);
+                        if (is_numeric($xNorm)) {
+                            $xValue = (float)$xNorm;
+                        }
+                    }
+                    if ($xValue === null) {
+                        $xValue = $parseMinutesFromLabel($labelPoint);
+                    }
+                    if ($xValue === null) {
+                        continue;
+                    }
+
+                    $points[] = [
+                        'row_id' => $rowId,
+                        'label' => $labelPoint,
+                        'x_value' => $xValue,
+                    ];
+                }
+
+                if (count($points) < 2) {
+                    continue;
+                }
+
+                usort($points, static function ($a, $b) {
+                    return ($a['x_value'] <=> $b['x_value']);
+                });
+
+                $minPoints = isset($chartRaw['min_points_required']) && is_numeric($chartRaw['min_points_required'])
+                    ? max(2, min(20, (int)$chartRaw['min_points_required']))
+                    : 3;
+
+                $v2Curves[] = [
+                    'id' => trim((string)($chartRaw['id'] ?? 'curva_' . ($idxChart + 1))),
+                    'label' => trim((string)($chartRaw['label'] ?? 'Curva ' . ($idxChart + 1))),
+                    'type' => 'line_curve',
+                    'y_col_id' => $yColId,
+                    'min_points_required' => $minPoints,
+                    'connect_gaps' => !empty($chartRaw['connect_gaps']),
+                    'strict_units' => !array_key_exists('strict_units', $chartRaw) || !empty($chartRaw['strict_units']),
+                    'points' => $points,
+                ];
+            }
+        }
+
         $adicional = $formatDef['legacy_items'];
         if (!is_array($adicional)) {
             $adicional = [];
@@ -747,6 +862,21 @@ class ExamCardView {
                             </tbody>
                         </table>
                     </div>
+                    <?php if (!empty($v2Curves)): ?>
+                        <div class="v2-curve-zone mt-3">
+                            <?php foreach ($v2Curves as $curveCfg): ?>
+                                <?php $curveJson = htmlspecialchars(json_encode($curveCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8'); ?>
+                                <div class="v2-curve-card mb-3 p-2 border rounded bg-light" data-v2-curve-config='<?= $curveJson ?>'>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <strong><?= htmlspecialchars((string)($curveCfg['label'] ?? 'Curva')) ?></strong>
+                                        <span class="badge bg-primary">Eje Y: <?= htmlspecialchars((string)($curveCfg['y_col_id'] ?? 'resultado')) ?></span>
+                                    </div>
+                                    <canvas class="v2-curve-canvas" height="180"></canvas>
+                                    <div class="v2-curve-status small text-muted mt-1">Esperando resultados numéricos.</div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                 <?php foreach ($adicional as $item) {
                     if (!is_array($item)) {

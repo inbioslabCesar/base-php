@@ -49,8 +49,8 @@ if ($busqueda !== '') {
                         <span class="badge bg-primary ms-2">#<?= htmlspecialchars($paciente['codigo_cliente']) ?></span>
                     </h5>
                     <p class="mb-1">DNI: <strong><?= htmlspecialchars($paciente['dni']) ?></strong></p>
-                    <a href="dashboard.php?vista=form_cotizacion&id=<?= $paciente['id'] ?>" class="btn btn-success">
-                        <i class="bi bi-file-earmark-plus"></i> Cotizar
+                    <a href="dashboard.php?vista=form_cotizacion&id=<?= $paciente['id'] ?>" class="btn btn-success btn-cotizar-cta-global d-inline-flex align-items-center gap-1 fw-semibold" title="Crear cotizacion">
+                        <i class="bi bi-cart-plus-fill"></i> Cotizar
                     </a>
                 </div>
             </div>

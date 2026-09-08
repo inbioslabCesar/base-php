@@ -111,6 +111,11 @@ if ($configEmpresaPath === null) {
 
 require_once $configEmpresaPath;
 
+$qrVerifyConfigPath = __DIR__ . '/qr_verificacion_config.php';
+if (file_exists($qrVerifyConfigPath)) {
+    require_once $qrVerifyConfigPath;
+}
+
 if (!defined('BASE_URL')) {
     if ($empresa === 'desarrollo') {
         define('BASE_URL', '/base-php/src/');

@@ -201,7 +201,8 @@ $renderSidebarAccordion = static function (string $accordionId, array $sections,
     </div>
     <style>
         .sidebar-gradient {
-            background: var(--ui-sidebar-bg, #0d6efd);
+            background: var(--ui-sidebar-bg, #0d6efd) !important;
+            background-color: var(--ui-sidebar-bg, #0d6efd) !important;
             --sidebar-panel-bg: <?= htmlspecialchars($sidebarPanelBg, ENT_QUOTES, 'UTF-8') ?>;
             --sidebar-panel-active-bg: <?= htmlspecialchars($sidebarPanelActiveBg, ENT_QUOTES, 'UTF-8') ?>;
             --sidebar-hover-text: <?= htmlspecialchars($sidebarHoverTextColor, ENT_QUOTES, 'UTF-8') ?>;
@@ -216,10 +217,27 @@ $renderSidebarAccordion = static function (string $accordionId, array $sections,
         }
         .offcanvas.sidebar-gradient {
             --bs-offcanvas-bg: var(--ui-sidebar-bg, #0d6efd);
-            background-color: var(--ui-sidebar-bg, #0d6efd);
+            --bs-offcanvas-zindex: 1090;
+            background-color: var(--ui-sidebar-bg, #0d6efd) !important;
+            z-index: 1090 !important;
         }
         .offcanvas.sidebar-gradient .offcanvas-body {
-            background-color: var(--ui-sidebar-bg, #0d6efd);
+            background-color: var(--ui-sidebar-bg, #0d6efd) !important;
+        }
+        .offcanvas-backdrop.show {
+            z-index: 1080 !important;
+        }
+        @media (max-width: 767.98px) {
+            .offcanvas.sidebar-gradient {
+                top: var(--app-header-offset, 0px) !important;
+                height: calc(100dvh - var(--app-header-offset, 0px)) !important;
+                max-height: calc(100dvh - var(--app-header-offset, 0px)) !important;
+                border-radius: 0;
+            }
+            .offcanvas-backdrop.show {
+                top: var(--app-header-offset, 0px) !important;
+                height: calc(100dvh - var(--app-header-offset, 0px)) !important;
+            }
         }
         .sidebar-accordion {
             --bs-accordion-bg: transparent;
@@ -241,13 +259,18 @@ $renderSidebarAccordion = static function (string $accordionId, array $sections,
             box-shadow: none !important;
         }
         .sidebar-accordion-item {
-            background: transparent;
+            background: transparent !important;
+            border: 0 !important;
             border-radius: 0.7rem;
             overflow: hidden;
         }
+        .sidebar-accordion .accordion-item {
+            background: transparent !important;
+            border: 0 !important;
+        }
         .sidebar-accordion-item .accordion-collapse,
         .sidebar-accordion-item .accordion-body {
-            background: rgba(62, 69, 77, 0.82);
+            background: rgba(62, 69, 77, 0.82) !important;
         }
         .sidebar-accordion-btn {
             padding: 0.8rem 1rem;
@@ -256,24 +279,38 @@ $renderSidebarAccordion = static function (string $accordionId, array $sections,
             border-radius: 0.7rem;
             color: var(--sidebar-text-color, #f5faff) !important;
             background: var(--sidebar-panel-bg, #123a53) !important;
+            background-color: var(--sidebar-panel-bg, #123a53) !important;
             border: 1px solid rgba(255, 255, 255, 0.24) !important;
             text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
-            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+            transition: color 0.2s ease, border-color 0.2s ease;
         }
         .sidebar-accordion-btn.collapsed {
             color: var(--sidebar-text-color, #f5faff) !important;
             background: var(--sidebar-panel-bg, #123a53) !important;
+            background-color: var(--sidebar-panel-bg, #123a53) !important;
         }
         .sidebar-accordion-btn:not(.collapsed) {
             color: var(--sidebar-text-color, #f5faff) !important;
             background: var(--sidebar-panel-active-bg, #0e2d40) !important;
+            background-color: var(--sidebar-panel-active-bg, #0e2d40) !important;
+        }
+        .sidebar-gradient .sidebar-accordion .accordion-button,
+        .sidebar-gradient .sidebar-accordion .accordion-button:hover,
+        .sidebar-gradient .sidebar-accordion .accordion-button:focus {
+            background-color: var(--sidebar-panel-bg, #123a53) !important;
+        }
+        .sidebar-gradient .sidebar-accordion .accordion-button:not(.collapsed),
+        .sidebar-gradient .sidebar-accordion .accordion-button:not(.collapsed):hover,
+        .sidebar-gradient .sidebar-accordion .accordion-button:not(.collapsed):focus {
+            background-color: var(--sidebar-panel-active-bg, #0e2d40) !important;
         }
         .sidebar-accordion-btn::after {
             filter: brightness(0) invert(1);
             opacity: 0.9;
         }
         .sidebar-accordion-btn i {
-            font-size: 1rem;
+            font-size: 1rem !important;
+            line-height: 1 !important;
             color: #e6f2ff !important;
         }
         .sidebar-link {
@@ -289,7 +326,8 @@ $renderSidebarAccordion = static function (string $accordionId, array $sections,
             background: rgba(255, 255, 255, 0.08);
         }
         .sidebar-link i {
-            font-size: 1rem;
+            font-size: 1rem !important;
+            line-height: 1 !important;
             vertical-align: middle;
             margin-right: 0.55rem;
             width: 1.1rem;

@@ -426,6 +426,181 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         return $htmlList;
     };
 
+    $renderCurvaV2Pdf = static function (array $curve): string {
+        $points = is_array($curve['points'] ?? null) ? $curve['points'] : [];
+        $pointsSorted = $points;
+        usort($pointsSorted, static function ($a, $b) {
+            $ax = isset($a['x']) && is_numeric($a['x']) ? (float)$a['x'] : INF;
+            $bx = isset($b['x']) && is_numeric($b['x']) ? (float)$b['x'] : INF;
+            return $ax <=> $bx;
+        });
+
+        $validPoints = [];
+        foreach ($pointsSorted as $p) {
+            $x = (isset($p['x']) && is_numeric($p['x'])) ? (float)$p['x'] : null;
+            $y = (isset($p['y']) && is_numeric($p['y'])) ? (float)$p['y'] : null;
+            if ($x === null || $y === null) {
+                continue;
+            }
+            $validPoints[] = [
+                'x' => $x,
+                'y' => $y,
+                'label' => (string)($p['label'] ?? ''),
+                'unidad' => trim((string)($p['unidad'] ?? '')),
+                'ref_min' => (isset($p['ref_min']) && is_numeric($p['ref_min'])) ? (float)$p['ref_min'] : null,
+                'ref_max' => (isset($p['ref_max']) && is_numeric($p['ref_max'])) ? (float)$p['ref_max'] : null,
+            ];
+        }
+
+        $minRequired = isset($curve['min_points_required']) && is_numeric($curve['min_points_required'])
+            ? max(2, min(20, (int)$curve['min_points_required']))
+            : 3;
+
+        $units = [];
+        foreach ($validPoints as $vp) {
+            $u = trim((string)($vp['unidad'] ?? ''));
+            if ($u !== '') {
+                $units[$u] = true;
+            }
+        }
+        $unitList = array_keys($units);
+        $unitMismatch = !empty($curve['strict_units']) && count($unitList) > 1;
+
+        $title = trim((string)($curve['label'] ?? 'Curva'));
+        if ($title === '') {
+            $title = 'Curva';
+        }
+
+        if (count($validPoints) < 2 || count($validPoints) < $minRequired || $unitMismatch) {
+            $msg = 'Datos insuficientes para graficar.';
+            if ($unitMismatch) {
+                $msg = 'No se grafica por unidades inconsistentes: ' . implode(', ', array_map('htmlspecialchars', $unitList)) . '.';
+            } elseif (count($validPoints) < $minRequired) {
+                $msg = 'Curva incompleta: ' . count($validPoints) . '/' . $minRequired . ' punto(s) validos.';
+            }
+            return '<div style="margin:4px 0 8px 0; border:0.7px solid #d6e3f7; background:#f8fbff; padding:6px 8px;">'
+                . '<div style="font-weight:700; color:#0f2a57; margin-bottom:4px;">' . htmlspecialchars($title) . '</div>'
+                . '<div style="font-size:10px; color:#64748b;">' . $msg . '</div>'
+                . '</div>';
+        }
+
+        $xVals = array_map(static fn($p) => (float)$p['x'], $validPoints);
+        $yVals = array_map(static fn($p) => (float)$p['y'], $validPoints);
+        $refMins = array_values(array_filter(array_map(static fn($p) => $p['ref_min'], $validPoints), static fn($v) => $v !== null));
+        $refMaxs = array_values(array_filter(array_map(static fn($p) => $p['ref_max'], $validPoints), static fn($v) => $v !== null));
+
+        $minX = min($xVals);
+        $maxX = max($xVals);
+        $minY = min($yVals);
+        $maxY = max($yVals);
+        if (!empty($refMins)) {
+            $minY = min($minY, min($refMins));
+        }
+        if (!empty($refMaxs)) {
+            $maxY = max($maxY, max($refMaxs));
+        }
+
+        if ($minX === $maxX) {
+            $minX -= 1;
+            $maxX += 1;
+        }
+        if ($minY === $maxY) {
+            $minY -= 1;
+            $maxY += 1;
+        }
+        $yPad = ($maxY - $minY) * 0.12;
+        if ($yPad > 0) {
+            $minY -= $yPad;
+            $maxY += $yPad;
+        }
+
+        $svgW = 680;
+        $svgH = 220;
+        $padL = 56;
+        $padR = 16;
+        $padT = 12;
+        $padB = 36;
+        $plotW = $svgW - $padL - $padR;
+        $plotH = $svgH - $padT - $padB;
+
+        $toX = static function (float $x) use ($minX, $maxX, $padL, $plotW): float {
+            return $padL + (($x - $minX) / ($maxX - $minX)) * $plotW;
+        };
+        $toY = static function (float $y) use ($minY, $maxY, $padT, $plotH): float {
+            return $padT + (1 - (($y - $minY) / ($maxY - $minY))) * $plotH;
+        };
+
+        $lineData = [];
+        foreach ($validPoints as $p) {
+            $lineData[] = round($toX((float)$p['x']), 2) . ',' . round($toY((float)$p['y']), 2);
+        }
+
+        $refBand = '';
+        $hasBand = false;
+        $topPts = [];
+        $bottomPts = [];
+        foreach ($validPoints as $p) {
+            if ($p['ref_min'] === null || $p['ref_max'] === null) {
+                $hasBand = false;
+                $topPts = [];
+                $bottomPts = [];
+                break;
+            }
+            $hasBand = true;
+            $topPts[] = round($toX((float)$p['x']), 2) . ',' . round($toY((float)$p['ref_max']), 2);
+            $bottomPts[] = round($toX((float)$p['x']), 2) . ',' . round($toY((float)$p['ref_min']), 2);
+        }
+        if ($hasBand && count($topPts) >= 2 && count($bottomPts) >= 2) {
+            $poly = implode(' ', $topPts) . ' ' . implode(' ', array_reverse($bottomPts));
+            $refBand = '<polygon points="' . htmlspecialchars($poly, ENT_QUOTES, 'UTF-8') . '" fill="#22c55e" fill-opacity="0.12" stroke="none" />';
+        }
+
+        $xTicks = array_values(array_unique(array_map(static fn($p) => (string)((float)$p['x']), $validPoints)));
+        sort($xTicks, SORT_NUMERIC);
+        $xLabels = '';
+        foreach ($xTicks as $tick) {
+            $t = (float)$tick;
+            $xx = round($toX($t), 2);
+            $xLabels .= '<text x="' . $xx . '" y="' . ($padT + $plotH + 16) . '" font-size="10" fill="#334155" text-anchor="middle">' . htmlspecialchars((string)$tick) . '</text>';
+        }
+
+        $pointCircles = '';
+        $pointLabels = '';
+        foreach ($validPoints as $p) {
+            $cx = round($toX((float)$p['x']), 2);
+            $cy = round($toY((float)$p['y']), 2);
+            $pointCircles .= '<circle cx="' . $cx . '" cy="' . $cy . '" r="3.2" fill="#0ea5e9" />';
+            $pointLabels .= '<text x="' . $cx . '" y="' . ($cy - 7) . '" font-size="9" fill="#0f172a" text-anchor="middle">' . htmlspecialchars((string)$p['y']) . '</text>';
+        }
+
+        $unitLabel = count($unitList) === 1 ? $unitList[0] : '';
+        $unitInfo = $unitLabel !== '' ? ' (' . htmlspecialchars($unitLabel) . ')' : '';
+
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' . $svgW . ' ' . $svgH . '">'
+            . '<rect x="0" y="0" width="' . $svgW . '" height="' . $svgH . '" fill="#ffffff" />'
+            . '<line x1="' . $padL . '" y1="' . $padT . '" x2="' . $padL . '" y2="' . ($padT + $plotH) . '" stroke="#94a3b8" stroke-width="1" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + $plotH) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + $plotH) . '" stroke="#94a3b8" stroke-width="1" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.25)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.25)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.5)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.5)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.75)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.75)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
+            . $refBand
+            . '<polyline points="' . htmlspecialchars(implode(' ', $lineData), ENT_QUOTES, 'UTF-8') . '" fill="none" stroke="#2563eb" stroke-width="2" />'
+            . $pointCircles
+            . $pointLabels
+            . '<text x="' . ($padL + $plotW / 2) . '" y="' . ($svgH - 7) . '" font-size="10" fill="#334155" text-anchor="middle">Tiempo (min)</text>'
+            . '<text x="12" y="' . ($padT + 10) . '" font-size="10" fill="#334155" text-anchor="start">' . htmlspecialchars((string)round($maxY, 2)) . '</text>'
+            . '<text x="12" y="' . ($padT + $plotH) . '" font-size="10" fill="#334155" text-anchor="start">' . htmlspecialchars((string)round($minY, 2)) . '</text>'
+            . $xLabels
+            . '</svg>';
+
+        $status = 'Curva completa: ' . count($validPoints) . ' punto(s) validos. Y: ' . htmlspecialchars((string)($curve['y_col_id'] ?? 'resultado')) . $unitInfo . '.';
+        return '<div style="margin:6px 0 10px 0; border:0.7px solid #d6e3f7; background:#f8fbff; padding:6px 8px;">'
+            . '<div style="font-weight:700; color:#0f2a57; margin-bottom:4px;">' . htmlspecialchars($title) . '</div>'
+            . $svg
+            . '<div style="font-size:9.6px; color:#475569; margin-top:2px;">' . $status . '</div>'
+            . '</div>';
+    };
+
     $formatFechaClinica = static function ($valor) {
         $valor = trim((string)$valor);
         if ($valor === '') {
@@ -700,6 +875,16 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             }
 
             $html .= '</tbody></table>';
+
+            $curvasV2 = is_array($item['curvas_v2'] ?? null) ? $item['curvas_v2'] : [];
+            if (!empty($curvasV2)) {
+                foreach ($curvasV2 as $curveCfg) {
+                    if (!is_array($curveCfg)) {
+                        continue;
+                    }
+                    $html .= $renderCurvaV2Pdf($curveCfg);
+                }
+            }
         } elseif ($item['tipo'] === "Título" || $item['tipo'] === "Subtítulo") {
             $openLegacyTable();
             $color_fondo = $item['color_fondo'] ?? "#e3e8f5";

@@ -68,7 +68,6 @@ foreach ($registros as $r) {
     $total_deuda += max(0, $total - $pagado);
 }
 ?>
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
 /* Fuerza color de encabezado y estados de ordenación en ingresos */
 #tablaIngresos thead th {
@@ -93,7 +92,7 @@ foreach ($registros as $r) {
 <div class="container-fluid mt-4">
     <div class="header-section mb-3">
         <div class="p-3">
-            <h3 class="mb-0 text-white text-3xl">Reporte de Deudas y Adelantos</h3>
+            <h3 class="mb-0 text-white fs-3 fw-bold">Reporte de Deudas y Adelantos</h3>
         </div>
     </div>
     <form method="get" class="row g-2 align-items-end mb-3">
@@ -149,18 +148,18 @@ foreach ($registros as $r) {
     </form>
     <div class="table-responsive ingresos-table-responsive">
         <table id="tablaIngresos" class="table table-striped table-bordered align-middle" style="width:100%; min-width:1200px;">
-            <thead class="bg-indigo-600 text-white">
+            <thead class="text-white">
                 <tr>
-                    <th class="px-4 py-2 text-sm font-semibold">Código Cotización</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Fecha</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Mét. Pago</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Cliente</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Tipo de Paciente</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Referencia</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Total Cotización</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Adelanto</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Deuda</th>
-                    <th class="px-4 py-2 text-sm font-semibold">Acciones</th>
+                    <th class="fw-semibold">Código Cotización</th>
+                    <th class="fw-semibold">Fecha</th>
+                    <th class="fw-semibold">Mét. Pago</th>
+                    <th class="fw-semibold">Cliente</th>
+                    <th class="fw-semibold">Tipo de Paciente</th>
+                    <th class="fw-semibold">Referencia</th>
+                    <th class="fw-semibold">Total Cotización</th>
+                    <th class="fw-semibold">Adelanto</th>
+                    <th class="fw-semibold">Deuda</th>
+                    <th class="fw-semibold">Acciones</th>
                 </tr>
             </thead>
             <tbody>

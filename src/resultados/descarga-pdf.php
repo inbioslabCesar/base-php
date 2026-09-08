@@ -10,6 +10,7 @@ require_once __DIR__ . '/../usuarios/funciones/usuarios_privilegios.php';
 // Agregar estos dos require para los componentes:
 require_once __DIR__ . '/resultados_pdf_datos.php';
 require_once __DIR__ . '/resultados_pdf_html.php';
+require_once __DIR__ . '/qr_verificacion_utils.php';
 use Mpdf\Mpdf;
 
 $cotizacion_id = $_GET['cotizacion_id'] ?? null;
@@ -329,12 +330,24 @@ $mpdf = new Mpdf([
     'margin_footer' => 4
 ]);
 
-// Generar código QR con datos clave para el header
-$qrText = 'Laboratorio: ' . ($empresa['nombre'] ?? 'INBIOSLAB')
-    . ' | Resultado ID: ' . ($paciente['id'] ?? '')
-    . ' | Paciente: ' . ($paciente['nombre'] ?? '')
-    . ' | DNI: ' . ($paciente['dni'] ?? '')
-    . ' | Fecha de proceso: ' . ($paciente['fecha_proceso'] ?? '');
+// Generar código QR de verificación segura (sin exponer PII en texto plano).
+$qrFingerprint = qr_verificacion_resultados_fingerprint((int)$cotizacion_id, is_array($rows) ? $rows : []);
+$qrToken = qr_verificacion_firmar_token([
+    'v' => 1,
+    'cid' => (int)$cotizacion_id,
+    'fp' => $qrFingerprint,
+    'iat' => time(),
+], is_array($empresa) ? $empresa : []);
+
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+$baseUrl = rtrim((string)BASE_URL, '/');
+$qrVerifyUrl = '';
+if ($host !== '') {
+    $qrVerifyUrl = $scheme . '://' . $host . $baseUrl . '/resultados/verificar_qr.php?t=' . urlencode($qrToken);
+}
+
+$qrText = $qrVerifyUrl !== '' ? $qrVerifyUrl : ('COT:' . (int)$cotizacion_id . '|FP:' . $qrFingerprint);
 $qrBase64 = '';
 try {
     if (class_exists('Endroid\\QrCode\\QrCode')) {

@@ -781,8 +781,294 @@ function updatePreview() {
 
 const v2State = {
   columns: [],
-  rows: []
+  rows: [],
+  charts: []
 };
+
+function getV2DataRows() {
+  return v2State.rows.filter((r) => String(r && r.type || '').trim().toLowerCase() === 'data' && String(r.id || '').trim() !== '');
+}
+
+function inferMinutesFromText(text) {
+  const src = String(text || '').trim().toLowerCase();
+  if (!src) return null;
+  if (src.includes('basal') || src.includes('ayuno') || src === '0' || src === '0 min' || src === '0 minutos') {
+    return 0;
+  }
+  const m = src.match(/(\d+(?:[\.,]\d+)?)/);
+  if (!m) return null;
+  const n = parseFloat(String(m[1]).replace(',', '.'));
+  if (!isFinite(n)) return null;
+  if (src.includes('hora') || /\bhr?s?\b/.test(src)) return n * 60;
+  return n;
+}
+
+function getV2RowAnchorText(row) {
+  if (!row || typeof row !== 'object') return '';
+  const label = String(row.label || '').trim();
+  if (label) return label;
+  const cells = row.cells && typeof row.cells === 'object' ? row.cells : {};
+  const orderedCols = Array.isArray(v2State.columns) ? v2State.columns : [];
+  for (const col of orderedCols) {
+    const colId = String(col && col.id || '').trim();
+    if (!colId) continue;
+    const kind = String(col && col.kind || 'text').trim().toLowerCase();
+    if (kind !== 'text' && kind !== 'reference') continue;
+    const cellValue = String(cells[colId] || '').trim();
+    if (cellValue) return cellValue;
+  }
+  for (const key of Object.keys(cells)) {
+    const cellValue = String(cells[key] || '').trim();
+    if (cellValue) return cellValue;
+  }
+  return String(row.id || '').trim();
+}
+
+function guessV2CurveResultColumn() {
+  const preferred = v2State.columns.find((c) => {
+    const kind = String(c && c.kind || '').toLowerCase();
+    return !!c && !!c.editable && (kind === 'result' || kind === 'number');
+  });
+  if (preferred) return String(preferred.id || '').trim();
+  const fallback = v2State.columns.find((c) => !!c && !!c.editable);
+  return fallback ? String(fallback.id || '').trim() : '';
+}
+
+function syncV2ChartsWithSchema() {
+  if (!Array.isArray(v2State.charts)) {
+    v2State.charts = [];
+  }
+  const validColIds = new Set(v2State.columns.map((c) => String(c && c.id || '').trim()).filter(Boolean));
+  const dataRows = getV2DataRows();
+  const dataRowsById = new Map(dataRows.map((r) => [String(r.id), r]));
+  const fallbackY = guessV2CurveResultColumn();
+
+  v2State.charts = v2State.charts
+    .map((chart, idx) => {
+      const c = chart && typeof chart === 'object' ? chart : {};
+      const idBase = String(c.id || `curva_${idx + 1}`).trim() || `curva_${idx + 1}`;
+      const label = String(c.label || `Curva ${idx + 1}`).trim() || `Curva ${idx + 1}`;
+      const yCol = String(c.y_col_id || '').trim();
+      const pointsRaw = Array.isArray(c.points) ? c.points : [];
+      const pointByRow = new Map();
+      pointsRaw.forEach((p) => {
+        if (!p || typeof p !== 'object') return;
+        const rid = String(p.row_id || '').trim();
+        if (!rid) return;
+        pointByRow.set(rid, p);
+      });
+
+      const points = dataRows.map((row) => {
+        const rid = String(row.id || '').trim();
+        const prev = pointByRow.get(rid) || {};
+        const labelAuto = getV2RowAnchorText(row);
+        const inferred = inferMinutesFromText(String(labelAuto || prev.label || ''));
+        return {
+          row_id: rid,
+          label: String(labelAuto || prev.label || rid).trim(),
+          x_value: (prev.x_value !== undefined && prev.x_value !== null && String(prev.x_value).trim() !== '')
+            ? String(prev.x_value).trim()
+            : (inferred !== null ? String(inferred) : ''),
+          enabled: Object.prototype.hasOwnProperty.call(prev, 'enabled') ? !!prev.enabled : (inferred !== null)
+        };
+      });
+
+      return {
+        id: ensureUniqueChartId(idBase, idx),
+        label,
+        type: 'line_curve',
+        y_col_id: validColIds.has(yCol) ? yCol : fallbackY,
+        min_points_required: Number.isFinite(parseInt(c.min_points_required, 10)) ? Math.max(2, Math.min(20, parseInt(c.min_points_required, 10))) : 3,
+        connect_gaps: !!c.connect_gaps,
+        strict_units: !Object.prototype.hasOwnProperty.call(c, 'strict_units') || !!c.strict_units,
+        points,
+      };
+    })
+    .filter((chart) => String(chart.y_col_id || '').trim() !== '' || dataRowsById.size === 0);
+}
+
+function addV2Chart(chart = {}) {
+  const id = ensureUniqueChartId(String(chart.id || `curva_${v2State.charts.length + 1}`).trim() || `curva_${v2State.charts.length + 1}`);
+  v2State.charts.push({
+    id,
+    label: String(chart.label || `Curva ${v2State.charts.length + 1}`).trim(),
+    type: 'line_curve',
+    y_col_id: String(chart.y_col_id || guessV2CurveResultColumn()).trim(),
+    min_points_required: Number.isFinite(parseInt(chart.min_points_required, 10)) ? parseInt(chart.min_points_required, 10) : 3,
+    connect_gaps: !!chart.connect_gaps,
+    strict_units: !Object.prototype.hasOwnProperty.call(chart, 'strict_units') || !!chart.strict_units,
+    points: Array.isArray(chart.points) ? chart.points : []
+  });
+  syncV2ChartsWithSchema();
+}
+
+function renderV2Charts() {
+  const container = document.getElementById('v2ChartsList');
+  if (!container) return;
+  syncV2ChartsWithSchema();
+
+  const editableCols = v2State.columns.filter((c) => !!c.editable);
+  const dataRows = getV2DataRows();
+
+  if (dataRows.length === 0) {
+    container.innerHTML = '<div class="alert alert-light border mb-0">Agrega al menos una fila de tipo Data para configurar curvas.</div>';
+    return;
+  }
+
+  if (editableCols.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning mb-0">No hay columnas editables para usar como eje Y de la curva.</div>';
+    return;
+  }
+
+  if (!Array.isArray(v2State.charts) || v2State.charts.length === 0) {
+    container.innerHTML = '<div class="alert alert-light border mb-0">Todavia no hay curvas configuradas. Usa "Agregar curva".</div>';
+    return;
+  }
+
+  const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  container.innerHTML = '';
+
+  v2State.charts.forEach((chart, chartIdx) => {
+    const card = document.createElement('div');
+    card.className = 'border rounded p-2 mb-2 bg-white';
+
+    const yOptions = editableCols.map((col) => {
+      const cid = String(col.id || '').trim();
+      const selected = cid === chart.y_col_id ? 'selected' : '';
+      return `<option value="${escapeHtml(cid)}" ${selected}>${escapeHtml(col.label || cid)} (${escapeHtml(col.kind || 'text')})</option>`;
+    }).join('');
+
+    const pointRows = (Array.isArray(chart.points) ? chart.points : []).map((pt, pointIdx) => {
+      const row = dataRows.find((r) => String(r.id || '') === String(pt.row_id || ''));
+      const rowLabel = row ? getV2RowAnchorText(row) : String(pt.label || pt.row_id || '');
+      return `
+        <tr>
+          <td><input type="checkbox" class="form-check-input v2-chart-point-enabled" data-chart-idx="${chartIdx}" data-point-idx="${pointIdx}" ${pt.enabled ? 'checked' : ''}></td>
+          <td>${escapeHtml(String(pt.row_id || ''))}</td>
+          <td>${escapeHtml(rowLabel)}</td>
+          <td><input type="number" step="any" class="form-control form-control-sm v2-chart-point-x" data-chart-idx="${chartIdx}" data-point-idx="${pointIdx}" value="${escapeHtml(String(pt.x_value || ''))}" placeholder="min"></td>
+        </tr>
+      `;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-3">
+          <label class="small text-muted d-block mb-1">Nombre de curva</label>
+          <input type="text" class="form-control form-control-sm v2-chart-label" data-chart-idx="${chartIdx}" value="${escapeHtml(chart.label || '')}">
+        </div>
+        <div class="col-md-3">
+          <label class="small text-muted d-block mb-1">Columna de resultado (eje Y)</label>
+          <select class="form-select form-select-sm v2-chart-y-col" data-chart-idx="${chartIdx}">${yOptions}</select>
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Puntos minimos</label>
+          <input type="number" min="2" max="20" class="form-control form-control-sm v2-chart-min-points" data-chart-idx="${chartIdx}" value="${escapeHtml(String(chart.min_points_required || 3))}">
+        </div>
+        <div class="col-md-3">
+          <div class="form-check mt-4">
+            <input type="checkbox" class="form-check-input v2-chart-connect-gaps" data-chart-idx="${chartIdx}" ${chart.connect_gaps ? 'checked' : ''}>
+            <label class="form-check-label">Unir puntos con vacios</label>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input v2-chart-strict-units" data-chart-idx="${chartIdx}" ${chart.strict_units ? 'checked' : ''}>
+            <label class="form-check-label">Validar unidad homogénea</label>
+          </div>
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="button" class="btn btn-outline-danger btn-sm v2-chart-del" data-chart-idx="${chartIdx}">Quitar</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered mb-0">
+          <thead>
+            <tr><th>Incluir</th><th>Fila</th><th>Etiqueta</th><th>X (min)</th></tr>
+          </thead>
+          <tbody>${pointRows}</tbody>
+        </table>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('.v2-chart-label').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      v2State.charts[idx].label = String(e.target.value || '').trim();
+      renderV2Preview();
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-y-col').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      v2State.charts[idx].y_col_id = String(e.target.value || '').trim();
+      renderV2Preview();
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-min-points').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      const raw = parseInt(String(e.target.value || ''), 10);
+      v2State.charts[idx].min_points_required = Number.isFinite(raw) ? Math.max(2, Math.min(20, raw)) : 3;
+      renderV2Preview();
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-connect-gaps').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      v2State.charts[idx].connect_gaps = !!e.target.checked;
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-strict-units').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      v2State.charts[idx].strict_units = !!e.target.checked;
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-point-enabled').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const cIdx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      const pIdx = parseInt(e.target.getAttribute('data-point-idx') || '-1', 10);
+      if (!Number.isFinite(cIdx) || !Number.isFinite(pIdx)) return;
+      const chart = v2State.charts[cIdx];
+      if (!chart || !Array.isArray(chart.points) || !chart.points[pIdx]) return;
+      chart.points[pIdx].enabled = !!e.target.checked;
+      renderV2Preview();
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-point-x').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const cIdx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      const pIdx = parseInt(e.target.getAttribute('data-point-idx') || '-1', 10);
+      if (!Number.isFinite(cIdx) || !Number.isFinite(pIdx)) return;
+      const chart = v2State.charts[cIdx];
+      if (!chart || !Array.isArray(chart.points) || !chart.points[pIdx]) return;
+      chart.points[pIdx].x_value = String(e.target.value || '').trim();
+      renderV2Preview();
+    });
+  });
+
+  container.querySelectorAll('.v2-chart-del').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+      v2State.charts.splice(idx, 1);
+      renderV2Charts();
+      renderV2Preview();
+    });
+  });
+}
 
 function slugifyV2(text) {
   return String(text || '')
@@ -806,6 +1092,15 @@ function ensureUniqueRowId(baseId, indexToIgnore = -1) {
   let n = 1;
   while (v2State.rows.some((r, idx) => idx !== indexToIgnore && r.id === id)) {
     id = `${slugifyV2(baseId) || 'fila'}_${n++}`;
+  }
+  return id;
+}
+
+function ensureUniqueChartId(baseId, indexToIgnore = -1) {
+  let id = slugifyV2(baseId) || 'curva';
+  let n = 1;
+  while (v2State.charts.some((c, idx) => idx !== indexToIgnore && c.id === id)) {
+    id = `${slugifyV2(baseId) || 'curva'}_${n++}`;
   }
   return id;
 }
@@ -1082,6 +1377,8 @@ function renderV2Columns() {
 
     tbody.appendChild(tr);
   });
+
+  renderV2Charts();
 }
 
 function renderV2Rows() {
@@ -1620,11 +1917,14 @@ function renderV2Rows() {
 
     tbody.appendChild(tr);
   });
+
+  renderV2Charts();
 }
 
 function renderV2Preview() {
   const preview = document.getElementById('previewV2');
   if (!preview) return;
+  syncV2ChartsWithSchema();
 
   const cols = v2State.columns.filter(c => c.visible_capture !== false);
   let html = '<table class="table table-bordered table-sm"><thead><tr>';
@@ -1701,12 +2001,27 @@ function renderV2Preview() {
   });
 
   html += '</tbody></table>';
+
+  if (Array.isArray(v2State.charts) && v2State.charts.length > 0) {
+    html += '<div class="mt-3"><h6 class="mb-2">Curvas configuradas</h6>';
+    v2State.charts.forEach((chart) => {
+      const points = Array.isArray(chart.points) ? chart.points : [];
+      const enabled = points.filter((p) => !!p.enabled);
+      const detail = enabled
+        .map((p) => `${String(p.label || p.row_id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')} -> ${String(p.x_value || '?').replace(/</g, '&lt;').replace(/>/g, '&gt;')} min`)
+        .join(' | ');
+      html += `<div class="small mb-1"><strong>${String(chart.label || 'Curva').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</strong> · Y: ${String(chart.y_col_id || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')} · min puntos: ${Number(chart.min_points_required || 3)}${detail ? `<div class="text-muted">${detail}</div>` : '<div class="text-muted">Sin puntos activos.</div>'}</div>`;
+    });
+    html += '</div>';
+  }
+
   preview.innerHTML = html;
 }
 
 function resetV2State() {
   v2State.columns = [];
   v2State.rows = [];
+  v2State.charts = [];
 }
 
 function buildLegacyReferenciaText(item) {
@@ -1866,14 +2181,39 @@ function migrateLegacyToV2(legacyItems) {
     row.formulas.resultado = converted;
   });
 
+  const dataRows = getV2DataRows();
+  if (dataRows.length >= 2) {
+    const points = dataRows.map((row) => {
+      const label = getV2RowAnchorText(row);
+      const x = inferMinutesFromText(label);
+      return {
+        row_id: String(row.id || '').trim(),
+        label,
+        x_value: x !== null ? String(x) : '',
+        enabled: x !== null,
+      };
+    });
+    const enabledCount = points.filter((p) => p.enabled).length;
+    if (enabledCount >= 2) {
+      addV2Chart({
+        label: 'Curva sugerida',
+        y_col_id: guessV2CurveResultColumn(),
+        min_points_required: Math.min(3, enabledCount),
+        points,
+      });
+    }
+  }
+
   renderV2Columns();
   renderV2Rows();
+  renderV2Charts();
   renderV2Preview();
   clearV2ValidationAlert();
   return true;
 }
 
 function buildV2Payload() {
+  syncV2ChartsWithSchema();
   const cols = v2State.columns.map((c, idx) => ({
     id: String(c.id || '').trim(),
     label: String(c.label || '').trim() || String(c.id || '').trim(),
@@ -1965,11 +2305,33 @@ function buildV2Payload() {
     };
   }).filter(r => r.id !== '' || r.type !== 'data');
 
+  const charts = (Array.isArray(v2State.charts) ? v2State.charts : []).map((chart, idx) => {
+    const points = Array.isArray(chart.points) ? chart.points : [];
+    return {
+      id: String(chart.id || `curva_${idx + 1}`).trim() || `curva_${idx + 1}`,
+      label: String(chart.label || `Curva ${idx + 1}`).trim() || `Curva ${idx + 1}`,
+      type: 'line_curve',
+      y_col_id: String(chart.y_col_id || '').trim(),
+      min_points_required: Number.isFinite(parseInt(chart.min_points_required, 10))
+        ? Math.max(2, Math.min(20, parseInt(chart.min_points_required, 10)))
+        : 3,
+      connect_gaps: !!chart.connect_gaps,
+      strict_units: !Object.prototype.hasOwnProperty.call(chart, 'strict_units') || !!chart.strict_units,
+      points: points.map((point) => ({
+        row_id: String((point && point.row_id) || '').trim(),
+        label: String((point && point.label) || '').trim(),
+        x_value: String((point && point.x_value) ?? '').trim(),
+        enabled: !!(point && point.enabled),
+      })),
+    };
+  });
+
   return {
     schema_version: 2,
     layout: {
       columns: cols,
-      rows
+      rows,
+      charts
     }
   };
 }
@@ -2014,6 +2376,7 @@ function validateV2Payload(payload) {
   const layout = payload.layout || {};
   const columns = Array.isArray(layout.columns) ? layout.columns : [];
   const rows = Array.isArray(layout.rows) ? layout.rows : [];
+  const charts = Array.isArray(layout.charts) ? layout.charts : [];
 
   if (columns.length === 0) {
     errors.push('Debes registrar al menos una columna.');
@@ -2126,6 +2489,52 @@ function validateV2Payload(payload) {
     errors.push('Debe existir al menos un campo editable para ingresar resultados.');
   }
 
+  const rowIds = new Set(rows
+    .filter((r) => String(r && r.type || '').trim() === 'data')
+    .map((r) => String(r.id || '').trim())
+    .filter(Boolean));
+
+  charts.forEach((chart, idx) => {
+    const yCol = String(chart.y_col_id || '').trim();
+    if (!yCol) {
+      errors.push(`La curva #${idx + 1} no tiene columna de resultado (eje Y).`);
+    } else if (!seenIds.has(yCol)) {
+      errors.push(`La curva #${idx + 1} usa una columna Y inexistente: '${yCol}'.`);
+    }
+
+    const minPoints = Number.isFinite(parseInt(chart.min_points_required, 10))
+      ? Math.max(2, Math.min(20, parseInt(chart.min_points_required, 10)))
+      : 3;
+    const points = Array.isArray(chart.points) ? chart.points : [];
+    const enabledPoints = points.filter((p) => !!(p && p.enabled));
+    if (enabledPoints.length === 0) {
+      errors.push(`La curva #${idx + 1} no tiene puntos activos.`);
+      return;
+    }
+
+    const xSeen = new Set();
+    enabledPoints.forEach((point) => {
+      const rid = String((point && point.row_id) || '').trim();
+      const xRaw = String((point && point.x_value) ?? '').trim();
+      if (!rowIds.has(rid)) {
+        errors.push(`La curva #${idx + 1} referencia una fila de datos inexistente: '${rid}'.`);
+      }
+      if (xRaw === '' || !isFinite(parseFloat(xRaw))) {
+        errors.push(`La curva #${idx + 1} tiene un punto sin valor X válido (fila '${rid || '?'}').`);
+      } else {
+        const xNorm = String(parseFloat(xRaw));
+        if (xSeen.has(xNorm)) {
+          errors.push(`La curva #${idx + 1} tiene valores X repetidos (${xNorm}).`);
+        }
+        xSeen.add(xNorm);
+      }
+    });
+
+    if (enabledPoints.length < minPoints) {
+      errors.push(`La curva #${idx + 1} exige ${minPoints} punto(s) mínimos pero solo tiene ${enabledPoints.length} activo(s).`);
+    }
+  });
+
   return errors;
 }
 
@@ -2133,6 +2542,7 @@ window.initExamFormatBuilder = function(datosAdicionales) {
   const modeSwitch = document.getElementById('formatModeV2');
   const btnAddCol = document.getElementById('v2AddColumn');
   const btnAddRowV2 = document.getElementById('v2AddRow');
+  const btnAddChart = document.getElementById('v2AddChart');
   const btnMigrateLegacy = document.getElementById('v2MigrateLegacy');
 
   const hasLegacySource = Array.isArray(datosAdicionales) && datosAdicionales.length > 0;
@@ -2149,6 +2559,13 @@ window.initExamFormatBuilder = function(datosAdicionales) {
     btnAddRowV2.addEventListener('click', () => {
       addV2DataRow();
       renderV2Rows();
+      renderV2Preview();
+    });
+  }
+  if (btnAddChart) {
+    btnAddChart.addEventListener('click', () => {
+      addV2Chart();
+      renderV2Charts();
       renderV2Preview();
     });
   }
@@ -2174,6 +2591,9 @@ window.initExamFormatBuilder = function(datosAdicionales) {
     const rows = Array.isArray(layout.rows) ? layout.rows : [];
     rows.forEach(r => addV2DataRow(r));
 
+    const charts = Array.isArray(layout.charts) ? layout.charts : [];
+    charts.forEach((chart) => addV2Chart(chart));
+
     if (modeSwitch) modeSwitch.checked = true;
   } else if (Array.isArray(datosAdicionales) && datosAdicionales.length > 0) {
     datosAdicionales.forEach(parametro => addRow(parametro));
@@ -2189,8 +2609,13 @@ window.initExamFormatBuilder = function(datosAdicionales) {
     });
   }
 
+  if (isV2Data && v2State.charts.length === 0 && getV2DataRows().length >= 2) {
+    addV2Chart();
+  }
+
   renderV2Columns();
   renderV2Rows();
+  renderV2Charts();
   renderV2Preview();
   setBuilderMode(modeSwitch ? modeSwitch.checked : false);
 
