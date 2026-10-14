@@ -54,6 +54,8 @@ if ($empresa === '') {
         'plum-tiger-189332.hostingersite.com' => 'requena',
         'seashell-pig-429058.hostingersite.com' => 'farlab',
         'www.seashell-pig-429058.hostingersite.com' => 'farlab',
+        'olivedrab-chinchilla-903422.hostingersite.com' => 'bioscience',
+        'www.olivedrab-chinchilla-903422.hostingersite.com' => 'bioscience',
 
         // Entornos locales
         'localhost' => 'desarrollo',
