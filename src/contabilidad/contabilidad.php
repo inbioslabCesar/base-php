@@ -102,6 +102,20 @@ $stmt = $pdo->query("
 ");
 $deudaTotal = floatval($stmt->fetchColumn());
 
+// Cotizaciones antiguas que nunca se atendieron ni se pagaron (suelen ser solo consultas de precio).
+require_once __DIR__ . '/../cotizaciones/funciones/deuda_antigua.php';
+$diasDeudaAntigua = COTIZACIONES_DIAS_SIN_ATENDER;
+$deudaAntigua = ['cantidad' => 0, 'monto' => 0.0];
+try {
+    $stmtAntigua = $pdo->prepare('SELECT COUNT(*) AS cantidad, IFNULL(SUM(c.total), 0) AS monto FROM cotizaciones c WHERE ' . cotizacionesCondicionSinAtender($pdo));
+    $stmtAntigua->execute([$diasDeudaAntigua]);
+    $deudaAntigua = $stmtAntigua->fetch(PDO::FETCH_ASSOC) ?: $deudaAntigua;
+} catch (Throwable $e) {
+    error_log('contabilidad: no se pudo calcular deuda antigua: ' . $e->getMessage());
+}
+$deudaAntiguaMonto = min((float)$deudaAntigua['monto'], $deudaTotal);
+$deudaActiva = max(0.0, $deudaTotal - $deudaAntiguaMonto);
+
 $cajaTablesReady = false;
 $cajaHasTurnoColumn = false;
 $cajaAbierta = null;
@@ -411,7 +425,15 @@ if ($reaperturaTableReady) {
                 <div class="card-header"><i class="bi bi-person-x"></i> Deuda de Clientes</div>
                 <div class="card-body">
                     <h4 class="card-title"><?= money_format_local($deudaTotal, $currencyCfg) ?></h4>
-                    <p class="card-text">Saldo pendiente por cobrar</p>
+                    <p class="card-text mb-1">Saldo pendiente por cobrar</p>
+                    <?php if ((int)$deudaAntigua['cantidad'] > 0): ?>
+                        <hr class="my-2">
+                        <div class="small">
+                            <div class="d-flex justify-content-between"><span>Atenciones realizadas</span><strong><?= money_format_local($deudaActiva, $currencyCfg) ?></strong></div>
+                            <div class="d-flex justify-content-between"><span>Sin atender (+<?= (int)$diasDeudaAntigua ?> días)</span><strong><?= money_format_local($deudaAntiguaMonto, $currencyCfg) ?></strong></div>
+                            <a href="dashboard.php?vista=cotizaciones&amp;deuda=sin_atender" class="link-dark">Revisar <?= (int)$deudaAntigua['cantidad'] ?> cotización(es) y anular</a>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../conexion/conexion.php';
 require_once __DIR__ . '/../funciones/cotizaciones_utils.php';
+require_once __DIR__ . '/../funciones/deuda_antigua.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -316,6 +317,10 @@ try {
     if (!empty($_GET['filtro_fecha_hasta'])) {
         $where[] = "c.fecha <= ?";
         $params[] = $_GET['filtro_fecha_hasta'];
+    }
+    if (strtolower(trim((string)($_GET['filtro_deuda'] ?? ''))) === 'sin_atender' && !$soloAnuladas) {
+        $where[] = '(' . cotizacionesCondicionSinAtender($pdo) . ')';
+        $params[] = COTIZACIONES_DIAS_SIN_ATENDER;
     }
     if ($filtroUsuarioResultados !== '') {
         if ($hasIdLaboratorista) {

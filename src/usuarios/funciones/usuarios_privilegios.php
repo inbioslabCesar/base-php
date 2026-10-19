@@ -14,6 +14,7 @@ if (!function_exists('usuarios_privilegios_catalogo')) {
             'menu_estadisticas' => ['label' => 'Ver Estadística', 'group' => 'Menú lateral'],
             'menu_inventario' => ['label' => 'Ver Inventario', 'group' => 'Menú lateral'],
             'menu_cotizaciones' => ['label' => 'Ver Cotizaciones', 'group' => 'Menú lateral'],
+            'menu_cotizador_express' => ['label' => 'Ver Cotizador Express', 'group' => 'Menú lateral'],
             'menu_contabilidad' => ['label' => 'Ver Contabilidad', 'group' => 'Menú lateral'],
             'menu_resultados' => ['label' => 'Ver Resultados', 'group' => 'Menú lateral'],
             'menu_turnos' => ['label' => 'Ver Turnos de Laboratorio', 'group' => 'Menú lateral'],
@@ -67,7 +68,7 @@ if (!function_exists('usuarios_privilegios_defecto_por_rol')) {
         }
 
         if ($rol === 'recepcionista') {
-            $permisos = ['menu_cotizaciones', 'menu_pacientes', 'menu_estadisticas', 'menu_inventario', 'menu_contabilidad', 'examenes_crear', 'examenes_editar', 'cotizaciones_ver', 'cotizaciones_crear', 'cotizaciones_editar', 'cotizaciones_pagar', 'resultados_comparar'];
+            $permisos = ['menu_cotizaciones', 'menu_cotizador_express', 'menu_pacientes', 'menu_estadisticas', 'menu_inventario', 'menu_contabilidad', 'examenes_crear', 'examenes_editar', 'cotizaciones_ver', 'cotizaciones_crear', 'cotizaciones_editar', 'cotizaciones_pagar', 'resultados_comparar'];
             if ($esSis) {
                 $permisos = array_values(array_diff($permisos, ['menu_contabilidad', 'cotizaciones_pagar']));
             }

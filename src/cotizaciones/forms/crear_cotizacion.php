@@ -596,6 +596,16 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($vals);
 $id_cotizacion = $pdo->lastInsertId();
 
+// Si viene de una cotización express, se marca como convertida (la tabla puede no existir aún).
+$expressId = (int)($_POST['express_id'] ?? 0);
+if ($expressId > 0 && in_array($rol_creador, ['admin', 'recepcionista'], true) && app_database_has_table($pdo, 'cotizaciones_express')) {
+    try {
+        $stmtExp = $pdo->prepare("UPDATE cotizaciones_express SET estado = 'convertida', cliente_id = ?, convertida_cotizacion_id = ?, convertida_en = NOW() WHERE id = ? AND estado = 'emitida'");
+        $stmtExp->execute([$id_cliente, $id_cotizacion, $expressId]);
+    } catch (Throwable $e) {
+        error_log('crear_cotizacion: no se pudo marcar la cotización express como convertida: ' . $e->getMessage());
+    }
+}
 if ($esAtencionSis && app_database_has_table($pdo, 'sis_coberturas')) {
     try {
         $stmtSis = $pdo->prepare("INSERT INTO sis_coberturas (cotizacion_id, cliente_id, numero_afiliacion, numero_autorizacion, numero_fua, estado_validacion, monto_atencion, observaciones, creado_por, creada_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

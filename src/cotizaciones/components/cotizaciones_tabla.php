@@ -699,6 +699,7 @@ function getSeleccionGlobal() {
                     d.filtro_fecha_hasta = $('#filtroFechaHasta').val();
                     d.filtro_alerta = filtroAlertaEstado;
                     d.modo = modoCotizaciones;
+                    d.filtro_deuda = <?= json_encode(($_GET['deuda'] ?? '') === 'sin_atender' ? 'sin_atender' : '') ?>;
                 }
             },
             "pageLength": 3,

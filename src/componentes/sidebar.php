@@ -93,6 +93,12 @@ if (($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_empresas')) && !$esModoS
 if ($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_pacientes')) {
     $agregarItemSidebar($sidebarItems, 'atencion', 'clientes', 'Pacientes', 'bi-person');
 }
+if ($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_cotizador_express')) {
+    $agregarItemSidebar($sidebarItems, 'atencion', 'cotizador_express', 'Cotizador Express', 'bi-lightning-charge');
+    if (!$esModoSisSidebar) {
+        $agregarItemSidebar($sidebarItems, 'atencion', 'cotizador_express_historial', 'Historial Express', 'bi-clock-history');
+    }
+}
 if (($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_convenios')) && !$esModoSisSidebar) {
     $agregarItemSidebar($sidebarItems, 'gestion', 'convenios', 'Convenios', 'bi-person-vcard');
 }

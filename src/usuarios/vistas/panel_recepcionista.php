@@ -10,6 +10,11 @@ $esModoSisRecepcionista = !empty($operacionContextRecepcionista['es_sis']);
         Aquí podrás gestionar tus cotizaciones, clientes<?= $esModoSisRecepcionista ? '' : ' y consultar la contabilidad del día' ?>.
     </div>
     <div class="row g-3">
+        <div class="col-12 d-grid">
+            <a href="dashboard.php?vista=cotizador_express" class="btn btn-warning btn-lg fw-semibold">
+                <i class="bi bi-lightning-charge-fill"></i> Cotizador Express (sin registrar paciente)
+            </a>
+        </div>
         <div class="col-md-4 d-grid">
             <a href="dashboard.php?vista=cotizaciones" class="btn btn-primary btn-lg">
                 <i class="bi bi-file-earmark-text"></i> Mis Cotizaciones

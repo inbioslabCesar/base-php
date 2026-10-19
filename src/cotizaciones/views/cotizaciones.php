@@ -22,6 +22,7 @@ $mostrarBotonAnuladas = ($rolActualCotVista === 'admin');
 
 // Consultas para cotizaciones
 require_once __DIR__ . '/../api/cotizaciones_consultas.php';
+require_once __DIR__ . '/../funciones/deuda_antigua.php';
 
 // Paginación para cards móviles
 //require_once __DIR__ . '/cotizaciones_paginacion.php';
@@ -66,6 +67,13 @@ require_once __DIR__ . '/../api/cotizaciones_consultas.php';
         <div class="alert alert-warning alert-dismissible fade show" role="alert">
             Para registrar una cotización SIS debes ingresar número de afiliación o número de acreditación.
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <?php endif; ?>
+
+    <?php if (($_GET['deuda'] ?? '') === 'sin_atender'): ?>
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+            <span><i class="bi bi-funnel"></i> Mostrando cotizaciones de más de <?= (int)COTIZACIONES_DIAS_SIN_ATENDER ?> días <strong>sin pagos, sin resultados y con muestra pendiente</strong>. Si fueron solo consultas de precio, anúlalas para que dejen de contarse como deuda.</span>
+            <a href="dashboard.php?vista=cotizaciones" class="btn btn-sm btn-outline-dark">Ver todas</a>
         </div>
     <?php endif; ?>
 

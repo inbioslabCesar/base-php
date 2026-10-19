@@ -155,6 +155,27 @@ if ($isEdit) {
 
 $formMsg = trim((string)($_GET['msg'] ?? ''));
 
+// Conversión de una cotización express: precarga los exámenes y cantidades.
+$expressIdPrefill = 0;
+$expressPrefillItems = [];
+if (!$isEdit && !empty($_GET['express_id']) && in_array($rol, ['admin', 'recepcionista'], true)) {
+    try {
+        if (app_database_has_table($pdo, 'cotizaciones_express') && app_database_has_table($pdo, 'cotizaciones_express_items')) {
+            $stmtExp = $pdo->prepare("SELECT id FROM cotizaciones_express WHERE id = ? AND estado = 'emitida' LIMIT 1");
+            $stmtExp->execute([(int)$_GET['express_id']]);
+            if ($stmtExp->fetchColumn()) {
+                $stmtExpIt = $pdo->prepare('SELECT examen_id AS id, cantidad AS cant FROM cotizaciones_express_items WHERE express_id = ? ORDER BY id');
+                $stmtExpIt->execute([(int)$_GET['express_id']]);
+                $expressPrefillItems = array_map(static fn($i) => ['id' => (int)$i['id'], 'cant' => (int)$i['cant']], $stmtExpIt->fetchAll(PDO::FETCH_ASSOC));
+                $expressIdPrefill = (int)$_GET['express_id'];
+            }
+        }
+    } catch (Throwable $e) {
+        $expressIdPrefill = 0;
+        $expressPrefillItems = [];
+    }
+}
+
 try {
     $stmtColsDet = $pdo->query("SHOW COLUMNS FROM cotizaciones_detalle");
     $colsDet = $stmtColsDet ? $stmtColsDet->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -805,6 +826,9 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                         <input type="hidden" name="id_cotizacion" value="<?= htmlspecialchars($cotizacionData['id']) ?>">
                     <?php endif; ?>
                     <input type="hidden" name="id_cliente" value="<?= htmlspecialchars($id_cliente) ?>">
+                    <?php if ($expressIdPrefill > 0): ?>
+                        <input type="hidden" name="express_id" value="<?= (int)$expressIdPrefill ?>">
+                    <?php endif; ?>
                     <input type="hidden" name="descuento_aplicado" id="descuento_aplicado" value="<?= $descuento_empresa_convenio ?: $descuento_cliente ?>">
                     <input type="hidden" name="detalles_json" id="detallesJsonCotizacion" value="[]">
                     <div id="hiddenPayloadCotizacion"></div>
@@ -2211,5 +2235,16 @@ if (!isEdit && Number(examenIdPrefill) > 0) {
     if (agregarExamenPorId(examenIdPrefill, false)) {
         renderizarLista();
     }
+}
+
+const expressPrefillItems = <?= json_encode($expressPrefillItems) ?>;
+if (!isEdit && expressPrefillItems.length) {
+    expressPrefillItems.forEach(function (it) {
+        if (agregarExamenPorId(it.id, false)) {
+            let sel = examenesSeleccionados.find(ex => ex.id == it.id);
+            if (sel) sel.cantidad = Math.max(1, parseInt(it.cant, 10) || 1);
+        }
+    });
+    renderizarLista();
 }
 </script>

@@ -39,6 +39,17 @@ $esModoSisPanelAdmin = !empty($operacionPanelAdmin['es_sis']);
 ?>
 
 <div class="container-fluid mt-4">
+    <div class="card mb-4 shadow-sm border-warning">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h4 class="mb-1"><i class="bi bi-lightning-charge-fill text-warning me-2"></i>Cotizador Express</h4>
+                <span class="text-muted">Cotiza al instante sin registrar al paciente y envíalo por WhatsApp, ticket o PDF.</span>
+            </div>
+            <a href="<?= BASE_URL ?>dashboard.php?vista=cotizador_express" class="btn btn-warning btn-lg fw-semibold">
+                <i class="bi bi-lightning-charge"></i> Cotizar ahora
+            </a>
+        </div>
+    </div>
     <!-- Formulario de búsqueda de paciente -->
     <div class="card mb-4 shadow-sm">
         <div class="card-body">
