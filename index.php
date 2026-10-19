@@ -324,6 +324,13 @@ $shareImageLocalPath = $resolveLocalAbsolutePath($rawShareImage);
 if ($shareImageLocalPath === '') {
     $shareImageLocalPath = $resolveLocalAbsolutePath($sharePreviewDefaultRel);
 }
+// Logos cuadrados/circulares u otras formas: se sirve una versión 1200x630 en caché (sin recortar).
+require_once __DIR__ . '/src/config/share_image.php';
+$shareImageVariant = share_image_social_variant($shareImageLocalPath, __DIR__);
+if ($shareImageVariant) {
+    $shareImage = $toAbsoluteUrl($shareImageVariant['rel']);
+    $shareImageLocalPath = $shareImageVariant['abs'];
+}
 $shareImage = $appendVersionToUrl($shareImage, $shareImageLocalPath);
 
 $pwaBasePath = $siteBasePath;

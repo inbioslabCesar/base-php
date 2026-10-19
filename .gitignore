@@ -22,3 +22,6 @@ vendor.zip
 
 # Legacy image migration backups
 uploads/empresa/_legacy_backup_src_images_empresa_2026_05_20/
+
+# Cache de imagenes para compartir (se regenera automaticamente)
+uploads/empresa/share_cache/

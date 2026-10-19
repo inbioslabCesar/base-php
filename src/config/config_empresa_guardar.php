@@ -624,6 +624,17 @@ $saveSharePreviewUpload = function (string $field) use ($baseDir, $describeUploa
         }
     }
 
+    // Cualquier forma/proporción (cuadrada, circular, vertical...) se ajusta a 1200x630 sin recortar.
+    require_once __DIR__ . '/share_image.php';
+    $dimensions = @getimagesize($tmp);
+    if (is_array($dimensions) && share_image_needs_compose((int)$dimensions[0], (int)$dimensions[1])) {
+        $relativeJpg = $relativeDir . '/share_preview_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.jpg';
+        $destinoJpg = rtrim($baseDir, '\/') . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativeJpg);
+        if (share_image_compose($tmp, $destinoJpg)) {
+            return '../' . ltrim($relativeJpg, '/');
+        }
+    }
+
     if (!move_uploaded_file($tmp, $destino)) {
         $_SESSION['msg'] = 'Error al guardar la imagen de compartido.';
         header('Location: ' . BASE_URL . 'dashboard.php?vista=config_empresa_datos');

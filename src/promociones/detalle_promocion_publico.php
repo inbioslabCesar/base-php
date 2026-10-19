@@ -91,6 +91,19 @@ if ($rawShareImage === '') {
 }
 $shareImage = $toAbsoluteUrl($rawShareImage);
 
+// Logos cuadrados/circulares u otras formas: se sirve una versión 1200x630 en caché (sin recortar).
+require_once dirname(__DIR__, 2) . '/src/config/share_image.php';
+$shareLocalRel = ltrim(preg_replace('#^(\./|\.\./)+#', '', str_replace('\\', '/', $rawShareImage)), '/');
+foreach ([dirname(__DIR__, 2) . '/' . $shareLocalRel, dirname(__DIR__, 2) . '/src/' . $shareLocalRel] as $shareLocalAbs) {
+    if ($shareLocalRel !== '' && !preg_match('~^(https?:)?//~i', $rawShareImage) && is_file($shareLocalAbs)) {
+        $shareVariant = share_image_social_variant($shareLocalAbs, dirname(__DIR__, 2));
+        if ($shareVariant) {
+            $shareImage = $toAbsoluteUrl($shareVariant['rel']) . '?v=' . (int)@filemtime($shareVariant['abs']);
+        }
+        break;
+    }
+}
+
 $fechaInicio = !empty($promo['fecha_inicio']) && strtotime((string)$promo['fecha_inicio'])
     ? date('d/m/Y', strtotime((string)$promo['fecha_inicio']))
     : '';

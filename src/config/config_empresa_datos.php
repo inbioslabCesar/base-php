@@ -515,11 +515,11 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
             <div class="col-12 mb-3">
                 <label for="share_preview_imagen_file" class="form-label">Subir nueva imagen para compartir (recomendado)</label>
                 <input type="file" class="form-control" id="share_preview_imagen_file" name="share_preview_imagen_file" accept="image/png,image/jpeg,image/webp">
-                <div class="form-text">Formato recomendado: 1200x630 px. Al guardar, el sistema reemplaza la imagen de compartido actual.</div>
+                <div class="form-text">Sube tu logo o banner en cualquier forma (cuadrado, circular, horizontal, vertical). Al guardar, el sistema lo ajusta solo a 1200x630 px, sin recortarlo, y reemplaza la imagen de compartido actual.</div>
             </div>
             <div class="col-12 mb-3">
                 <div id="sharePreviewValidation" class="alert alert-secondary py-2 mb-0 small" role="status">
-                    Recomendación: usa 1200x630 px y peso menor a 1 MB para una vista previa estable en WhatsApp.
+                    Puedes subir cualquier forma o tamaño: el sistema lo adapta a 1200x630 px para que se vea completo al compartir en WhatsApp.
                 </div>
             </div>
             <div class="col-12 mb-4">
@@ -530,7 +530,7 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
                                 id="sharePreviewCardImage"
                                 src="<?= htmlspecialchars($sharePreviewFallbackImage, ENT_QUOTES, 'UTF-8') ?>"
                                 alt="Imagen de vista previa"
-                                style="width:100%; height:100%; min-height:190px; object-fit:cover; display:block;"
+                                style="width:100%; height:100%; min-height:190px; object-fit:contain; display:block;"
                             >
                         </div>
                         <div class="col-12 col-md-8">
@@ -800,7 +800,7 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
             return;
         }
         validationBox.textContent = message;
-        validationBox.classList.remove('alert-secondary', 'alert-success', 'alert-warning', 'alert-danger');
+        validationBox.classList.remove('alert-secondary', 'alert-success', 'alert-warning', 'alert-danger', 'alert-info');
         validationBox.classList.add(level || 'alert-secondary');
     }
 
@@ -825,12 +825,13 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
         }
 
         const notes = [];
-        if (!ratioOk) notes.push('proporción no ideal');
-        if (!minOk) notes.push('resolución baja');
-        if (!sizeOk) notes.push('peso alto');
-
-        const level = (!minOk || !sizeOk) ? 'alert-danger' : 'alert-warning';
-        setValidation(base + ' - Ajusta: ' + notes.join(', ') + '. Recomendado 1200x630 y <1 MB.', level);
+        if (!ratioOk) notes.push('proporción distinta a 1200x630');
+        if (!minOk) notes.push('tamaño pequeño');
+        if (ratioOk && minOk) {
+            setValidation(base + ' - Pesa más de 1 MB: se recomienda reducirlo para que WhatsApp lo cargue rápido.', 'alert-warning');
+            return;
+        }
+        setValidation(base + ' - ' + notes.join(' y ') + '. No hay problema: al guardar se ajusta automáticamente a 1200x630 sin recortar tu logo (cuadrado, circular o de cualquier forma).', 'alert-info');
     }
 
     function validateFromCurrentPreview() {
