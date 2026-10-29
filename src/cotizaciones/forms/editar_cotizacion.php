@@ -493,6 +493,23 @@ if (!empty($_POST['id_cotizacion'])) {
     if (!empty($_POST['fecha_toma']) && !empty($_POST['hora_toma'])) {
         $fecha_update = $_POST['fecha_toma'] . ' ' . $_POST['hora_toma'] . ':00';
     }
+
+    // Código prestacional SIS (301-306) y gestante: la edad se evalúa a la fecha de la cotización.
+    $prestacionalSis = null;
+    if ($esAtencionSis) {
+        $fechaRefPrestacional = $fecha_update;
+        if (!$fechaRefPrestacional) {
+            $stmtFechaCot = $pdo->prepare('SELECT fecha FROM cotizaciones WHERE id = ?');
+            $stmtFechaCot->execute([$id_cotizacion]);
+            $fechaRefPrestacional = $stmtFechaCot->fetchColumn() ?: null;
+        }
+        $prestacionalSis = sis_prestacional_preparar($pdo, (int)$id_cliente, $fechaRefPrestacional, $_POST);
+        if (!$prestacionalSis['ok']) {
+            $base = defined('BASE_URL') ? BASE_URL : '../';
+            header("Location: {$base}dashboard.php?vista=form_cotizacion&id={$id_cotizacion}&edit=1&msg=" . $prestacionalSis['error']);
+            exit;
+        }
+    }
     if ($fecha_update) {
         $set = [
             'id_cliente=?',
@@ -631,6 +648,10 @@ if (!empty($_POST['id_cotizacion'])) {
         $params[] = $id_cotizacion;
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+    }
+
+    if ($prestacionalSis) {
+        sis_prestacional_persistir($pdo, $id_cotizacion, $prestacionalSis['datos']);
     }
 
     if ($esAtencionSis && app_database_has_table($pdo, 'sis_coberturas')) {

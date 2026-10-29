@@ -14,6 +14,18 @@ $esModoSisCot = !empty($esModoSis ?? false);
 $empresas = $pdo->query("SELECT id, nombre_comercial, razon_social FROM empresas WHERE estado = 1 ORDER BY nombre_comercial")->fetchAll(\PDO::FETCH_ASSOC);
 $convenios = $pdo->query("SELECT id, nombre FROM convenios ORDER BY nombre")->fetchAll(\PDO::FETCH_ASSOC);
 $currencyCfg = currency_get_config($pdo);
+// Catálogo de códigos prestacionales SIS para los badges del historial (incluye inactivos: el histórico los conserva).
+$sisCatalogoBadges = [];
+if ($esModoSisCot || !empty($operacionContext['es_mixto'] ?? false) || ($modoOperativoActual ?? '') === 'MIXTO') {
+    foreach (sis_prestacional_catalogo($pdo, false) as $filaCat) {
+        $sisCatalogoBadges[(string)$filaCat['codigo']] = [
+            'nombre' => (string)$filaCat['nombre'],
+            'color' => (string)(($filaCat['color'] ?? '') ?: '#6c757d'),
+            'icono_clase' => (string)(($filaCat['icono_clase'] ?? '') ?: 'bi-shield-check'),
+            'icono_url' => sis_prestacional_icono_url($filaCat['icono_ruta'] ?? null),
+        ];
+    }
+}
 ?>
 <?php if ($esModoSisCot): ?>
 <style>
@@ -442,6 +454,35 @@ const puedeEditarCotizaciones = <?= $puedeEditarCotizaciones ? 'true' : 'false' 
 const modoCotizaciones = '<?= $soloAnuladas ? 'anuladas' : 'activas' ?>';
 const soloAnuladas = <?= $soloAnuladas ? 'true' : 'false' ?>;
 const esModoSisCot = <?= $esModoSisCot ? 'true' : 'false' ?>;
+const sisCatalogoBadges = <?= json_encode($sisCatalogoBadges, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_FORCE_OBJECT) ?>;
+
+function escHtmlSis(valor) {
+    return String(valor ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Insignia junto al nombre del paciente: código prestacional SIS y, si aplica, gestación con semanas.
+function renderPrestacionalBadge(row) {
+    const codigo = String(row.codigo_prestacional || '');
+    const gestante = parseInt(row.es_gestante || 0, 10) === 1;
+    if (codigo === '' && !gestante) {
+        return '';
+    }
+    let html = '';
+    if (codigo !== '') {
+        const cfg = sisCatalogoBadges[codigo] || { nombre: '', color: '#6c757d', icono_clase: 'bi-shield-check', icono_url: null };
+        const icono = cfg.icono_url
+            ? `<img src='${escHtmlSis(cfg.icono_url)}' alt='' width='16' height='16' style='background:#fff;border-radius:50%;padding:1px;object-fit:contain;'>`
+            : `<i class='bi ${escHtmlSis(cfg.icono_clase)}'></i>`;
+        html += `<span class='badge ms-1 text-white' style='background-color:${escHtmlSis(cfg.color)};' title='Código prestacional ${escHtmlSis(codigo)}${cfg.nombre ? ' - ' + escHtmlSis(cfg.nombre) : ''}'>${icono} ${escHtmlSis(codigo)}</span>`;
+    }
+    if (gestante) {
+        const sem = row.edad_gestacional_semanas;
+        const dias = parseInt(row.edad_gestacional_dias || 0, 10);
+        const detalle = (sem !== null && sem !== undefined && sem !== '') ? ` ${parseInt(sem, 10)}s${dias > 0 ? '+' + dias + 'd' : ''}` : '';
+        html += `<span class='badge ms-1' style='background-color:#fce4f1;color:#a61e63;' title='Gestante${detalle ? ' - ' + detalle.trim() : ''}'><i class='bi bi-heart-pulse-fill'></i> Gest.${escHtmlSis(detalle)}</span>`;
+    }
+    return html;
+}
 let filtroAlertaEstado = '';
 const formatMoneySafe = (value) => (typeof window.formatMoney === 'function')
     ? window.formatMoney(value)
@@ -722,7 +763,8 @@ function getSeleccionGlobal() {
                 {
                     "data": null,
                     "render": function(data, type, row) {
-                        return `${row.nombre_cliente || ''} ${row.apellido_cliente || ''}`;
+                        const nombreCompleto = `${row.nombre_cliente || ''} ${row.apellido_cliente || ''}`;
+                        return type === 'display' ? nombreCompleto + renderPrestacionalBadge(row) : nombreCompleto;
                     }
                 },
                 { "data": "dni" },
@@ -1273,7 +1315,7 @@ function renderCotizacionCard(row) {
     return `
     <div class='cotizacion-card mb-3'>
         <div class='d-flex justify-content-between align-items-center mb-2'>
-            <span class='cotizacion-nombre'>${row.nombre_cliente || ''} ${row.apellido_cliente || ''}</span>
+            <span class='cotizacion-nombre'>${row.nombre_cliente || ''} ${row.apellido_cliente || ''}${renderPrestacionalBadge(row)}</span>
             <span class='cotizacion-codigo'>${row.codigo_cliente || ''}</span>
         </div>
         <div class='info-item'><span class='info-label'>DNI</span><span class='info-value'>${row.dni || ''}</span></div>

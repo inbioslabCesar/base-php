@@ -36,6 +36,12 @@ function normalizeRefAlertTexts(value) {
 function normalizeRefAlertTextColors(value) {
   return String(value || '').trim();
 }
+function normalizeRefBoolFlag(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value > 0;
+  const txt = String(value || '').trim().toLowerCase();
+  return ['1', 'true', 'si', 'sí', 'yes', 'on'].includes(txt);
+}
 
 function splitRefTextList(value) {
   return String(value || '')
@@ -154,7 +160,7 @@ function syncLegacyAlertVisualEditor(group) {
   hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
 }
 
-function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', sexo = 'cualquiera', edad_min = '', edad_max = '', alerta_modo = REF_ALERT_DEFAULT_MODE, alerta_color = REF_ALERT_DEFAULT_COLOR, alerta_textos = '', alerta_colores_texto = '') {
+function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', sexo = 'cualquiera', edad_min = '', edad_max = '', alerta_modo = REF_ALERT_DEFAULT_MODE, alerta_color = REF_ALERT_DEFAULT_COLOR, alerta_textos = '', alerta_colores_texto = '', mostrar_descripcion_resultado = 0, marcar_anormal = 0) {
   const div = document.createElement('div');
   // Regla unificada: coma para miles y punto para decimales.
   let valorMinStr = valor_min !== '' ? valor_min.toString().replace(/,/g, '') : '';
@@ -165,7 +171,9 @@ function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', s
   const alertColorNorm = normalizeRefAlertColor(alerta_color);
   const alertTextsNorm = normalizeRefAlertTexts(alerta_textos);
   const alertTextColorsNorm = normalizeRefAlertTextColors(alerta_colores_texto);
-  const showAdv = (valorMinStr !== '' || valorMaxStr !== '' || (sexo && sexo !== 'cualquiera') || (edad_min !== '' || edad_max !== '') || alertModeNorm !== REF_ALERT_DEFAULT_MODE || alertColorNorm.toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alertTextsNorm !== '' || alertTextColorsNorm !== '');
+  const showDescResult = String(mostrar_descripcion_resultado) === '1';
+  const markAnormal = String(marcar_anormal) === '1';
+  const showAdv = (valorMinStr !== '' || valorMaxStr !== '' || (sexo && sexo !== 'cualquiera') || (edad_min !== '' || edad_max !== '') || alertModeNorm !== REF_ALERT_DEFAULT_MODE || alertColorNorm.toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alertTextsNorm !== '' || alertTextColorsNorm !== '' || showDescResult || markAnormal);
   div.className = 'valores-ref-group' + (showAdv ? ' show-advanced' : '');
   div.innerHTML = `
     <div class="ref-header">
@@ -220,6 +228,18 @@ function createRefGroup(valor = '', desc = '', valor_min = '', valor_max = '', s
       <div class="field">
         <label class="label-sm">Color alerta</label>
         <input type="color" class="form-control form-control-sm alerta-color-ref" value="${alertColorNorm}">
+      </div>
+      <div class="field" style="min-width:220px; flex: 2 1 220px;">
+        <label class="label-sm mb-0">
+          <input type="checkbox" class="form-check-input me-1 mostrar-descripcion-ref" ${showDescResult ? 'checked' : ''}>
+          Mostrar descripción junto al resultado
+        </label>
+      </div>
+      <div class="field" style="min-width:180px; flex: 1 1 180px;">
+        <label class="label-sm mb-0">
+          <input type="checkbox" class="form-check-input me-1 marcar-anormal-ref" ${markAnormal ? 'checked' : ''}>
+          Marcar anormal
+        </label>
       </div>
       <div class="field" style="min-width:220px; flex: 2 1 220px;">
         <label class="label-sm">Textos alerta (coma)</label>
@@ -286,9 +306,9 @@ function addRow(data = {}) {
   tdRef.setAttribute('data-label', 'Referencia');
   const refList = document.createElement('div');
   refList.className = 'valores-ref-list';
-  const referencias = data.referencias || [{valor:'', desc:'', valor_min:'', valor_max:'', sexo:'cualquiera', edad_min:'', edad_max:'', alerta_modo:REF_ALERT_DEFAULT_MODE, alerta_color:REF_ALERT_DEFAULT_COLOR, alerta_textos:'', alerta_colores_texto:''}];
+  const referencias = data.referencias || [{valor:'', desc:'', valor_min:'', valor_max:'', sexo:'cualquiera', edad_min:'', edad_max:'', alerta_modo:REF_ALERT_DEFAULT_MODE, alerta_color:REF_ALERT_DEFAULT_COLOR, alerta_textos:'', alerta_colores_texto:'', mostrar_descripcion_resultado:0, marcar_anormal:0}];
   referencias.forEach(ref => {
-    refList.appendChild(createRefGroup(ref.valor, ref.desc, ref.valor_min, ref.valor_max, ref.sexo, ref.edad_min, ref.edad_max, ref.alerta_modo, ref.alerta_color, (ref.alerta_textos ?? ref.alert_text_values ?? ref.alerta_valores ?? ''), (ref.alerta_colores_texto ?? ref.alert_text_colors ?? ref.alerta_colores ?? '')));
+    refList.appendChild(createRefGroup(ref.valor, ref.desc, ref.valor_min, ref.valor_max, ref.sexo, ref.edad_min, ref.edad_max, ref.alerta_modo, ref.alerta_color, (ref.alerta_textos ?? ref.alert_text_values ?? ref.alerta_valores ?? ''), (ref.alerta_colores_texto ?? ref.alert_text_colors ?? ref.alerta_colores ?? ''), (ref.mostrar_descripcion_resultado ?? 0), (ref.marcar_anormal ?? 0)));
   });
   const btnAddRef = document.createElement('button');
   btnAddRef.type = 'button';
@@ -1165,8 +1185,10 @@ function addV2DataRow(row = {}) {
           alerta_modo: normalizeRefAlertMode((r && (r.alerta_modo ?? r.alert_mode)) || REF_ALERT_DEFAULT_MODE),
           alerta_color: normalizeRefAlertColor((r && (r.alerta_color ?? r.alert_color)) || REF_ALERT_DEFAULT_COLOR),
           alerta_textos: normalizeRefAlertTexts((r && (r.alerta_textos ?? r.alert_text_values ?? r.alerta_valores)) || ''),
-          alerta_colores_texto: normalizeRefAlertTextColors((r && (r.alerta_colores_texto ?? r.alert_text_colors ?? r.alerta_colores)) || '')
-        })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '')
+          alerta_colores_texto: normalizeRefAlertTextColors((r && (r.alerta_colores_texto ?? r.alert_text_colors ?? r.alerta_colores)) || ''),
+          mostrar_descripcion_resultado: normalizeRefBoolFlag(r && (r.mostrar_descripcion_resultado ?? r.show_result_description)) ? 1 : 0,
+          marcar_anormal: normalizeRefBoolFlag(r && (r.marcar_anormal ?? r.mark_abnormal)) ? 1 : 0
+        })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '' || Number(r.mostrar_descripcion_resultado) === 1 || Number(r.marcar_anormal) === 1)
       : [];
     referenceRanges[c.id] = ranges;
     if (String(c.kind || '').toLowerCase() === 'reference' && ranges.length > 0 && String(cells[c.id] || '').trim() === '') {
@@ -1682,6 +1704,20 @@ function renderV2Rows() {
               <div class="col-5"><input type="hidden" class="v2-ref-alert-texts" value="${normalizeRefAlertTexts(r.alerta_textos || r.alert_text_values || r.alerta_valores || '')}"><div class="small text-muted">Se sincroniza automaticamente desde opciones.</div></div>
             </div>
             <div class="row g-1 mt-1">
+              <div class="col-6">
+                <label class="form-check-label small">
+                  <input type="checkbox" class="form-check-input v2-ref-show-desc" ${normalizeRefBoolFlag(r.mostrar_descripcion_resultado || r.show_result_description) ? 'checked' : ''}>
+                  Mostrar descripción junto al resultado
+                </label>
+              </div>
+              <div class="col-6">
+                <label class="form-check-label small">
+                  <input type="checkbox" class="form-check-input v2-ref-mark-abnormal" ${normalizeRefBoolFlag(r.marcar_anormal || r.mark_abnormal) ? 'checked' : ''}>
+                  Marcar anormal
+                </label>
+              </div>
+            </div>
+            <div class="row g-1 mt-1">
               <div class="col-12"><input type="hidden" class="v2-ref-alert-text-colors" value="${normalizeRefAlertTextColors(r.alerta_colores_texto || r.alert_text_colors || r.alerta_colores || '')}"><div class="v2-ref-alert-text-color-list border rounded p-2 bg-light"></div></div>
             </div>
           </div>`;
@@ -1813,8 +1849,10 @@ function renderV2Rows() {
         alerta_modo: normalizeRefAlertMode(it.querySelector('.v2-ref-alert-mode')?.value || REF_ALERT_DEFAULT_MODE),
         alerta_color: normalizeRefAlertColor(it.querySelector('.v2-ref-alert-color')?.value || REF_ALERT_DEFAULT_COLOR),
         alerta_textos: normalizeRefAlertTexts(it.querySelector('.v2-ref-alert-texts')?.value || ''),
-        alerta_colores_texto: normalizeRefAlertTextColors(it.querySelector('.v2-ref-alert-text-colors')?.value || '')
-      })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '');
+        alerta_colores_texto: normalizeRefAlertTextColors(it.querySelector('.v2-ref-alert-text-colors')?.value || ''),
+        mostrar_descripcion_resultado: it.querySelector('.v2-ref-show-desc')?.checked ? 1 : 0,
+        marcar_anormal: it.querySelector('.v2-ref-mark-abnormal')?.checked ? 1 : 0
+      })).filter(r => r.desc || r.valor || r.valor_min || r.valor_max || r.edad_min || r.edad_max || (r.sexo && r.sexo !== 'cualquiera') || r.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(r.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || r.alerta_textos !== '' || r.alerta_colores_texto !== '' || Number(r.mostrar_descripcion_resultado) === 1 || Number(r.marcar_anormal) === 1);
       if (!row.cells) row.cells = {};
       row.cells[cid] = buildV2ReferenceSummary(row.reference_ranges[cid]);
       renderV2Preview();
@@ -1836,7 +1874,9 @@ function renderV2Rows() {
           alerta_modo: REF_ALERT_DEFAULT_MODE,
           alerta_color: REF_ALERT_DEFAULT_COLOR,
           alerta_textos: '',
-          alerta_colores_texto: ''
+          alerta_colores_texto: '',
+          mostrar_descripcion_resultado: 0,
+          marcar_anormal: 0
         });
         renderV2Rows();
         renderV2Preview();
@@ -2267,8 +2307,10 @@ function buildV2Payload() {
             alerta_modo: normalizeRefAlertMode((rr && (rr.alerta_modo ?? rr.alert_mode)) || REF_ALERT_DEFAULT_MODE),
             alerta_color: normalizeRefAlertColor((rr && (rr.alerta_color ?? rr.alert_color)) || REF_ALERT_DEFAULT_COLOR),
             alerta_textos: normalizeRefAlertTexts((rr && (rr.alerta_textos ?? rr.alert_text_values ?? rr.alerta_valores)) || ''),
-            alerta_colores_texto: normalizeRefAlertTextColors((rr && (rr.alerta_colores_texto ?? rr.alert_text_colors ?? rr.alerta_colores)) || '')
-          })).filter(rr => rr.desc || rr.valor || rr.valor_min || rr.valor_max || rr.edad_min || rr.edad_max || (rr.sexo && rr.sexo !== 'cualquiera') || rr.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(rr.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || rr.alerta_textos !== '' || rr.alerta_colores_texto !== '')
+            alerta_colores_texto: normalizeRefAlertTextColors((rr && (rr.alerta_colores_texto ?? rr.alert_text_colors ?? rr.alerta_colores)) || ''),
+            mostrar_descripcion_resultado: normalizeRefBoolFlag(rr && (rr.mostrar_descripcion_resultado ?? rr.show_result_description)) ? 1 : 0,
+            marcar_anormal: normalizeRefBoolFlag(rr && (rr.marcar_anormal ?? rr.mark_abnormal)) ? 1 : 0
+          })).filter(rr => rr.desc || rr.valor || rr.valor_min || rr.valor_max || rr.edad_min || rr.edad_max || (rr.sexo && rr.sexo !== 'cualquiera') || rr.alerta_modo !== REF_ALERT_DEFAULT_MODE || String(rr.alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || rr.alerta_textos !== '' || rr.alerta_colores_texto !== '' || Number(rr.mostrar_descripcion_resultado) === 1 || Number(rr.marcar_anormal) === 1)
         : [];
       if (ranges.length > 0) {
         outReferenceRanges[c.id] = ranges;
@@ -2661,8 +2703,10 @@ document.getElementById('form-examen').addEventListener('submit', function(e) {
       const alerta_color = normalizeRefAlertColor(refDiv.querySelector('.alerta-color-ref')?.value || REF_ALERT_DEFAULT_COLOR);
       const alerta_textos = normalizeRefAlertTexts(refDiv.querySelector('.alerta-textos-ref')?.value || '');
       const alerta_colores_texto = normalizeRefAlertTextColors(refDiv.querySelector('.alerta-colores-texto-ref')?.value || '');
-      if (valor || desc || valor_min || valor_max || edad_min || edad_max || (sexo && sexo !== 'cualquiera') || alerta_modo !== REF_ALERT_DEFAULT_MODE || String(alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alerta_textos !== '' || alerta_colores_texto !== '') {
-        referencias.push({ valor, desc, valor_min, valor_max, sexo, edad_min, edad_max, alerta_modo, alerta_color, alerta_textos, alerta_colores_texto });
+      const mostrar_descripcion_resultado = refDiv.querySelector('.mostrar-descripcion-ref')?.checked ? 1 : 0;
+      const marcar_anormal = refDiv.querySelector('.marcar-anormal-ref')?.checked ? 1 : 0;
+      if (valor || desc || valor_min || valor_max || edad_min || edad_max || (sexo && sexo !== 'cualquiera') || alerta_modo !== REF_ALERT_DEFAULT_MODE || String(alerta_color || '').toLowerCase() !== REF_ALERT_DEFAULT_COLOR || alerta_textos !== '' || alerta_colores_texto !== '' || mostrar_descripcion_resultado === 1 || marcar_anormal === 1) {
+        referencias.push({ valor, desc, valor_min, valor_max, sexo, edad_min, edad_max, alerta_modo, alerta_color, alerta_textos, alerta_colores_texto, mostrar_descripcion_resultado, marcar_anormal });
       }
     });
     let opciones = tr.children[4].querySelector('.opciones-input').value

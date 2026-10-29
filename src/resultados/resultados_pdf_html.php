@@ -168,10 +168,11 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     };
 
     $sinDecimales = ['R_GLOBULOS_BLANCOS', 'PLAQUETAS'];
-    $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
+    $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad, $resultadoRaw = null) use ($toNullableFloat, $parseNumericExpression): ?array {
         if (empty($referencias)) {
             return null;
         }
+        $candidatas = [];
         foreach ($referencias as $ref) {
             if (!is_array($ref)) {
                 continue;
@@ -185,10 +186,61 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 $edadOk = ($refEdadMin === null || $edad >= $refEdadMin) && ($refEdadMax === null || $edad <= $refEdadMax);
             }
             if ($sexoOk && $edadOk) {
-                return $ref;
+                $candidatas[] = $ref;
             }
         }
-        return is_array($referencias[0] ?? null) ? $referencias[0] : null;
+
+        if (empty($candidatas)) {
+            return null;
+        }
+
+        $resultadoNum = $toNullableFloat($resultadoRaw);
+        $tieneReglasNumericas = false;
+        $referenciasNumericas = [];
+        foreach ($candidatas as $refCand) {
+            $minTmp = isset($refCand['valor_min']) ? $toNullableFloat($refCand['valor_min']) : null;
+            $maxTmp = isset($refCand['valor_max']) ? $toNullableFloat($refCand['valor_max']) : null;
+            if ($minTmp !== null || $maxTmp !== null) {
+                $tieneReglasNumericas = true;
+                $referenciasNumericas[] = $refCand;
+            }
+        }
+        if ($resultadoNum !== null) {
+            $coincidencias = [];
+            foreach ($candidatas as $refCand) {
+                $min = isset($refCand['valor_min']) ? $toNullableFloat($refCand['valor_min']) : null;
+                $max = isset($refCand['valor_max']) ? $toNullableFloat($refCand['valor_max']) : null;
+                if ($min === null && $max === null) {
+                    continue;
+                }
+                $inMin = ($min === null || $resultadoNum >= $min);
+                $inMax = ($max === null || $resultadoNum <= $max);
+                if ($inMin && $inMax) {
+                    $coincidencias[] = ['ref' => $refCand, 'min' => $min, 'max' => $max];
+                }
+            }
+            if (!empty($coincidencias)) {
+                usort($coincidencias, static function ($a, $b) {
+                    $aMin = ($a['min'] === null) ? -INF : (float)$a['min'];
+                    $bMin = ($b['min'] === null) ? -INF : (float)$b['min'];
+                    if ($aMin !== $bMin) {
+                        return ($bMin <=> $aMin);
+                    }
+                    $aMax = ($a['max'] === null) ? INF : (float)$a['max'];
+                    $bMax = ($b['max'] === null) ? INF : (float)$b['max'];
+                    return ($aMax <=> $bMax);
+                });
+                return $coincidencias[0]['ref'];
+            }
+            if ($tieneReglasNumericas) {
+                if (count($referenciasNumericas) === 1) {
+                    return $referenciasNumericas[0];
+                }
+                return null;
+            }
+        }
+
+        return $candidatas[0];
     };
 
     $normalizeText = static function ($value): string {
@@ -372,6 +424,16 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
     $normalizeAlertColor = static function ($color): string {
         $raw = trim((string)$color);
         return preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $raw) ? $raw : '#c62828';
+    };
+    $isTruthyRefFlag = static function ($value): bool {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if (is_numeric($value)) {
+            return ((float)$value) > 0;
+        }
+        $txt = strtolower(trim((string)$value));
+        return in_array($txt, ['1', 'true', 'si', 'sí', 'yes', 'on'], true);
     };
 
     $resolveAlertConfig = static function (array $referencia) use ($normalizeAlertMode, $normalizeAlertColor): array {
@@ -825,11 +887,49 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                         $edadPaciente = isset($paciente['edad']) ? $toNullableFloat($paciente['edad']) : null;
                         $sexoPaciente = isset($paciente['sexo']) ? strtolower(trim((string)$paciente['sexo'])) : '';
                         $fueraRango = false;
+                        $sinReferenciaAplicable = false;
+                        $mostrarDescResultado = false;
+                        $descResultado = '';
+                        $descResultadoColor = '';
+                        $marcarAnormal = false;
                         $alertCfg = ['mode' => 'both', 'color' => '#c62828'];
                         if (!empty($currentReferences)) {
-                            $refAplicada = $seleccionarReferencia($currentReferences, $sexoPaciente, $edadPaciente);
+                            $refAplicada = $seleccionarReferencia($currentReferences, $sexoPaciente, $edadPaciente, $val);
+                            if (!is_array($refAplicada)) {
+                                $hasNumericRules = false;
+                                foreach ($currentReferences as $refTmp) {
+                                    if (!is_array($refTmp)) {
+                                        continue;
+                                    }
+                                    $refSexoTmp = strtolower(trim((string)($refTmp['sexo'] ?? '')));
+                                    $refEdadMinTmp = isset($refTmp['edad_min']) ? $toNullableFloat($refTmp['edad_min']) : null;
+                                    $refEdadMaxTmp = isset($refTmp['edad_max']) ? $toNullableFloat($refTmp['edad_max']) : null;
+                                    $sexoOkTmp = ($refSexoTmp === '' || $refSexoTmp === 'cualquiera' || $refSexoTmp === $sexoPaciente);
+                                    $edadOkTmp = true;
+                                    if ($edadPaciente !== null) {
+                                        $edadOkTmp = ($refEdadMinTmp === null || $edadPaciente >= $refEdadMinTmp)
+                                            && ($refEdadMaxTmp === null || $edadPaciente <= $refEdadMaxTmp);
+                                    }
+                                    if (!$sexoOkTmp || !$edadOkTmp) {
+                                        continue;
+                                    }
+                                    $minTmp = array_key_exists('valor_min', $refTmp) ? $toNullableFloat($refTmp['valor_min']) : null;
+                                    $maxTmp = array_key_exists('valor_max', $refTmp) ? $toNullableFloat($refTmp['valor_max']) : null;
+                                    if ($minTmp !== null || $maxTmp !== null) {
+                                        $hasNumericRules = true;
+                                        break;
+                                    }
+                                }
+                                $resultadoNumericoEvaluable = ($parseNumericExpression((string)$val) !== null) || ($toNullableFloat($val) !== null);
+                                $sinReferenciaAplicable = ($hasNumericRules && $resultadoNumericoEvaluable);
+                            }
                             if (is_array($refAplicada)) {
                                 $alertCfg = $resolveAlertConfig($refAplicada);
+                                $mostrarDescResultado = $isTruthyRefFlag($refAplicada['mostrar_descripcion_resultado'] ?? ($refAplicada['show_result_description'] ?? 0));
+                                $descResultado = trim((string)($refAplicada['desc'] ?? ''));
+                                $rawDescColor = trim((string)($refAplicada['alerta_color'] ?? ($refAplicada['alert_color'] ?? '')));
+                                $descResultadoColor = preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $rawDescColor) ? $rawDescColor : '';
+                                $marcarAnormal = $isTruthyRefFlag($refAplicada['marcar_anormal'] ?? ($refAplicada['mark_abnormal'] ?? 0));
                                 $min = array_key_exists('valor_min', $refAplicada) ? $toNullableFloat($refAplicada['valor_min']) : null;
                                 $max = array_key_exists('valor_max', $refAplicada) ? $toNullableFloat($refAplicada['valor_max']) : null;
                                 $hasNumericRule = ($min !== null || $max !== null);
@@ -862,7 +962,22 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                                     }
                                     }
                                 }
+                                if ($marcarAnormal && !$sinReferenciaAplicable) {
+                                    $fueraRango = true;
+                                }
                             }
+                        }
+                        if ($sinReferenciaAplicable) {
+                            $cellHtml .= '<br><em>Sin referencia aplicable</em>';
+                        }
+                        if (!$sinReferenciaAplicable && $mostrarDescResultado && $descResultado !== '') {
+                            $descHtml = htmlspecialchars($descResultado);
+                            if ($descResultadoColor !== '') {
+                                $descHtml = '<span style="margin-left:6px;color:' . htmlspecialchars($descResultadoColor) . ';font-weight:600;">' . $descHtml . '</span>';
+                            } else {
+                                $descHtml = '<span style="margin-left:6px;font-weight:600;">' . $descHtml . '</span>';
+                            }
+                            $cellHtml .= $descHtml;
                         }
 
                         if ($fueraRango) {
@@ -936,14 +1051,50 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             // Discriminación de referencia por sexo y edad con fallback al primer rango disponible
             $fuera_rango = false;
             $referencia_aplicada = null;
+            $sin_referencia_aplicable = false;
+            $mostrar_desc_resultado = false;
+            $desc_resultado = '';
+            $desc_resultado_color = '';
+            $marcar_anormal = false;
             $alertCfg = ['mode' => 'both', 'color' => '#c62828'];
             $edad_paciente = isset($paciente['edad']) ? floatval($paciente['edad']) : null;
             $sexo_paciente = isset($paciente['sexo']) ? strtolower(trim($paciente['sexo'])) : '';
             if (isset($item['referencias']) && is_array($item['referencias']) && $valorOriginal !== "") {
-                $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente);
+                $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente, $valorOriginal);
+                $hayReglasNumericas = false;
+                foreach ((array)$item['referencias'] as $refTmp) {
+                    if (!is_array($refTmp)) {
+                        continue;
+                    }
+                    $refSexoTmp = strtolower(trim((string)($refTmp['sexo'] ?? '')));
+                    $refEdadMinTmp = isset($refTmp['edad_min']) ? $toNullableFloat($refTmp['edad_min']) : null;
+                    $refEdadMaxTmp = isset($refTmp['edad_max']) ? $toNullableFloat($refTmp['edad_max']) : null;
+                    $sexoOkTmp = ($refSexoTmp === '' || $refSexoTmp === 'cualquiera' || $refSexoTmp === $sexo_paciente);
+                    $edadOkTmp = true;
+                    if ($edad_paciente !== null) {
+                        $edadOkTmp = ($refEdadMinTmp === null || $edad_paciente >= $refEdadMinTmp)
+                            && ($refEdadMaxTmp === null || $edad_paciente <= $refEdadMaxTmp);
+                    }
+                    if (!$sexoOkTmp || !$edadOkTmp) {
+                        continue;
+                    }
+                    $minTmp = isset($refTmp['valor_min']) ? $toNullableFloat($refTmp['valor_min']) : null;
+                    $maxTmp = isset($refTmp['valor_max']) ? $toNullableFloat($refTmp['valor_max']) : null;
+                    if ($minTmp !== null || $maxTmp !== null) {
+                        $hayReglasNumericas = true;
+                        break;
+                    }
+                }
+                $resultadoNumericoEvaluable = ($parseNumericExpression((string)$valorOriginal) !== null) || ($toNullableFloat($valorOriginal) !== null);
+                $sin_referencia_aplicable = ($referencia_aplicada === null && $hayReglasNumericas && $resultadoNumericoEvaluable);
                 $valor_num = $toNullableFloat($valorOriginal);
                 if ($referencia_aplicada) {
                     $alertCfg = $resolveAlertConfig((array)$referencia_aplicada);
+                    $mostrar_desc_resultado = $isTruthyRefFlag($referencia_aplicada['mostrar_descripcion_resultado'] ?? ($referencia_aplicada['show_result_description'] ?? 0));
+                    $desc_resultado = trim((string)($referencia_aplicada['desc'] ?? ''));
+                    $rawDescColor = trim((string)($referencia_aplicada['alerta_color'] ?? ($referencia_aplicada['alert_color'] ?? '')));
+                    $desc_resultado_color = preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $rawDescColor) ? $rawDescColor : '';
+                    $marcar_anormal = $isTruthyRefFlag($referencia_aplicada['marcar_anormal'] ?? ($referencia_aplicada['mark_abnormal'] ?? 0));
                     $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
                     $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
                     $hasNumericRule = ($min !== null || $max !== null);
@@ -976,6 +1127,9 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                             }
                         }
                     }
+                    if ($marcar_anormal && !$sin_referencia_aplicable) {
+                        $fuera_rango = true;
+                    }
                 }
             }
             // Formatear valor para mostrar, respetando decimales configurados
@@ -997,8 +1151,23 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                     $valorFormateado = (string) $valorFormateado;
                 }
             }
+            $valorFormateadoHtml = htmlspecialchars((string)$valorFormateado);
+            if (!$sin_referencia_aplicable && $mostrar_desc_resultado && $desc_resultado !== '') {
+                $descHtml = htmlspecialchars($desc_resultado);
+                if ($desc_resultado_color !== '') {
+                    $descHtml = '<span style="margin-left:6px;color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;">' . $descHtml . '</span>';
+                } else {
+                    $descHtml = '<span style="margin-left:6px;font-weight:600;">' . $descHtml . '</span>';
+                }
+                $valorFormateadoHtml .= $descHtml;
+            }
             if ($fuera_rango && $valorFormateado !== "") {
-                $valorFormateado = $decorateOutOfRangeHtml(htmlspecialchars((string)$valorFormateado), $alertCfg);
+                $valorFormateado = $decorateOutOfRangeHtml($valorFormateadoHtml, $alertCfg);
+            } else {
+                $valorFormateado = $valorFormateadoHtml;
+            }
+            if ($sin_referencia_aplicable) {
+                $refHTML .= '<div><em>Sin referencia aplicable</em></div>';
             }
             if (is_array($valorFormateado)) {
                 foreach ($valorFormateado as $valorSel) {
@@ -1016,9 +1185,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 $html .= '<tr>';
                 $html .= '<td class="prueba" style="font-weight:' . $font_weight . ';font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['prueba']) . '</td>';
                 $html .= '<td class="metodologia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['metodologia'] ?? "") . '</td>';
-                $resultadoHtml = $fuera_rango
-                    ? (string)$valorFormateado
-                    : htmlspecialchars((string)$valorFormateado);
+                $resultadoHtml = (string)$valorFormateado;
                 $html .= '<td class="resultado" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . $resultadoHtml . '</td>';
                 $html .= '<td class="unidades" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . htmlspecialchars($item['unidad'] ?? "") . '</td>';
                 $html .= '<td class="referencia" style="font-style:' . $font_style . ';text-align:' . htmlspecialchars($text_align) . '">' . $refHTML . '</td>';

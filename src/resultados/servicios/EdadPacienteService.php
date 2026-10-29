@@ -71,6 +71,112 @@ class EdadPacienteService
         ];
     }
 
+    private static function tablaTieneColumna(PDO $pdo, string $tabla, string $columna): bool
+    {
+        static $cache = [];
+        $key = $tabla . '.' . $columna;
+        if (!array_key_exists($key, $cache)) {
+            $stmt = $pdo->prepare("SHOW COLUMNS FROM `{$tabla}` LIKE ?");
+            $stmt->execute([$columna]);
+            $cache[$key] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        return $cache[$key];
+    }
+
+    /**
+     * Recalcula el snapshot de edad (edad_paciente_valor/texto) de resultados_examenes con los datos
+     * actuales del paciente, que es lo que lee el PDF.
+     * - $cotizacionId: limita el refresco a una cotización (null = todas las del cliente).
+     * - $respetarValidadas: omite cotizaciones con alguna sección ya validada (histórico emitido).
+     */
+    public static function refrescarSnapshotResultados(PDO $pdo, int $clienteId, ?int $cotizacionId = null, bool $respetarValidadas = true): void
+    {
+        $hasValor = self::tablaTieneColumna($pdo, 'resultados_examenes', 'edad_paciente_valor');
+        $hasTexto = self::tablaTieneColumna($pdo, 'resultados_examenes', 'edad_paciente_texto');
+        if (!$hasValor && !$hasTexto) {
+            return;
+        }
+        $hasEstadoValidacion = self::tablaTieneColumna($pdo, 'resultados_examenes', 'estado_validacion');
+
+        $selValorRef = self::tablaTieneColumna($pdo, 'clientes', 'edad_referida_valor') ? 'edad_referida_valor' : 'NULL AS edad_referida_valor';
+        $selFechaRef = self::tablaTieneColumna($pdo, 'clientes', 'edad_referida_fecha') ? 'edad_referida_fecha' : 'NULL AS edad_referida_fecha';
+        $stmtCli = $pdo->prepare("SELECT fecha_nacimiento, edad, {$selValorRef}, {$selFechaRef} FROM clientes WHERE id = ? LIMIT 1");
+        $stmtCli->execute([$clienteId]);
+        $cli = $stmtCli->fetch(PDO::FETCH_ASSOC);
+        if (!$cli) {
+            return;
+        }
+
+        $selValidacion = $hasEstadoValidacion ? 're.estado_validacion' : "'pendiente' AS estado_validacion";
+        $sql = "SELECT re.id, re.id_cotizacion, re.estado, {$selValidacion}, co.fecha AS cot_fecha, co.fecha_toma AS cot_fecha_toma
+            FROM resultados_examenes re
+            LEFT JOIN cotizaciones co ON co.id = re.id_cotizacion
+            WHERE re.id_cliente = ? AND re.id_cotizacion IS NOT NULL";
+        $params = [$clienteId];
+        if ($cotizacionId !== null) {
+            $sql .= ' AND re.id_cotizacion = ?';
+            $params[] = $cotizacionId;
+        }
+        $stmtRows = $pdo->prepare($sql);
+        $stmtRows->execute($params);
+
+        $porCotizacion = [];
+        foreach ($stmtRows->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $cotId = (int)$row['id_cotizacion'];
+            if (!isset($porCotizacion[$cotId])) {
+                $porCotizacion[$cotId] = ['validada' => false, 'ids' => [], 'fecha' => '', 'fecha_toma' => ''];
+            }
+            if ((string)($row['estado_validacion'] ?? '') === 'validado') {
+                $porCotizacion[$cotId]['validada'] = true;
+            }
+            if ((string)($row['estado'] ?? '') !== 'anulado') {
+                $porCotizacion[$cotId]['ids'][] = (int)$row['id'];
+            }
+            $porCotizacion[$cotId]['fecha'] = (string)($row['cot_fecha'] ?? '');
+            $porCotizacion[$cotId]['fecha_toma'] = trim((string)($row['cot_fecha_toma'] ?? ''));
+        }
+
+        $fallbackEdad = ($cli['edad_referida_valor'] ?? null) !== null && (string)$cli['edad_referida_valor'] !== ''
+            ? (string)$cli['edad_referida_valor']
+            : ($cli['edad'] ?? null);
+
+        foreach ($porCotizacion as $info) {
+            if (empty($info['ids']) || ($respetarValidadas && $info['validada'])) {
+                continue;
+            }
+
+            // Misma fecha de referencia que usa el formulario de resultados.
+            if ($info['fecha_toma'] !== '') {
+                $fechaRef = $info['fecha_toma'] . ' 00:00:00';
+            } elseif ($info['fecha'] !== '') {
+                $fechaRef = $info['fecha'];
+            } else {
+                $fechaRef = (new DateTimeImmutable('now', new DateTimeZone(self::TZ)))->format('Y-m-d H:i:s');
+            }
+
+            $edad = self::resolverEdadParaEvento(
+                $cli['fecha_nacimiento'] ?? null,
+                $fechaRef,
+                $fallbackEdad,
+                $cli['edad_referida_fecha'] ?? null
+            );
+
+            $sets = [];
+            $paramsUpd = [];
+            if ($hasValor) {
+                $sets[] = 'edad_paciente_valor = ?';
+                $paramsUpd[] = $edad['edad_valor'];
+            }
+            if ($hasTexto) {
+                $sets[] = 'edad_paciente_texto = ?';
+                $paramsUpd[] = $edad['edad_texto'];
+            }
+            $placeholders = implode(',', array_fill(0, count($info['ids']), '?'));
+            $stmtUpd = $pdo->prepare('UPDATE resultados_examenes SET ' . implode(', ', $sets) . " WHERE id IN ({$placeholders})");
+            $stmtUpd->execute(array_merge($paramsUpd, $info['ids']));
+        }
+    }
+
     public static function convertirEdadTextoADecimal($rawEdad): ?float
     {
         $fallback = self::parseLegacyEdad($rawEdad);

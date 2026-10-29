@@ -496,6 +496,17 @@ if (!empty($_POST['fecha_toma']) && !empty($_POST['hora_toma'])) {
     date_default_timezone_set('America/Lima');
     $fecha = date('Y-m-d H:i:s');
 }
+
+// Código prestacional SIS (301-306) y datos de gestante; se valida antes de crear la cotización.
+$prestacionalSis = null;
+if ($esAtencionSis) {
+    $prestacionalSis = sis_prestacional_preparar($pdo, (int)$id_cliente, $fecha, $_POST);
+    if (!$prestacionalSis['ok']) {
+        $base = defined('BASE_URL') ? BASE_URL : '../';
+        header("Location: {$base}dashboard.php?vista=form_cotizacion&id=" . (int)$id_cliente . "&msg=" . $prestacionalSis['error']);
+        exit;
+    }
+}
 $cols = [
     'codigo','id_cliente','id_empresa','id_convenio','tipo_usuario','fecha','total','total_bruto','estado_pago','emitir_comprobante','creado_por','rol_creador','tipo_toma','fecha_toma','hora_toma','direccion_toma','descuento_aplicado'
 ];
@@ -595,6 +606,10 @@ $sql = 'INSERT INTO cotizaciones (' . implode(',', $cols) . ') VALUES (' . $plac
 $stmt = $pdo->prepare($sql);
 $stmt->execute($vals);
 $id_cotizacion = $pdo->lastInsertId();
+
+if ($prestacionalSis) {
+    sis_prestacional_persistir($pdo, (int)$id_cotizacion, $prestacionalSis['datos']);
+}
 
 // Si viene de una cotización express, se marca como convertida (la tabla puede no existir aún).
 $expressId = (int)($_POST['express_id'] ?? 0);

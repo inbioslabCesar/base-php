@@ -155,6 +155,36 @@ if ($isEdit) {
 
 $formMsg = trim((string)($_GET['msg'] ?? ''));
 
+// Código prestacional SIS (301-306) y gestante: datos para la vista previa del formulario.
+$prestacionalCatalogo = [];
+$prestacionalEdadMeses = null;
+$esGestanteValor = false;
+$gestSemanasValor = '';
+$gestDiasValor = '';
+$gestFppValor = '';
+if ($mostrarCoberturaSis && !empty($id_cliente)) {
+    foreach (sis_prestacional_catalogo($pdo, true) as $filaCat) {
+        $prestacionalCatalogo[] = [
+            'codigo' => (string)$filaCat['codigo'],
+            'nombre' => (string)$filaCat['nombre'],
+            'tipo' => (string)$filaCat['tipo_regla'],
+            'min' => $filaCat['edad_min_meses'] !== null ? (int)$filaCat['edad_min_meses'] : 0,
+            'max' => $filaCat['edad_max_meses'] !== null ? (int)$filaCat['edad_max_meses'] : null,
+            'color' => (string)(($filaCat['color'] ?? '') ?: '#6c757d'),
+            'icono_clase' => (string)(($filaCat['icono_clase'] ?? '') ?: 'bi-shield-check'),
+            'icono_url' => sis_prestacional_icono_url($filaCat['icono_ruta'] ?? null),
+        ];
+    }
+    $prestacionalEdadMeses = sis_prestacional_edad_meses($pdo, (int)$id_cliente, $isEdit ? ($cotizacionData['fecha'] ?? null) : null);
+    if ($isEdit && !empty($cotizacionData['es_gestante'])) {
+        $esGestanteValor = true;
+        $gestSemanasValor = (string)($cotizacionData['edad_gestacional_semanas'] ?? '');
+        $gestDiasValor = (string)($cotizacionData['edad_gestacional_dias'] ?? '');
+        $gestFppValor = (string)($cotizacionData['fpp'] ?? '');
+    }
+}
+$prestacionalColumnasListas = sis_prestacional_columnas_ok($pdo);
+
 // Conversión de una cotización express: precarga los exámenes y cantidades.
 $expressIdPrefill = 0;
 $expressPrefillItems = [];
@@ -809,6 +839,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                         Debes ingresar número de afiliación o número de acreditación para registrar una cotización SIS.
                     </div>
                 <?php endif; ?>
+                <?php if ($formMsg === 'gestacion_invalida'): ?>
+                    <div class="alert alert-warning" role="alert">
+                        Para una gestante debes indicar edad gestacional (1 a 42 semanas, 0 a 6 días) y una fecha probable de parto (FPP) válida.
+                    </div>
+                <?php endif; ?>
                 <?php if ($formMsg === 'profesional_solicitante_requerido'): ?>
                     <div class="alert alert-warning" role="alert">
                         Debes seleccionar el profesional solicitante asociado al servicio para continuar.
@@ -1086,6 +1121,43 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
                                         <small class="text-muted d-block mt-2">Requiere al menos número de afiliación o autorización. La atención se registrará con monto S/ 0.00.</small>
                                     </div>
                                 </div>
+
+                                <div class="col-12 mb-3" id="sisPrestacionalWrap">
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-md-4">
+                                            <label class="form-label-modern d-block">
+                                                <i class="bi bi-tags"></i>
+                                                Código prestacional (curso de vida)
+                                            </label>
+                                            <div id="sisCodigoPrestacionalPreview" class="sis-prestacional-preview"></div>
+                                            <small class="text-muted d-block mt-1" id="sisCodigoPrestacionalHint"></small>
+                                            <?php if (!$prestacionalColumnasListas): ?>
+                                                <small class="text-danger d-block mt-1">Falta aplicar la migración de códigos prestacionales: el código no se guardará.</small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="esGestante" name="es_gestante" value="1" <?= $esGestanteValor ? 'checked' : '' ?>>
+                                                <label class="form-check-label" for="esGestante">Es gestante</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2 sis-gestante-field">
+                                            <label for="edadGestacionalSemanas" class="form-label-modern">Semanas</label>
+                                            <input type="number" id="edadGestacionalSemanas" name="edad_gestacional_semanas" class="form-control form-control-modern" min="1" max="42" step="1" value="<?= htmlspecialchars($gestSemanasValor) ?>">
+                                            <div class="invalid-feedback">1 a 42.</div>
+                                        </div>
+                                        <div class="col-md-2 sis-gestante-field">
+                                            <label for="edadGestacionalDias" class="form-label-modern">Días</label>
+                                            <input type="number" id="edadGestacionalDias" name="edad_gestacional_dias" class="form-control form-control-modern" min="0" max="6" step="1" value="<?= htmlspecialchars($gestDiasValor !== '' ? $gestDiasValor : '0') ?>">
+                                            <div class="invalid-feedback">0 a 6.</div>
+                                        </div>
+                                        <div class="col-md-2 sis-gestante-field">
+                                            <label for="fppGestante" class="form-label-modern">FPP</label>
+                                            <input type="date" id="fppGestante" name="fpp" class="form-control form-control-modern" value="<?= htmlspecialchars($gestFppValor) ?>">
+                                            <div class="invalid-feedback">Obligatoria.</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         <?php endif; ?>
                     <?php endif; ?>
@@ -1245,6 +1317,11 @@ if ($rol === 'empresa' && !empty($_SESSION['empresa_id'])) {
         </div>
     </div>
 </div>
+<style>
+.sis-prestacional-preview .sis-cod-badge { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .75rem; border-radius: 999px; color: #fff; font-weight: 600; }
+.sis-prestacional-preview .sis-cod-badge img { background: #fff; border-radius: 50%; padding: 2px; }
+.sis-prestacional-preview .sis-cod-vacio { color: #6c757d; font-style: italic; }
+</style>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 var rolUsuario = '<?= $rol ?>';
@@ -1260,6 +1337,8 @@ let isEdit = <?= $isEdit ? 'true' : 'false' ?>;
 let hasDetalleReferenciadoCols = <?= $hasDetalleReferenciadoCols ? 'true' : 'false' ?>;
 const sisForzadoEnSistema = <?= $sisForzado ? 'true' : 'false' ?>;
 const sisCotizacionInicial = <?= $sisCotizacionExistente ? 'true' : 'false' ?>;
+const sisCatalogoPrestacional = <?= json_encode($prestacionalCatalogo, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+const sisEdadMesesPaciente = <?= $prestacionalEdadMeses === null ? 'null' : (int)$prestacionalEdadMeses ?>;
 const formCurrencyConfig = <?= json_encode($currencyCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 const servicioProfesionalesMap = <?= json_encode($servicioProfesionalesMap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 const profesionalSolicitanteInicial = <?= (int)$profesionalSolicitanteSeleccionado ?>;
@@ -1389,6 +1468,71 @@ function showCotizacionFormError(message) {
 
 function clearSisCoverageValidation() {
     $('#sisNumeroAfiliacion, #sisNumeroAutorizacion').removeClass('is-invalid');
+}
+
+// Vista previa del código prestacional; el servidor lo recalcula al guardar.
+function resolverCodigoPrestacionalPreview(esGestante) {
+    const catalogo = Array.isArray(sisCatalogoPrestacional) ? sisCatalogoPrestacional : [];
+    if (esGestante) {
+        const gest = catalogo.find((c) => c.tipo === 'GESTANTE');
+        if (gest) {
+            return gest;
+        }
+    }
+    if (sisEdadMesesPaciente === null) {
+        return null;
+    }
+    return catalogo.find((c) => c.tipo === 'EDAD' && sisEdadMesesPaciente >= c.min && (c.max === null || sisEdadMesesPaciente <= c.max)) || null;
+}
+
+function renderCodigoPrestacionalPreview() {
+    const $preview = $('#sisCodigoPrestacionalPreview');
+    if ($preview.length === 0) {
+        return;
+    }
+    const esGestante = $('#esGestante').is(':checked');
+    const cod = resolverCodigoPrestacionalPreview(esGestante);
+    $preview.empty();
+    if (!cod) {
+        $preview.append($('<span class="sis-cod-vacio"></span>').text('Sin código: falta fecha de nacimiento/edad del paciente'));
+        $('#sisCodigoPrestacionalHint').text('');
+        return;
+    }
+    const $badge = $('<span class="sis-cod-badge"></span>').css('background-color', cod.color);
+    if (cod.icono_url) {
+        $badge.append($('<img alt="" width="22" height="22">').attr('src', cod.icono_url));
+    } else {
+        $badge.append($('<i class="bi"></i>').addClass(cod.icono_clase));
+    }
+    $badge.append($('<span></span>').text(cod.codigo + ' · ' + cod.nombre));
+    $preview.append($badge);
+    $('#sisCodigoPrestacionalHint').text(esGestante ? 'Gestante: se asigna este código sin importar la edad.' : 'Asignado según la edad del paciente.');
+}
+
+function syncGestanteFields() {
+    const sisEnabled = isSisActive();
+    const esGestante = sisEnabled && $('#esGestante').is(':checked');
+    $('#esGestante').prop('disabled', !sisEnabled);
+    $('.sis-gestante-field').toggleClass('d-none', !esGestante);
+    $('#edadGestacionalSemanas, #edadGestacionalDias, #fppGestante').prop('disabled', !esGestante).prop('required', esGestante).removeClass('is-invalid');
+    renderCodigoPrestacionalPreview();
+}
+
+function validateGestanteRequirement() {
+    if (!isSisActive() || !$('#esGestante').is(':checked')) {
+        return true;
+    }
+    const semanas = parseInt($('#edadGestacionalSemanas').val() || '', 10);
+    const diasRaw = ($('#edadGestacionalDias').val() || '').toString().trim();
+    const dias = diasRaw === '' ? 0 : parseInt(diasRaw, 10);
+    const fpp = ($('#fppGestante').val() || '').toString().trim();
+    const semanasOk = Number.isInteger(semanas) && semanas >= 1 && semanas <= 42;
+    const diasOk = Number.isInteger(dias) && dias >= 0 && dias <= 6;
+    const fppOk = fpp !== '';
+    $('#edadGestacionalSemanas').toggleClass('is-invalid', !semanasOk);
+    $('#edadGestacionalDias').toggleClass('is-invalid', !diasOk);
+    $('#fppGestante').toggleClass('is-invalid', !fppOk);
+    return semanasOk && diasOk && fppOk;
 }
 
 function clearProfessionalValidation() {
@@ -1525,6 +1669,12 @@ $('#formCotizacion').on('submit', function(e) {
         } catch (err) {
             // noop
         }
+        return false;
+    }
+
+    if (!validateGestanteRequirement()) {
+        e.preventDefault();
+        showCotizacionFormError('Para una gestante debes indicar edad gestacional (1 a 42 semanas, 0 a 6 días) y la fecha probable de parto (FPP).');
         return false;
     }
 
@@ -1728,7 +1878,9 @@ function syncSisFields() {
     if (sisCheckbox.length) {
         $('#sisFieldAfiliacionWrap, #sisFieldAutorizacionWrap, #sisFieldFuaWrap, #sisFieldObsWrap').toggleClass('d-none', !sisEnabled);
         $('#sisNumeroAfiliacion, #sisNumeroAutorizacion, #sisNumeroFua, #sisObservaciones').prop('disabled', !sisEnabled);
+        $('#sisPrestacionalWrap').toggleClass('d-none', !sisEnabled);
     }
+    syncGestanteFields();
 
     // Si la atencion es SIS, no exigir tipo de cliente manual.
     if (sisEnabled && $('#tipoCliente').length) {
@@ -1757,6 +1909,7 @@ function syncSisFields() {
 }
 
 $('#esSis').on('change', syncSisFields);
+$('#esGestante').on('change', syncGestanteFields);
 
 // Inicializar visibilidad al cargar
 $(document).ready(function() {

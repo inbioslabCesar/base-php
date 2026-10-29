@@ -110,6 +110,9 @@ if ($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_examenes')) {
 }
 if ($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_estadisticas')) {
     $agregarItemSidebar($sidebarItems, 'control', 'estadisticas', 'Estadistica', 'bi-bar-chart');
+    if ($esModoSisSidebar) {
+        $agregarItemSidebar($sidebarItems, 'control', 'estadisticas_sis', 'Estadistica SIS', 'bi-shield-check');
+    }
     $agregarItemSidebar($sidebarItems, 'control', 'offline_monitor', 'Monitoreo Offline', 'bi-wifi-off');
 }
 if ($_SESSION['rol'] == 'admin' || $puedeSidebar('menu_inventario')) {

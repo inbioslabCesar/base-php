@@ -170,6 +170,12 @@ function validarCampoConReferencias(target) {
     const raw = String(color || '').trim();
     return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : '#c62828';
   };
+  const isTruthyRefFlag = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value > 0;
+    const t = String(value ?? '').trim().toLowerCase();
+    return ['1', 'true', 'si', 'sí', 'yes', 'on'].includes(t);
+  };
 
   const ensureAsteriskMarker = (el, show, color) => {
     if (!el || !el.parentNode) return;
@@ -211,6 +217,30 @@ function validarCampoConReferencias(target) {
     el.style.color = color;
     el.style.boxShadow = `0 0 0 0.2rem ${color}33`;
   };
+  const ensureDescriptionMarker = (el, text, color) => {
+    if (!el || !el.parentNode) return;
+    let marker = null;
+    const siblings = Array.from(el.parentNode.querySelectorAll('.result-reference-desc'));
+    if (siblings.length > 0) {
+      marker = siblings[0];
+    }
+    if (!marker && text) {
+      marker = document.createElement('span');
+      marker.className = 'result-reference-desc';
+      marker.style.marginLeft = '8px';
+      marker.style.fontWeight = '600';
+      el.insertAdjacentElement('afterend', marker);
+    }
+    if (marker) {
+      if (text) {
+        marker.textContent = text;
+        marker.style.display = 'inline';
+        marker.style.color = color || '';
+      } else {
+        marker.style.display = 'none';
+      }
+    }
+  };
 
   let referencias = [];
   try {
@@ -219,21 +249,78 @@ function validarCampoConReferencias(target) {
   } catch (err) {
     referencias = [];
   }
+  const targetTextRaw = String(target.value ?? '').trim();
   const edad = parseNullableFloat(document.getElementById('edad-paciente')?.value ?? target.getAttribute('data-edad'));
   const sexo = (document.getElementById('sexo-paciente')?.value ?? target.getAttribute('data-sexo') ?? '').toLowerCase();
   let referencia_aplicada = null;
+  let sinReferenciaAplicable = false;
 
   if (referencias.length > 0) {
+    const candidatas = [];
     referencias.forEach(ref => {
       const ref_sexo = (ref.sexo || '').toLowerCase();
       const ref_edad_min = parseNullableFloat(ref.edad_min);
       const ref_edad_max = parseNullableFloat(ref.edad_max);
       const sexo_match = (ref_sexo === '' || ref_sexo === 'cualquiera' || ref_sexo === sexo);
       const edad_match = (edad === null) || ((ref_edad_min === null || edad >= ref_edad_min) && (ref_edad_max === null || edad <= ref_edad_max));
-      if (sexo_match && edad_match && !referencia_aplicada) referencia_aplicada = ref;
+      if (sexo_match && edad_match) candidatas.push(ref);
     });
-    if (!referencia_aplicada && referencias.length > 0) {
-      referencia_aplicada = referencias[0];
+
+    if (candidatas.length > 0) {
+      const numericRangeRefs = candidatas.filter((ref) => {
+        const min = parseNullableFloat(ref.valor_min);
+        const max = parseNullableFloat(ref.valor_max);
+        return (min !== null || max !== null);
+      });
+      const hasNumericRanges = numericRangeRefs.length > 0;
+      if (targetTextRaw !== '') {
+        const coincidencias = [];
+        for (const ref of candidatas) {
+          const min = parseNullableFloat(ref.valor_min);
+          const max = parseNullableFloat(ref.valor_max);
+          if (min === null && max === null) {
+            continue;
+          }
+          const numericStatus = evaluateNumericExpressionAgainstRange(targetTextRaw, min, max);
+          if (numericStatus === 'in') {
+            coincidencias.push({ ref, min, max });
+            continue;
+          }
+          if (numericStatus === null) {
+            const valorNum = parseNullableFloat(targetTextRaw);
+            if (valorNum !== null) {
+              const inMin = (min === null || valorNum >= min);
+              const inMax = (max === null || valorNum <= max);
+              if (inMin && inMax) {
+                coincidencias.push({ ref, min, max });
+              }
+            }
+          }
+        }
+        if (coincidencias.length > 0) {
+          coincidencias.sort((a, b) => {
+            const aMin = Number.isFinite(a.min) ? a.min : -Infinity;
+            const bMin = Number.isFinite(b.min) ? b.min : -Infinity;
+            if (aMin !== bMin) return bMin - aMin;
+            const aMax = Number.isFinite(a.max) ? a.max : Infinity;
+            const bMax = Number.isFinite(b.max) ? b.max : Infinity;
+            return aMax - bMax;
+          });
+          referencia_aplicada = coincidencias[0].ref;
+        }
+        const hasNumericInput = (parseNumericExpression(targetTextRaw) !== null) || (parseNullableFloat(targetTextRaw) !== null);
+        if (!referencia_aplicada && hasNumericRanges && hasNumericInput) {
+          if (numericRangeRefs.length === 1) {
+            referencia_aplicada = numericRangeRefs[0];
+          } else {
+            sinReferenciaAplicable = true;
+          }
+        }
+      }
+
+      if (!referencia_aplicada && !sinReferenciaAplicable) {
+        referencia_aplicada = candidatas[0];
+      }
     }
   }
 
@@ -244,11 +331,23 @@ function validarCampoConReferencias(target) {
   let alertMode = 'both';
   let alertColor = '#c62828';
   let valor = parseNullableFloat(target.value);
-  const targetTextRaw = String(target.value ?? '').trim();
-
+  let showDescription = false;
+  let descriptionText = '';
+  let descriptionColor = '';
+  let forceAbnormal = false;
+  if (sinReferenciaAplicable) {
+    target.dataset.referenceStatus = 'sin_referencia_aplicable';
+  } else {
+    delete target.dataset.referenceStatus;
+  }
   if (referencia_aplicada && targetTextRaw !== '') {
     alertMode = normalizeAlertMode(referencia_aplicada.alerta_modo ?? referencia_aplicada.alert_mode ?? 'both');
     alertColor = normalizeAlertColor(referencia_aplicada.alerta_color ?? referencia_aplicada.alert_color ?? '#c62828');
+    showDescription = isTruthyRefFlag(referencia_aplicada.mostrar_descripcion_resultado ?? referencia_aplicada.show_result_description ?? 0) && !sinReferenciaAplicable;
+    descriptionText = String(referencia_aplicada.desc ?? '').trim();
+    const rawDescColor = String(referencia_aplicada.alerta_color ?? referencia_aplicada.alert_color ?? '').trim();
+    descriptionColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(rawDescColor) ? rawDescColor : '';
+    forceAbnormal = isTruthyRefFlag(referencia_aplicada.marcar_anormal ?? referencia_aplicada.mark_abnormal ?? 0);
     const min = parseNullableFloat(referencia_aplicada.valor_min);
     const max = parseNullableFloat(referencia_aplicada.valor_max);
     const hasNumericRule = (min !== null || max !== null);
@@ -303,6 +402,9 @@ function validarCampoConReferencias(target) {
       }
       }
     }
+    if (forceAbnormal && !sinReferenciaAplicable) {
+      fuera_rango = true;
+    }
   }
   const showColor = fuera_rango && (alertMode === 'color' || alertMode === 'both');
   const showAsterisk = fuera_rango && (alertMode === 'asterisk' || alertMode === 'both');
@@ -318,6 +420,7 @@ function validarCampoConReferencias(target) {
     clearAlertStyles(target);
   }
   ensureAsteriskMarker(target, showAsterisk, alertColor);
+  ensureDescriptionMarker(target, (showDescription && descriptionText !== '' && !sinReferenciaAplicable) ? descriptionText : '', descriptionColor);
 }
 
 document.addEventListener('input', function(e) {

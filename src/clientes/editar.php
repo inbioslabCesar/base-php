@@ -370,6 +370,13 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
 
+    try {
+        // Solo cotizaciones sin secciones validadas; las emitidas quedan como histórico.
+        EdadPacienteService::refrescarSnapshotResultados($pdo, (int)$id);
+    } catch (Throwable $e) {
+        error_log('No se pudo refrescar la edad en resultados pendientes: ' . $e->getMessage());
+    }
+
     if ($operationId !== '') {
         $stmtOk = $pdo->prepare("UPDATE clientes_sync_operaciones SET estado = 'aplicado', cliente_id = ? WHERE operation_id = ?");
         $stmtOk->execute([(int)$id, $operationId]);

@@ -998,10 +998,33 @@ class ExamCardView {
                             return null;
                         };
 
-                        $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad) use ($toNullableFloat): ?array {
+                        $matchSexoEdad = static function (array $ref, string $sexo, ?float $edad) use ($toNullableFloat): bool {
+                            $refSexo = strtolower(trim((string)($ref['sexo'] ?? '')));
+                            $refEdadMin = isset($ref['edad_min']) ? $toNullableFloat($ref['edad_min']) : null;
+                            $refEdadMax = isset($ref['edad_max']) ? $toNullableFloat($ref['edad_max']) : null;
+                            $sexoOk = ($refSexo === '' || $refSexo === 'cualquiera' || $refSexo === $sexo);
+                            $edadOk = true;
+                            if ($edad !== null) {
+                                $edadOk = ($refEdadMin === null || $edad >= $refEdadMin) && ($refEdadMax === null || $edad <= $refEdadMax);
+                            }
+                            return $sexoOk && $edadOk;
+                        };
+                        $isTruthyRefFlag = static function ($value): bool {
+                            if (is_bool($value)) {
+                                return $value;
+                            }
+                            if (is_numeric($value)) {
+                                return ((float)$value) > 0;
+                            }
+                            $txt = strtolower(trim((string)$value));
+                            return in_array($txt, ['1', 'true', 'si', 'sí', 'yes', 'on'], true);
+                        };
+
+                        $seleccionarReferencia = static function (array $referencias, string $sexo, ?float $edad, $resultadoRaw = null) use ($toNullableFloat, $parseNumericExpression, $evaluateNumericExpressionAgainstRange): ?array {
                             if (empty($referencias)) {
                                 return null;
                             }
+                            $candidatas = [];
                             foreach ($referencias as $ref) {
                                 if (!is_array($ref)) {
                                     continue;
@@ -1015,16 +1038,97 @@ class ExamCardView {
                                     $edadOk = ($refEdadMin === null || $edad >= $refEdadMin) && ($refEdadMax === null || $edad <= $refEdadMax);
                                 }
                                 if ($sexoOk && $edadOk) {
-                                    return $ref;
+                                    $candidatas[] = $ref;
                                 }
                             }
-                            return is_array($referencias[0] ?? null) ? $referencias[0] : null;
+
+                            if (empty($candidatas)) {
+                                return null;
+                            }
+
+                            $resultadoTxt = trim((string)$resultadoRaw);
+                            $tieneReglasNumericas = false;
+                            $referenciasNumericas = [];
+                            foreach ($candidatas as $refCand) {
+                                $minTmp = isset($refCand['valor_min']) ? $toNullableFloat($refCand['valor_min']) : null;
+                                $maxTmp = isset($refCand['valor_max']) ? $toNullableFloat($refCand['valor_max']) : null;
+                                if ($minTmp !== null || $maxTmp !== null) {
+                                    $tieneReglasNumericas = true;
+                                    $referenciasNumericas[] = $refCand;
+                                }
+                            }
+
+                            if ($resultadoTxt !== '') {
+                                $coincidencias = [];
+                                foreach ($candidatas as $refCand) {
+                                    $min = isset($refCand['valor_min']) ? $toNullableFloat($refCand['valor_min']) : null;
+                                    $max = isset($refCand['valor_max']) ? $toNullableFloat($refCand['valor_max']) : null;
+                                    if ($min === null && $max === null) {
+                                        continue;
+                                    }
+                                    $numericStatus = $evaluateNumericExpressionAgainstRange($resultadoTxt, $min, $max);
+                                    if ($numericStatus === 'in') {
+                                        $coincidencias[] = ['ref' => $refCand, 'min' => $min, 'max' => $max];
+                                        continue;
+                                    }
+                                    if ($numericStatus === null) {
+                                        $valorNum = $toNullableFloat($resultadoTxt);
+                                        if ($valorNum !== null) {
+                                            $inMin = ($min === null || $valorNum >= $min);
+                                            $inMax = ($max === null || $valorNum <= $max);
+                                            if ($inMin && $inMax) {
+                                                $coincidencias[] = ['ref' => $refCand, 'min' => $min, 'max' => $max];
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!empty($coincidencias)) {
+                                    usort($coincidencias, static function ($a, $b) {
+                                        $aMin = ($a['min'] === null) ? -INF : (float)$a['min'];
+                                        $bMin = ($b['min'] === null) ? -INF : (float)$b['min'];
+                                        if ($aMin !== $bMin) {
+                                            return ($bMin <=> $aMin);
+                                        }
+                                        $aMax = ($a['max'] === null) ? INF : (float)$a['max'];
+                                        $bMax = ($b['max'] === null) ? INF : (float)$b['max'];
+                                        return ($aMax <=> $bMax);
+                                    });
+                                    return $coincidencias[0]['ref'];
+                                }
+
+                                $resultadoNumericoEvaluable = ($parseNumericExpression($resultadoTxt) !== null) || ($toNullableFloat($resultadoTxt) !== null);
+                                if ($tieneReglasNumericas && $resultadoNumericoEvaluable) {
+                                    if (count($referenciasNumericas) === 1) {
+                                        return $referenciasNumericas[0];
+                                    }
+                                    return null;
+                                }
+                            }
+
+                            return $candidatas[0];
                         };
 
                         $referencia_aplicada = null;
+                        $sin_referencia_aplicable = false;
                         $aplicada_idx = null;
+                        $valor_resultado = $getResultado($item['nombre'], '', $item);
                         if (!empty($item['referencias'])) {
-                            $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente);
+                            $referencia_aplicada = $seleccionarReferencia((array)$item['referencias'], $sexo_paciente, $edad_paciente, $valor_resultado);
+                            $hayReglasNumericas = false;
+                            foreach ((array)$item['referencias'] as $refTmp) {
+                                if (!is_array($refTmp) || !$matchSexoEdad($refTmp, $sexo_paciente, $edad_paciente)) {
+                                    continue;
+                                }
+                                $minTmp = isset($refTmp['valor_min']) ? $toNullableFloat($refTmp['valor_min']) : null;
+                                $maxTmp = isset($refTmp['valor_max']) ? $toNullableFloat($refTmp['valor_max']) : null;
+                                if ($minTmp !== null || $maxTmp !== null) {
+                                    $hayReglasNumericas = true;
+                                    break;
+                                }
+                            }
+                            $resultadoTxt = trim((string)$valor_resultado);
+                            $resultadoNumericoEvaluable = ($parseNumericExpression($resultadoTxt) !== null) || ($toNullableFloat($resultadoTxt) !== null);
+                            $sin_referencia_aplicable = ($referencia_aplicada === null && $hayReglasNumericas && $resultadoTxt !== '' && $resultadoNumericoEvaluable);
                             if ($referencia_aplicada !== null) {
                                 foreach ($item['referencias'] as $idx => $ref) {
                                     if ($ref === $referencia_aplicada) {
@@ -1034,10 +1138,18 @@ class ExamCardView {
                                 }
                             }
                         }
-                        $valor_resultado = $getResultado($item['nombre'], '', $item);
                         $valor_resultado_num = str_replace(',', '', (string)$valor_resultado);
                         $fuera_rango = false;
+                        $mostrar_desc_resultado = false;
+                        $desc_resultado = '';
+                        $desc_resultado_color = '';
+                        $marcar_anormal = false;
                         if ($referencia_aplicada) {
+                            $mostrar_desc_resultado = $isTruthyRefFlag($referencia_aplicada['mostrar_descripcion_resultado'] ?? 0) && !$sin_referencia_aplicable;
+                            $desc_resultado = trim((string)($referencia_aplicada['desc'] ?? ''));
+                            $tmpColor = trim((string)($referencia_aplicada['alerta_color'] ?? ($referencia_aplicada['alert_color'] ?? '')));
+                            $desc_resultado_color = preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $tmpColor) ? $tmpColor : '';
+                            $marcar_anormal = $isTruthyRefFlag($referencia_aplicada['marcar_anormal'] ?? 0);
                             $min = isset($referencia_aplicada['valor_min']) ? $toNullableFloat($referencia_aplicada['valor_min']) : null;
                             $max = isset($referencia_aplicada['valor_max']) ? $toNullableFloat($referencia_aplicada['valor_max']) : null;
                             $numericStatus = $evaluateNumericExpressionAgainstRange((string)$valor_resultado, $min, $max);
@@ -1048,6 +1160,9 @@ class ExamCardView {
                                 if (($min !== null && $valor_num < $min) || ($max !== null && $valor_num > $max)) {
                                     $fuera_rango = true;
                                 }
+                            }
+                            if ($marcar_anormal && !$sin_referencia_aplicable) {
+                                $fuera_rango = true;
                             }
                         }
                         echo '<div class="parameter-section">
@@ -1075,6 +1190,10 @@ class ExamCardView {
                                 echo '<option value="' . htmlspecialchars($opcion) . '"' . (($valorSelect !== '' && $valorSelect == $opcion) ? ' selected' : '') . '>' . htmlspecialchars($opcion) . '</option>';
                             }
                             echo '</select>';
+                            if ($mostrar_desc_resultado && $desc_resultado !== '') {
+                                $styleDesc = $desc_resultado_color !== '' ? ' style="margin-left:8px;color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;"' : ' style="margin-left:8px;font-weight:600;"';
+                                echo '<span class="result-reference-desc"' . $styleDesc . '>' . htmlspecialchars($desc_resultado) . '</span>';
+                            }
                         } else {
                             echo '<div class="input-icon">';
                             if (!empty($item['formula'])) {
@@ -1100,6 +1219,10 @@ class ExamCardView {
                                 ' data-sexo="' . htmlspecialchars($sexo_paciente ?? '') . '"' .
                                 ' data-decimales="' . htmlspecialchars(isset($item['decimales']) ? $item['decimales'] : '') . '"' .
                                 '>';                      
+                            if ($mostrar_desc_resultado && $desc_resultado !== '') {
+                                $styleDesc = $desc_resultado_color !== '' ? ' style="margin-left:8px;color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;"' : ' style="margin-left:8px;font-weight:600;"';
+                                echo '<span class="result-reference-desc"' . $styleDesc . '>' . htmlspecialchars($desc_resultado) . '</span>';
+                            }
                             // Checkbox "Sin .0" eliminado: el sistema ahora formatea de forma natural
                             echo '</div>';
                         }
@@ -1112,6 +1235,9 @@ class ExamCardView {
                                 if ($aplicada_idx !== null && $aplicada_idx === $i) {
                                     echo '<span class="badge bg-warning ms-1">Aplicado: ' . htmlspecialchars($ref['desc'] . ' ' . $ref['valor']) . '</span>';
                                 }
+                            }
+                            if ($sin_referencia_aplicable) {
+                                echo '<span class="badge bg-secondary ms-1">Sin referencia aplicable</span>';
                             }
                             echo '</div>';
                         }

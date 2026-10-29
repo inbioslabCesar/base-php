@@ -152,6 +152,14 @@ $selectAnuladaPorNombre = $hasAnuladaPor ? "CONCAT(COALESCE(ua.nombre,''), ' ', 
 $selectAnuladoMotivo = $hasAnuladoMotivo ? "c.anulado_motivo AS anulado_motivo" : "NULL AS anulado_motivo";
 $joinAnuladaUser = $hasAnuladaPor ? " LEFT JOIN usuarios ua ON ua.id = c.anulada_por " : " ";
 $selectEsSis = $hasEsSis ? "c.es_sis AS es_sis" : "0 AS es_sis";
+// Código prestacional SIS (badge junto al nombre en el historial); tolera migración no aplicada.
+$hasPrestacional = in_array('codigo_prestacional', $colsCot, true)
+    && in_array('es_gestante', $colsCot, true)
+    && in_array('edad_gestacional_semanas', $colsCot, true)
+    && in_array('edad_gestacional_dias', $colsCot, true);
+$selectEsSis .= $hasPrestacional
+    ? ", c.codigo_prestacional AS codigo_prestacional, c.es_gestante AS es_gestante, c.edad_gestacional_semanas AS edad_gestacional_semanas, c.edad_gestacional_dias AS edad_gestacional_dias"
+    : ", NULL AS codigo_prestacional, 0 AS es_gestante, NULL AS edad_gestacional_semanas, NULL AS edad_gestacional_dias";
 $selectServicioId = $hasServicioId ? "c.servicio_id AS servicio_id" : "NULL AS servicio_id";
 $selectNombreServicio = ($hasServicioId && $hasServiciosTable) ? "sv.nombre AS nombre_servicio" : "NULL AS nombre_servicio";
 $joinServicios = ($hasServicioId && $hasServiciosTable) ? " LEFT JOIN servicios sv ON sv.id = c.servicio_id " : " ";

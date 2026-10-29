@@ -6,6 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../config/operacion_context.php';
 require_once __DIR__ . '/../usuarios/funciones/laboratorio_turnos.php';
+require_once __DIR__ . '/servicios/EdadPacienteService.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: dashboard.php?vista=cotizaciones');
@@ -122,6 +123,18 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    // Al validar se fija la edad vigente del paciente en el snapshot que usa el PDF.
+    $stmtClienteRes = $pdo->prepare("SELECT id_cliente FROM resultados_examenes WHERE id = ? LIMIT 1");
+    $stmtClienteRes->execute([$idResultado]);
+    $clienteResultadoId = (int)($stmtClienteRes->fetchColumn() ?: 0);
+    if ($clienteResultadoId > 0) {
+        try {
+            EdadPacienteService::refrescarSnapshotResultados($pdo, $clienteResultadoId, $cotizacionId, false);
+        } catch (Throwable $e) {
+            error_log('No se pudo refrescar la edad al validar: ' . $e->getMessage());
+        }
+    }
 
     $stmtUpd = $pdo->prepare("UPDATE resultados_examenes
         SET estado_validacion = 'validado',
