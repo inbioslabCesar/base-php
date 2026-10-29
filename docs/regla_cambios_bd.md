@@ -31,4 +31,3 @@ Terminar siempre con una lista **"Scripts a ejecutar en producción"** con ruta 
 | 2026-10-14 | Cotizador Express – Fase 1 | Ninguno |
 | 2026-10-14 | Cotizador Express – Fases 2 y 3 (historial, conversión, enlace público, plantilla) | 3 tablas nuevas: `sql/2026_10_14_cotizador_express/` |
 | 2026-10-14 | Cotizador Express – Fase 4 (deuda sin atender en Contabilidad) | Ninguno (solo lectura) |
-| 2026-10-18 | Códigos prestacionales SIS (301-306) y gestantes | 1 tabla nueva + 7 columnas en `cotizaciones`: `sql/2026_10_18_codigos_prestacionales_sis/` |
