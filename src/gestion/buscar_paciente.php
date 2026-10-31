@@ -9,6 +9,7 @@ $busqueda = trim($_GET['busqueda_paciente'] ?? '');
 $resultados = [];
 $mensaje = '';
 $fallbackApi = null;
+$busquedaDocumento = documento_lookup_normalize($busqueda);
 
 if ($busqueda !== '') {
     $sql = "SELECT *, CONCAT(nombre, ' ', apellido) AS nombre_completo FROM clientes WHERE 
@@ -16,15 +17,20 @@ if ($busqueda !== '') {
         codigo_cliente LIKE ? OR 
         nombre LIKE ? OR 
         apellido LIKE ? OR 
-        CONCAT(nombre, ' ', apellido) LIKE ?
-        LIMIT 20";
-    $param = "%$busqueda%";
+        CONCAT(nombre, ' ', apellido) LIKE ?";
+    $param = '%' . $busqueda . '%';
+    $params = [$param, $param, $param, $param, $param];
+    if ($busquedaDocumento !== '') {
+        $sql .= " OR REPLACE(REPLACE(REPLACE(COALESCE(dni, ''), '.', ''), '-', ''), ' ', '') LIKE ?";
+        $params[] = '%' . $busquedaDocumento . '%';
+    }
+    $sql .= " LIMIT 20";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$param, $param, $param, $param, $param]);
+    $stmt->execute($params);
     $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (empty($resultados)) {
-        $doc = documento_lookup_normalize($busqueda);
+        $doc = $busquedaDocumento;
         $tipo = documento_lookup_tipo($doc);
         if ($tipo === 'dni' || $tipo === 'ruc') {
             $lookup = documento_lookup_consultar($pdo, 'cliente', $doc);

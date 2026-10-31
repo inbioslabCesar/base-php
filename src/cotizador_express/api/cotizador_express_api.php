@@ -22,6 +22,7 @@ if ($op === 'buscar_paciente') {
     if (mb_strlen($q) < 2) {
         $responder(['items' => []]);
     }
+    $qDocumento = preg_replace('/\D+/', '', $q) ?? '';
 
     $tieneCelular = cotExpHasColumn($pdo, 'clientes', 'celular');
     $tieneDni = cotExpHasColumn($pdo, 'clientes', 'dni');
@@ -34,6 +35,10 @@ if ($op === 'buscar_paciente') {
     if ($tieneDni) {
         $condiciones[] = "COALESCE(dni, '') LIKE :q3";
         $params[':q3'] = $like;
+        if ($qDocumento !== '') {
+            $condiciones[] = "REPLACE(REPLACE(REPLACE(COALESCE(dni, ''), '.', ''), '-', ''), ' ', '') LIKE :q4";
+            $params[':q4'] = '%' . $qDocumento . '%';
+        }
     }
 
     try {
