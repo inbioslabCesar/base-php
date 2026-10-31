@@ -10,6 +10,9 @@
 /src/config/facturacion_config.php
 /src/config/qr_verificacion_config.php
 
+# APISPERU token local
+/src/config/apisperu_token.local.php
+
 # WhatsApp local secrets
 /scripts/.whatsapp.env
 

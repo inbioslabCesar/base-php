@@ -23,7 +23,7 @@ function documento_lookup_load_config(): array
     $cfg = file_exists($cfgPath) ? require $cfgPath : [];
 
     return [
-        'base_url' => isset($cfg['base_url']) ? (string)$cfg['base_url'] : 'https://dniruc.apisperu.com/api/v1',
+        'base_url' => isset($cfg['base_url']) ? (string)$cfg['base_url'] : 'https://apiperu.net/consulta',
         'token' => isset($cfg['token']) ? (string)$cfg['token'] : '',
         'timeout_seconds' => isset($cfg['timeout_seconds']) ? (int)$cfg['timeout_seconds'] : 8,
     ];
@@ -120,13 +120,13 @@ function documento_lookup_call_api(string $tipo, string $documento): array
     }
 
     $base = rtrim((string)$cfg['base_url'], '/');
-    $url = $base . '/' . $tipo . '/' . rawurlencode($documento) . '?token=' . rawurlencode($token);
+    $url = $base . '/' . $tipo . '/' . rawurlencode($documento);
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => max(3, (int)$cfg['timeout_seconds']),
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_HTTPHEADER => ['Accept: application/json', 'Authorization: Bearer ' . $token],
     ]);
 
     $resp = curl_exec($ch);
@@ -163,17 +163,28 @@ function documento_lookup_call_api(string $tipo, string $documento): array
         ];
     }
 
+    if (array_key_exists('success', $json) && $json['success'] === false) {
+        return [
+            'ok' => false,
+            'message' => (string)($json['message'] ?? $json['error'] ?? 'Documento no encontrado.'),
+            'http_status' => 404,
+            'raw' => $json,
+        ];
+    }
+
+    $d = isset($json['data']) && is_array($json['data']) ? $json['data'] : $json;
+
     if ($tipo === 'dni') {
-        $nombres = trim((string)($json['nombres'] ?? ''));
-        $apPat = trim((string)($json['apellidoPaterno'] ?? ''));
-        $apMat = trim((string)($json['apellidoMaterno'] ?? ''));
+        $nombres = trim((string)($d['nombres'] ?? ''));
+        $apPat = trim((string)($d['apellido_paterno'] ?? $d['apellidoPaterno'] ?? ''));
+        $apMat = trim((string)($d['apellido_materno'] ?? $d['apellidoMaterno'] ?? ''));
 
         return [
             'ok' => true,
             'http_status' => 200,
             'message' => 'Consulta DNI exitosa.',
             'data' => [
-                'documento' => (string)($json['dni'] ?? $documento),
+                'documento' => (string)($d['numero'] ?? $d['dni'] ?? $documento),
                 'tipo_documento' => 'dni',
                 'nombres' => $nombres,
                 'apellido_paterno' => $apPat,
@@ -186,15 +197,15 @@ function documento_lookup_call_api(string $tipo, string $documento): array
         ];
     }
 
-    $razon = trim((string)($json['razonSocial'] ?? ''));
-    $comercial = trim((string)($json['nombreComercial'] ?? ''));
-    $direccion = trim((string)($json['direccion'] ?? ''));
+    $razon = trim((string)($d['nombre_o_razon_social'] ?? $d['razonSocial'] ?? ''));
+    $comercial = trim((string)($d['nombre_comercial'] ?? $d['nombreComercial'] ?? ''));
+    $direccion = trim((string)($d['direccion'] ?? ''));
     if ($direccion === '') {
         $direccion = trim(implode(' ', array_filter([
-            (string)($json['direccion_'] ?? ''),
-            (string)($json['distrito'] ?? ''),
-            (string)($json['provincia'] ?? ''),
-            (string)($json['departamento'] ?? ''),
+            (string)($d['direccion_'] ?? ''),
+            (string)($d['distrito'] ?? ''),
+            (string)($d['provincia'] ?? ''),
+            (string)($d['departamento'] ?? ''),
         ])));
     }
 
@@ -203,7 +214,7 @@ function documento_lookup_call_api(string $tipo, string $documento): array
         'http_status' => 200,
         'message' => 'Consulta RUC exitosa.',
         'data' => [
-            'documento' => (string)($json['ruc'] ?? $documento),
+            'documento' => (string)($d['ruc'] ?? $documento),
             'tipo_documento' => 'ruc',
             'nombres' => '',
             'apellido_paterno' => '',

@@ -1,11 +1,15 @@
 <?php
-// Configuracion de APISPERU para consulta de DNI/RUC.
-// Recomendado: definir APISPERU_TOKEN en variables de entorno del servidor.
+// Configuracion de apiperu.net para consulta de DNI/RUC (Authorization: Bearer).
+// Token: variable de entorno APISPERU_TOKEN o archivo local no versionado apisperu_token.local.php.
 
-$token = getenv('APISPERU_TOKEN') ?: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImluYmlvc2xhYkBnbWFpbC5jb20ifQ.nniID9A9mORK-Qz1xr5i2B5S2nomx6X5Wc6gU_aeths';
+$token = (string)getenv('APISPERU_TOKEN');
+$tokenLocalPath = __DIR__ . '/apisperu_token.local.php';
+if ($token === '' && file_exists($tokenLocalPath)) {
+    $token = trim((string)(require $tokenLocalPath));
+}
 
 return [
-    'base_url' => 'https://dniruc.apisperu.com/api/v1',
+    'base_url' => 'https://apiperu.net/consulta',
     'token' => $token,
     'timeout_seconds' => 8,
 ];
