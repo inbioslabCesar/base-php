@@ -973,11 +973,11 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                         if (!$sinReferenciaAplicable && $mostrarDescResultado && $descResultado !== '') {
                             $descHtml = htmlspecialchars($descResultado);
                             if ($descResultadoColor !== '') {
-                                $descHtml = '<span style="margin-left:6px;color:' . htmlspecialchars($descResultadoColor) . ';font-weight:600;">' . $descHtml . '</span>';
+                                $descHtml = '<span style="color:' . htmlspecialchars($descResultadoColor) . ';font-weight:600;">' . $descHtml . '</span>';
                             } else {
-                                $descHtml = '<span style="margin-left:6px;font-weight:600;">' . $descHtml . '</span>';
+                                $descHtml = '<span style="font-weight:600;">' . $descHtml . '</span>';
                             }
-                            $cellHtml .= $descHtml;
+                            $cellHtml .= '&nbsp;' . $descHtml;
                         }
 
                         if ($fueraRango) {
@@ -1155,11 +1155,11 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
             if (!$sin_referencia_aplicable && $mostrar_desc_resultado && $desc_resultado !== '') {
                 $descHtml = htmlspecialchars($desc_resultado);
                 if ($desc_resultado_color !== '') {
-                    $descHtml = '<span style="margin-left:6px;color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;">' . $descHtml . '</span>';
+                    $descHtml = '<span style="color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;">' . $descHtml . '</span>';
                 } else {
-                    $descHtml = '<span style="margin-left:6px;font-weight:600;">' . $descHtml . '</span>';
+                    $descHtml = '<span style="font-weight:600;">' . $descHtml . '</span>';
                 }
-                $valorFormateadoHtml .= $descHtml;
+                $valorFormateadoHtml .= '&nbsp;' . $descHtml;
             }
             if ($fuera_rango && $valorFormateado !== "") {
                 $valorFormateado = $decorateOutOfRangeHtml($valorFormateadoHtml, $alertCfg);
