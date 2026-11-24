@@ -12,6 +12,17 @@ function createTypeSelect() {
 
 const REF_ALERT_DEFAULT_MODE = 'both';
 const REF_ALERT_DEFAULT_COLOR = '#c62828';
+const CHART_TYPE_DEFAULT = 'line_curve';
+const CHART_COLOR_DEFAULTS = {
+  line_color: '#2563eb',
+  point_color: '#0ea5e9',
+  bar_fill_color: '#fef3c7',
+  bar_border_color: '#1f2937',
+  grid_color: '#cfd8e6',
+  axis_color: '#94a3b8',
+  text_color: '#334155',
+  reference_band_color: '#22c55e',
+};
 
 function normalizeRefAlertMode(mode) {
   const raw = String(mode || '').trim().toLowerCase();
@@ -24,6 +35,16 @@ function normalizeRefAlertMode(mode) {
 function normalizeRefAlertColor(color) {
   const raw = String(color || '').trim();
   return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : REF_ALERT_DEFAULT_COLOR;
+}
+
+function normalizeHexColor(color, fallback) {
+  const raw = String(color || '').trim();
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : String(fallback || '#000000');
+}
+
+function normalizeChartType(type) {
+  const raw = String(type || '').trim().toLowerCase();
+  return (raw === 'bar_chart' || raw === 'line_curve') ? raw : CHART_TYPE_DEFAULT;
 }
 
 function normalizeRefAlertTexts(value) {
@@ -574,9 +595,13 @@ function syncV2AlertVisualEditor(refItem, row) {
   const defaultColor = normalizeRefAlertColor(refItem.querySelector('.v2-ref-alert-color')?.value || REF_ALERT_DEFAULT_COLOR);
   const alertMode = normalizeRefAlertMode(refItem.querySelector('.v2-ref-alert-mode')?.value || REF_ALERT_DEFAULT_MODE);
   const hiddenTexts = refItem.querySelector('.v2-ref-alert-texts');
+  const manualTexts = refItem.querySelector('.v2-ref-alert-texts-manual');
   const hiddenMap = refItem.querySelector('.v2-ref-alert-text-colors');
   const listWrap = refItem.querySelector('.v2-ref-alert-text-color-list');
   if (!hiddenTexts || !hiddenMap || !listWrap) return;
+  if (manualTexts) {
+    hiddenTexts.value = normalizeRefAlertTexts(manualTexts.value);
+  }
 
   const selectedTokens = new Set(splitRefTextList(hiddenTexts.value));
   const map = parseRefAlertTextColorMap(hiddenMap.value);
@@ -614,6 +639,7 @@ function syncV2AlertVisualEditor(refItem, row) {
         nextMap[t] = c;
       });
       hiddenTexts.value = nextTexts.join(', ');
+      if (manualTexts) manualTexts.value = hiddenTexts.value;
       hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
       updatePreview();
       renderV2Preview();
@@ -635,6 +661,7 @@ function syncV2AlertVisualEditor(refItem, row) {
     nextMap[t] = c;
   });
   hiddenTexts.value = nextTexts.join(', ');
+  if (manualTexts) manualTexts.value = hiddenTexts.value;
   hiddenMap.value = serializeRefAlertTextColorMap(nextMap);
 }
 
@@ -896,11 +923,19 @@ function syncV2ChartsWithSchema() {
       return {
         id: ensureUniqueChartId(idBase, idx),
         label,
-        type: 'line_curve',
+        type: normalizeChartType(c.type),
         y_col_id: validColIds.has(yCol) ? yCol : fallbackY,
         min_points_required: Number.isFinite(parseInt(c.min_points_required, 10)) ? Math.max(2, Math.min(20, parseInt(c.min_points_required, 10))) : 3,
         connect_gaps: !!c.connect_gaps,
         strict_units: !Object.prototype.hasOwnProperty.call(c, 'strict_units') || !!c.strict_units,
+        line_color: normalizeHexColor(c.line_color, CHART_COLOR_DEFAULTS.line_color),
+        point_color: normalizeHexColor(c.point_color, CHART_COLOR_DEFAULTS.point_color),
+        bar_fill_color: normalizeHexColor(c.bar_fill_color, CHART_COLOR_DEFAULTS.bar_fill_color),
+        bar_border_color: normalizeHexColor(c.bar_border_color, CHART_COLOR_DEFAULTS.bar_border_color),
+        grid_color: normalizeHexColor(c.grid_color, CHART_COLOR_DEFAULTS.grid_color),
+        axis_color: normalizeHexColor(c.axis_color, CHART_COLOR_DEFAULTS.axis_color),
+        text_color: normalizeHexColor(c.text_color, CHART_COLOR_DEFAULTS.text_color),
+        reference_band_color: normalizeHexColor(c.reference_band_color, CHART_COLOR_DEFAULTS.reference_band_color),
         points,
       };
     })
@@ -912,11 +947,19 @@ function addV2Chart(chart = {}) {
   v2State.charts.push({
     id,
     label: String(chart.label || `Curva ${v2State.charts.length + 1}`).trim(),
-    type: 'line_curve',
+    type: normalizeChartType(chart.type),
     y_col_id: String(chart.y_col_id || guessV2CurveResultColumn()).trim(),
     min_points_required: Number.isFinite(parseInt(chart.min_points_required, 10)) ? parseInt(chart.min_points_required, 10) : 3,
     connect_gaps: !!chart.connect_gaps,
     strict_units: !Object.prototype.hasOwnProperty.call(chart, 'strict_units') || !!chart.strict_units,
+    line_color: normalizeHexColor(chart.line_color, CHART_COLOR_DEFAULTS.line_color),
+    point_color: normalizeHexColor(chart.point_color, CHART_COLOR_DEFAULTS.point_color),
+    bar_fill_color: normalizeHexColor(chart.bar_fill_color, CHART_COLOR_DEFAULTS.bar_fill_color),
+    bar_border_color: normalizeHexColor(chart.bar_border_color, CHART_COLOR_DEFAULTS.bar_border_color),
+    grid_color: normalizeHexColor(chart.grid_color, CHART_COLOR_DEFAULTS.grid_color),
+    axis_color: normalizeHexColor(chart.axis_color, CHART_COLOR_DEFAULTS.axis_color),
+    text_color: normalizeHexColor(chart.text_color, CHART_COLOR_DEFAULTS.text_color),
+    reference_band_color: normalizeHexColor(chart.reference_band_color, CHART_COLOR_DEFAULTS.reference_band_color),
     points: Array.isArray(chart.points) ? chart.points : []
   });
   syncV2ChartsWithSchema();
@@ -971,21 +1014,29 @@ function renderV2Charts() {
       `;
     }).join('');
 
+    const chartType = normalizeChartType(chart.type);
     card.innerHTML = `
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="small text-muted d-block mb-1">Nombre de curva</label>
           <input type="text" class="form-control form-control-sm v2-chart-label" data-chart-idx="${chartIdx}" value="${escapeHtml(chart.label || '')}">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Tipo</label>
+          <select class="form-select form-select-sm v2-chart-type" data-chart-idx="${chartIdx}">
+            <option value="line_curve" ${chartType === 'line_curve' ? 'selected' : ''}>Línea</option>
+            <option value="bar_chart" ${chartType === 'bar_chart' ? 'selected' : ''}>Barras</option>
+          </select>
+        </div>
+        <div class="col-md-2">
           <label class="small text-muted d-block mb-1">Columna de resultado (eje Y)</label>
           <select class="form-select form-select-sm v2-chart-y-col" data-chart-idx="${chartIdx}">${yOptions}</select>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
           <label class="small text-muted d-block mb-1">Puntos minimos</label>
           <input type="number" min="2" max="20" class="form-control form-control-sm v2-chart-min-points" data-chart-idx="${chartIdx}" value="${escapeHtml(String(chart.min_points_required || 3))}">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <div class="form-check mt-4">
             <input type="checkbox" class="form-check-input v2-chart-connect-gaps" data-chart-idx="${chartIdx}" ${chart.connect_gaps ? 'checked' : ''}>
             <label class="form-check-label">Unir puntos con vacios</label>
@@ -997,6 +1048,42 @@ function renderV2Charts() {
         </div>
         <div class="col-md-1 d-grid">
           <button type="button" class="btn btn-outline-danger btn-sm v2-chart-del" data-chart-idx="${chartIdx}">Quitar</button>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Color línea</label>
+          <input type="color" class="form-control form-control-sm v2-chart-line-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.line_color, CHART_COLOR_DEFAULTS.line_color))}">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Color puntos</label>
+          <input type="color" class="form-control form-control-sm v2-chart-point-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.point_color, CHART_COLOR_DEFAULTS.point_color))}">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Relleno barras</label>
+          <input type="color" class="form-control form-control-sm v2-chart-bar-fill-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.bar_fill_color, CHART_COLOR_DEFAULTS.bar_fill_color))}">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Borde barras</label>
+          <input type="color" class="form-control form-control-sm v2-chart-bar-border-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.bar_border_color, CHART_COLOR_DEFAULTS.bar_border_color))}">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Color ejes</label>
+          <input type="color" class="form-control form-control-sm v2-chart-axis-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.axis_color, CHART_COLOR_DEFAULTS.axis_color))}">
+        </div>
+        <div class="col-md-2">
+          <label class="small text-muted d-block mb-1">Color texto</label>
+          <input type="color" class="form-control form-control-sm v2-chart-text-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.text_color, CHART_COLOR_DEFAULTS.text_color))}">
+        </div>
+      </div>
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-md-3">
+          <label class="small text-muted d-block mb-1">Color grilla</label>
+          <input type="color" class="form-control form-control-sm v2-chart-grid-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.grid_color, CHART_COLOR_DEFAULTS.grid_color))}">
+        </div>
+        <div class="col-md-3">
+          <label class="small text-muted d-block mb-1">Color banda referencial</label>
+          <input type="color" class="form-control form-control-sm v2-chart-ref-band-color" data-chart-idx="${chartIdx}" value="${escapeHtml(normalizeHexColor(chart.reference_band_color, CHART_COLOR_DEFAULTS.reference_band_color))}">
         </div>
       </div>
       <div class="table-responsive">
@@ -1027,6 +1114,15 @@ function renderV2Charts() {
       v2State.charts[idx].y_col_id = String(e.target.value || '').trim();
       renderV2Preview();
     });
+
+    container.querySelectorAll('.v2-chart-type').forEach((el) => {
+      el.addEventListener('change', (e) => {
+        const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+        v2State.charts[idx].type = normalizeChartType(e.target.value);
+        renderV2Preview();
+      });
+    });
   });
 
   container.querySelectorAll('.v2-chart-min-points').forEach((el) => {
@@ -1053,6 +1149,25 @@ function renderV2Charts() {
       if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
       v2State.charts[idx].strict_units = !!e.target.checked;
     });
+
+    const bindColorInput = (selector, key, fallback) => {
+      container.querySelectorAll(selector).forEach((el) => {
+        el.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.getAttribute('data-chart-idx') || '-1', 10);
+          if (!Number.isFinite(idx) || idx < 0 || idx >= v2State.charts.length) return;
+          v2State.charts[idx][key] = normalizeHexColor(e.target.value, fallback);
+          renderV2Preview();
+        });
+      });
+    };
+    bindColorInput('.v2-chart-line-color', 'line_color', CHART_COLOR_DEFAULTS.line_color);
+    bindColorInput('.v2-chart-point-color', 'point_color', CHART_COLOR_DEFAULTS.point_color);
+    bindColorInput('.v2-chart-bar-fill-color', 'bar_fill_color', CHART_COLOR_DEFAULTS.bar_fill_color);
+    bindColorInput('.v2-chart-bar-border-color', 'bar_border_color', CHART_COLOR_DEFAULTS.bar_border_color);
+    bindColorInput('.v2-chart-grid-color', 'grid_color', CHART_COLOR_DEFAULTS.grid_color);
+    bindColorInput('.v2-chart-axis-color', 'axis_color', CHART_COLOR_DEFAULTS.axis_color);
+    bindColorInput('.v2-chart-text-color', 'text_color', CHART_COLOR_DEFAULTS.text_color);
+    bindColorInput('.v2-chart-ref-band-color', 'reference_band_color', CHART_COLOR_DEFAULTS.reference_band_color);
   });
 
   container.querySelectorAll('.v2-chart-point-enabled').forEach((el) => {
@@ -1237,6 +1352,14 @@ function addV2DataRow(row = {}) {
 
 function buildV2ReferenceSummary(ranges) {
   const list = Array.isArray(ranges) ? ranges : [];
+  const buildVisibleRange = (minRaw, maxRaw) => {
+    const min = String(minRaw || '').trim();
+    const max = String(maxRaw || '').trim();
+    if (min && max) return `${min} - ${max}`;
+    if (min) return `>= ${min}`;
+    if (max) return `<= ${max}`;
+    return '';
+  };
   const lines = list.map((r) => {
     const desc = String((r && r.desc) || '').trim();
     const valor = String((r && r.valor) || '').trim();
@@ -1245,7 +1368,7 @@ function buildV2ReferenceSummary(ranges) {
 
     // Mostrar solo información pública (desc + valor/rango). Edad/sexo se
     // mantienen en reference_ranges para la discriminación interna.
-    const rango = (min || max) ? `${min || ''} - ${max || ''}`.trim() : '';
+    const rango = buildVisibleRange(min, max);
     const visible = valor || rango;
 
     if (desc && visible) return `${desc} (${visible})`;
@@ -1701,7 +1824,11 @@ function renderV2Rows() {
                 </select>
               </div>
               <div class="col-3"><input type="color" class="form-control form-control-sm v2-ref-alert-color" value="${normalizeRefAlertColor(r.alerta_color || r.alert_color)}"></div>
-              <div class="col-5"><input type="hidden" class="v2-ref-alert-texts" value="${normalizeRefAlertTexts(r.alerta_textos || r.alert_text_values || r.alerta_valores || '')}"><div class="small text-muted">Se sincroniza automaticamente desde opciones.</div></div>
+              <div class="col-5">
+                <input type="hidden" class="v2-ref-alert-texts" value="${normalizeRefAlertTexts(r.alerta_textos || r.alert_text_values || r.alerta_valores || '')}">
+                <input type="text" class="form-control form-control-sm v2-ref-alert-texts-manual" value="${normalizeRefAlertTexts(r.alerta_textos || r.alert_text_values || r.alerta_valores || '')}" placeholder="Valores alterados (coma): POSITIVO, ALTERADO">
+                <div class="small text-muted mt-1">Versátil: puedes escribir valores clínicos o usar opciones detectadas.</div>
+              </div>
             </div>
             <div class="row g-1 mt-1">
               <div class="col-6">
@@ -1725,7 +1852,7 @@ function renderV2Rows() {
         html += `<td>
           <div class="v2-ref-editor" data-col-id="${c.id}">
             ${rangesHtml}
-            <button type="button" class="btn btn-outline-primary btn-sm v2-ref-add" data-col-id="${c.id}">+ Valor normal</button>
+            <button type="button" class="btn btn-outline-primary btn-sm v2-ref-add" data-col-id="${c.id}">+ Valor referencial</button>
           </div>
           <div class="text-muted small mt-1">${buildV2ReferenceSummary(normalizedRanges) || 'Sin referencias dinámicas'}</div>
         </td>`;
@@ -1905,7 +2032,11 @@ function renderV2Rows() {
     tr.querySelectorAll('.v2-ref-item input, .v2-ref-item select').forEach((ctrl) => {
       ctrl.addEventListener('input', () => {
         const refItem = ctrl.closest('.v2-ref-item');
-        if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
+        if (refItem && ctrl.classList.contains('v2-ref-alert-texts-manual')) {
+          const hidden = refItem.querySelector('.v2-ref-alert-texts');
+          if (hidden) hidden.value = normalizeRefAlertTexts(ctrl.value);
+          syncV2AlertVisualEditor(refItem, row);
+        } else if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
           syncV2AlertVisualEditor(refItem, row);
         }
         const editor = ctrl.closest('.v2-ref-editor');
@@ -1915,7 +2046,11 @@ function renderV2Rows() {
       });
       ctrl.addEventListener('change', () => {
         const refItem = ctrl.closest('.v2-ref-item');
-        if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
+        if (refItem && ctrl.classList.contains('v2-ref-alert-texts-manual')) {
+          const hidden = refItem.querySelector('.v2-ref-alert-texts');
+          if (hidden) hidden.value = normalizeRefAlertTexts(ctrl.value);
+          syncV2AlertVisualEditor(refItem, row);
+        } else if (refItem && (ctrl.classList.contains('v2-ref-alert-mode') || ctrl.classList.contains('v2-ref-alert-color'))) {
           syncV2AlertVisualEditor(refItem, row);
         }
         const editor = ctrl.closest('.v2-ref-editor');
@@ -2067,18 +2202,24 @@ function resetV2State() {
 function buildLegacyReferenciaText(item) {
   const refs = Array.isArray(item && item.referencias) ? item.referencias : [];
   if (refs.length === 0) return '';
+  const buildVisibleRange = (minRaw, maxRaw) => {
+    const min = String(minRaw || '').trim();
+    const max = String(maxRaw || '').trim();
+    if (min && max) return `${min} - ${max}`;
+    if (min) return `>= ${min}`;
+    if (max) return `<= ${max}`;
+    return '';
+  };
   const parts = refs.map(ref => {
     if (!ref || typeof ref !== 'object') {
       return String(ref || '').trim();
     }
     const desc = String(ref.desc || '').trim();
     const valor = String(ref.valor || '').trim();
-    const rango = [];
-    if (ref.valor_min !== undefined && ref.valor_min !== '') rango.push(String(ref.valor_min));
-    if (ref.valor_max !== undefined && ref.valor_max !== '') rango.push(String(ref.valor_max));
+    const rango = buildVisibleRange(ref.valor_min, ref.valor_max);
     let extra = '';
-    if (rango.length > 0) {
-      extra = ` (${rango.join(' - ')})`;
+    if (rango) {
+      extra = ` (${rango})`;
     }
     if (desc && valor) return `${desc}: ${valor}${extra}`;
     return `${valor}${extra}`.trim();
@@ -2352,13 +2493,21 @@ function buildV2Payload() {
     return {
       id: String(chart.id || `curva_${idx + 1}`).trim() || `curva_${idx + 1}`,
       label: String(chart.label || `Curva ${idx + 1}`).trim() || `Curva ${idx + 1}`,
-      type: 'line_curve',
+      type: normalizeChartType(chart.type),
       y_col_id: String(chart.y_col_id || '').trim(),
       min_points_required: Number.isFinite(parseInt(chart.min_points_required, 10))
         ? Math.max(2, Math.min(20, parseInt(chart.min_points_required, 10)))
         : 3,
       connect_gaps: !!chart.connect_gaps,
       strict_units: !Object.prototype.hasOwnProperty.call(chart, 'strict_units') || !!chart.strict_units,
+      line_color: normalizeHexColor(chart.line_color, CHART_COLOR_DEFAULTS.line_color),
+      point_color: normalizeHexColor(chart.point_color, CHART_COLOR_DEFAULTS.point_color),
+      bar_fill_color: normalizeHexColor(chart.bar_fill_color, CHART_COLOR_DEFAULTS.bar_fill_color),
+      bar_border_color: normalizeHexColor(chart.bar_border_color, CHART_COLOR_DEFAULTS.bar_border_color),
+      grid_color: normalizeHexColor(chart.grid_color, CHART_COLOR_DEFAULTS.grid_color),
+      axis_color: normalizeHexColor(chart.axis_color, CHART_COLOR_DEFAULTS.axis_color),
+      text_color: normalizeHexColor(chart.text_color, CHART_COLOR_DEFAULTS.text_color),
+      reference_band_color: normalizeHexColor(chart.reference_band_color, CHART_COLOR_DEFAULTS.reference_band_color),
       points: points.map((point) => ({
         row_id: String((point && point.row_id) || '').trim(),
         label: String((point && point.label) || '').trim(),
@@ -2537,11 +2686,15 @@ function validateV2Payload(payload) {
     .filter(Boolean));
 
   charts.forEach((chart, idx) => {
+    const rawType = String(chart.type || '').trim().toLowerCase();
+    if (rawType && rawType !== 'line_curve' && rawType !== 'bar_chart') {
+      errors.push(`El gráfico #${idx + 1} tiene un tipo inválido.`);
+    }
     const yCol = String(chart.y_col_id || '').trim();
     if (!yCol) {
-      errors.push(`La curva #${idx + 1} no tiene columna de resultado (eje Y).`);
+      errors.push(`El gráfico #${idx + 1} no tiene columna de resultado (eje Y).`);
     } else if (!seenIds.has(yCol)) {
-      errors.push(`La curva #${idx + 1} usa una columna Y inexistente: '${yCol}'.`);
+      errors.push(`El gráfico #${idx + 1} usa una columna Y inexistente: '${yCol}'.`);
     }
 
     const minPoints = Number.isFinite(parseInt(chart.min_points_required, 10))
@@ -2550,7 +2703,7 @@ function validateV2Payload(payload) {
     const points = Array.isArray(chart.points) ? chart.points : [];
     const enabledPoints = points.filter((p) => !!(p && p.enabled));
     if (enabledPoints.length === 0) {
-      errors.push(`La curva #${idx + 1} no tiene puntos activos.`);
+      errors.push(`El gráfico #${idx + 1} no tiene puntos activos.`);
       return;
     }
 
@@ -2559,22 +2712,39 @@ function validateV2Payload(payload) {
       const rid = String((point && point.row_id) || '').trim();
       const xRaw = String((point && point.x_value) ?? '').trim();
       if (!rowIds.has(rid)) {
-        errors.push(`La curva #${idx + 1} referencia una fila de datos inexistente: '${rid}'.`);
+        errors.push(`El gráfico #${idx + 1} referencia una fila de datos inexistente: '${rid}'.`);
       }
       if (xRaw === '' || !isFinite(parseFloat(xRaw))) {
-        errors.push(`La curva #${idx + 1} tiene un punto sin valor X válido (fila '${rid || '?'}').`);
+        errors.push(`El gráfico #${idx + 1} tiene un punto sin valor X válido (fila '${rid || '?'}').`);
       } else {
         const xNorm = String(parseFloat(xRaw));
         if (xSeen.has(xNorm)) {
-          errors.push(`La curva #${idx + 1} tiene valores X repetidos (${xNorm}).`);
+          errors.push(`El gráfico #${idx + 1} tiene valores X repetidos (${xNorm}).`);
         }
         xSeen.add(xNorm);
       }
     });
 
     if (enabledPoints.length < minPoints) {
-      errors.push(`La curva #${idx + 1} exige ${minPoints} punto(s) mínimos pero solo tiene ${enabledPoints.length} activo(s).`);
+      errors.push(`El gráfico #${idx + 1} exige ${minPoints} punto(s) mínimos pero solo tiene ${enabledPoints.length} activo(s).`);
     }
+
+    const chartColorKeys = [
+      'line_color',
+      'point_color',
+      'bar_fill_color',
+      'bar_border_color',
+      'grid_color',
+      'axis_color',
+      'text_color',
+      'reference_band_color',
+    ];
+    chartColorKeys.forEach((key) => {
+      const raw = String(chart[key] || '').trim();
+      if (raw && !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+        errors.push(`El gráfico #${idx + 1} tiene un color inválido en '${key}'.`);
+      }
+    });
   });
 
   return errors;

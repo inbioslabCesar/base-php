@@ -242,6 +242,82 @@ function validarCampoConReferencias(target) {
     }
   };
 
+  const getElementDisplayText = (el) => {
+    if (!el) return '';
+    const tag = String(el.tagName || '').toLowerCase();
+    if (tag === 'select') {
+      const opt = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+      return String(opt ? opt.textContent : el.value).trim();
+    }
+    return String(el.value ?? '').trim();
+  };
+
+  const syncSelectToReferenceDescription = (el, description) => {
+    if (!el || String(el.tagName || '').toLowerCase() !== 'select') return false;
+    const targetToken = normalizeText(description);
+    if (!targetToken) return false;
+    const targetStatus = resolveQualitativeStatus(targetToken);
+    let found = null;
+    Array.from(el.options || []).forEach((opt) => {
+      if (found) return;
+      const optValueToken = normalizeText(opt.value);
+      const optTextToken = normalizeText(opt.textContent || '');
+      if (optValueToken === targetToken || optTextToken === targetToken) {
+        found = opt;
+        return;
+      }
+      if (targetStatus) {
+        const valueStatus = resolveQualitativeStatus(optValueToken);
+        const textStatus = resolveQualitativeStatus(optTextToken);
+        if ((valueStatus && valueStatus === targetStatus) || (textStatus && textStatus === targetStatus)) {
+          found = opt;
+        }
+      }
+    });
+    if (!found) return false;
+    if (el.value === found.value) return false;
+    el.value = found.value;
+    return true;
+  };
+
+  const resolveEvaluationValue = (el, refs, currentRawValue) => {
+    const tag = String(el.tagName || '').toLowerCase();
+    if (tag !== 'select') return currentRawValue;
+    const hasNumericRules = Array.isArray(refs) && refs.some((ref) => {
+      if (!ref || typeof ref !== 'object') return false;
+      const min = parseNullableFloat(ref.valor_min);
+      const max = parseNullableFloat(ref.valor_max);
+      return (min !== null || max !== null);
+    });
+    if (!hasNumericRules) return currentRawValue;
+
+    const rowId = String(el.getAttribute('data-v2-row-id') || '').trim();
+    if (!rowId) return currentRawValue;
+
+    const scope = el.closest('.exam-card') || document;
+    const sameRowFields = Array.from(scope.querySelectorAll('[data-v2-row-id]')).filter((node) => {
+      if (!node || node === el) return false;
+      return String(node.getAttribute('data-v2-row-id') || '').trim() === rowId;
+    });
+
+    const ordered = sameRowFields.sort((a, b) => {
+      const ta = String(a.tagName || '').toLowerCase();
+      const tb = String(b.tagName || '').toLowerCase();
+      const wa = (ta === 'input' || ta === 'textarea') ? 0 : 1;
+      const wb = (tb === 'input' || tb === 'textarea') ? 0 : 1;
+      return wa - wb;
+    });
+
+    for (const node of ordered) {
+      const raw = String(node.value ?? '').trim();
+      if (!raw) continue;
+      if (parseNumericExpression(raw) !== null || parseNullableFloat(raw) !== null) {
+        return raw;
+      }
+    }
+    return currentRawValue;
+  };
+
   let referencias = [];
   try {
     const parsed = JSON.parse(rawRefs || '[]');
@@ -249,9 +325,10 @@ function validarCampoConReferencias(target) {
   } catch (err) {
     referencias = [];
   }
-  const targetTextRaw = String(target.value ?? '').trim();
+  let targetTextRaw = String(target.value ?? '').trim();
   const edad = parseNullableFloat(document.getElementById('edad-paciente')?.value ?? target.getAttribute('data-edad'));
   const sexo = (document.getElementById('sexo-paciente')?.value ?? target.getAttribute('data-sexo') ?? '').toLowerCase();
+  const evaluationValueRaw = resolveEvaluationValue(target, referencias, targetTextRaw);
   let referencia_aplicada = null;
   let sinReferenciaAplicable = false;
 
@@ -273,7 +350,7 @@ function validarCampoConReferencias(target) {
         return (min !== null || max !== null);
       });
       const hasNumericRanges = numericRangeRefs.length > 0;
-      if (targetTextRaw !== '') {
+      if (evaluationValueRaw !== '') {
         const coincidencias = [];
         for (const ref of candidatas) {
           const min = parseNullableFloat(ref.valor_min);
@@ -281,13 +358,13 @@ function validarCampoConReferencias(target) {
           if (min === null && max === null) {
             continue;
           }
-          const numericStatus = evaluateNumericExpressionAgainstRange(targetTextRaw, min, max);
+          const numericStatus = evaluateNumericExpressionAgainstRange(evaluationValueRaw, min, max);
           if (numericStatus === 'in') {
             coincidencias.push({ ref, min, max });
             continue;
           }
           if (numericStatus === null) {
-            const valorNum = parseNullableFloat(targetTextRaw);
+            const valorNum = parseNullableFloat(evaluationValueRaw);
             if (valorNum !== null) {
               const inMin = (min === null || valorNum >= min);
               const inMax = (max === null || valorNum <= max);
@@ -308,7 +385,7 @@ function validarCampoConReferencias(target) {
           });
           referencia_aplicada = coincidencias[0].ref;
         }
-        const hasNumericInput = (parseNumericExpression(targetTextRaw) !== null) || (parseNullableFloat(targetTextRaw) !== null);
+        const hasNumericInput = (parseNumericExpression(evaluationValueRaw) !== null) || (parseNullableFloat(evaluationValueRaw) !== null);
         if (!referencia_aplicada && hasNumericRanges && hasNumericInput) {
           if (numericRangeRefs.length === 1) {
             referencia_aplicada = numericRangeRefs[0];
@@ -330,7 +407,7 @@ function validarCampoConReferencias(target) {
   let numericInRange = false;
   let alertMode = 'both';
   let alertColor = '#c62828';
-  let valor = parseNullableFloat(target.value);
+  let valor = parseNullableFloat(evaluationValueRaw);
   let showDescription = false;
   let descriptionText = '';
   let descriptionColor = '';
@@ -340,7 +417,11 @@ function validarCampoConReferencias(target) {
   } else {
     delete target.dataset.referenceStatus;
   }
-  if (referencia_aplicada && targetTextRaw !== '') {
+  if (referencia_aplicada && evaluationValueRaw !== '') {
+    const didSyncSelect = syncSelectToReferenceDescription(target, String(referencia_aplicada.desc ?? '').trim());
+    if (didSyncSelect) {
+      targetTextRaw = String(target.value ?? '').trim();
+    }
     alertMode = normalizeAlertMode(referencia_aplicada.alerta_modo ?? referencia_aplicada.alert_mode ?? 'both');
     alertColor = normalizeAlertColor(referencia_aplicada.alerta_color ?? referencia_aplicada.alert_color ?? '#c62828');
     showDescription = isTruthyRefFlag(referencia_aplicada.mostrar_descripcion_resultado ?? referencia_aplicada.show_result_description ?? 0) && !sinReferenciaAplicable;
@@ -353,7 +434,7 @@ function validarCampoConReferencias(target) {
     const hasNumericRule = (min !== null || max !== null);
 
     if (hasNumericRule) {
-      const numericStatus = evaluateNumericExpressionAgainstRange(target.value, min, max);
+      const numericStatus = evaluateNumericExpressionAgainstRange(evaluationValueRaw, min, max);
       if (numericStatus !== null) {
         numericRuleEvaluated = true;
         if (numericStatus === 'out') {
@@ -362,7 +443,7 @@ function validarCampoConReferencias(target) {
           numericInRange = true;
         }
       } else {
-        valor = parseNullableFloat(target.value, { min, max });
+        valor = parseNullableFloat(evaluationValueRaw, { min, max });
         if (valor !== null) {
           numericRuleEvaluated = true;
           if (min !== null && valor < min) fuera_rango = true;
@@ -420,7 +501,10 @@ function validarCampoConReferencias(target) {
     clearAlertStyles(target);
   }
   ensureAsteriskMarker(target, showAsterisk, alertColor);
-  ensureDescriptionMarker(target, (showDescription && descriptionText !== '' && !sinReferenciaAplicable) ? descriptionText : '', descriptionColor);
+  const currentDisplayText = getElementDisplayText(target);
+  const shouldHideDuplicateDescription = normalizeText(currentDisplayText) !== '' && normalizeText(currentDisplayText) === normalizeText(descriptionText);
+  const descToRender = (showDescription && descriptionText !== '' && !sinReferenciaAplicable && !shouldHideDuplicateDescription) ? descriptionText : '';
+  ensureDescriptionMarker(target, descToRender, descriptionColor);
 }
 
 document.addEventListener('input', function(e) {

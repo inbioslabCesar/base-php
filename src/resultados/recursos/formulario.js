@@ -1196,6 +1196,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const n = parseFloat(s);
             return Number.isFinite(n) ? n : null;
         };
+        const normalizeHexColor = (value, fallback) => {
+            const raw = String(value ?? '').trim();
+            return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : fallback;
+        };
 
         const getFieldMap = () => {
             const map = new Map();
@@ -1209,10 +1213,19 @@ document.addEventListener('DOMContentLoaded', function () {
             return map;
         };
 
-        const drawCurveOnCanvas = (canvas, points, connectGaps) => {
+        const drawCurveOnCanvas = (canvas, points, connectGaps, chartType, styleCfg) => {
             if (!canvas || typeof canvas.getContext !== 'function') return;
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
+            const palette = {
+                lineColor: normalizeHexColor(styleCfg && styleCfg.line_color, '#2563eb'),
+                pointColor: normalizeHexColor(styleCfg && styleCfg.point_color, '#0ea5e9'),
+                barFillColor: normalizeHexColor(styleCfg && styleCfg.bar_fill_color, '#fef3c7'),
+                barBorderColor: normalizeHexColor(styleCfg && styleCfg.bar_border_color, '#1f2937'),
+                gridColor: normalizeHexColor(styleCfg && styleCfg.grid_color, '#cfd8e6'),
+                axisColor: normalizeHexColor(styleCfg && styleCfg.axis_color, '#94a3b8'),
+                textColor: normalizeHexColor(styleCfg && styleCfg.text_color, '#334155')
+            };
 
             const dpr = window.devicePixelRatio || 1;
             const parentWidth = canvas.parentElement ? canvas.parentElement.clientWidth : 0;
@@ -1230,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const plotW = Math.max(20, cssWidth - pad.left - pad.right);
             const plotH = Math.max(20, cssHeight - pad.top - pad.bottom);
 
-            ctx.strokeStyle = '#dbe3ef';
+            ctx.strokeStyle = palette.axisColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(pad.left, pad.top);
@@ -1240,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const valid = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
             if (valid.length < 2) {
-                ctx.fillStyle = '#64748b';
+                ctx.fillStyle = palette.textColor;
                 ctx.font = '12px Segoe UI, Arial, sans-serif';
                 ctx.fillText('Datos insuficientes para graficar', pad.left + 8, pad.top + 18);
                 return;
@@ -1267,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const toX = (x) => pad.left + ((x - minX) / (maxX - minX)) * plotW;
             const toY = (y) => pad.top + (1 - ((y - minY) / (maxY - minY))) * plotH;
 
-            ctx.strokeStyle = '#cfd8e6';
+            ctx.strokeStyle = palette.gridColor;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
             for (let i = 1; i <= 3; i++) {
@@ -1278,58 +1291,88 @@ document.addEventListener('DOMContentLoaded', function () {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            ctx.strokeStyle = '#2563eb';
-            ctx.lineWidth = 2;
-
-            if (connectGaps) {
-                const sorted = valid.slice().sort((a, b) => a.x - b.x);
-                ctx.beginPath();
-                sorted.forEach((p, i) => {
-                    const x = toX(p.x);
+            if (String(chartType || 'line_curve') === 'bar_chart') {
+                const sortedBars = valid.slice().sort((a, b) => a.x - b.x);
+                const count = Math.max(1, sortedBars.length);
+                const slot = plotW / (count + 1);
+                const barWidth = Math.min(68, Math.max(18, slot * 0.72));
+                sortedBars.forEach((p, idx) => {
+                    const x = pad.left + (slot * (idx + 1));
                     const y = toY(p.y);
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                    const h = (pad.top + plotH) - y;
+                    ctx.fillStyle = palette.barFillColor;
+                    ctx.strokeStyle = palette.barBorderColor;
+                    ctx.lineWidth = 1.2;
+                    ctx.fillRect(x - barWidth / 2, y, barWidth, h);
+                    ctx.strokeRect(x - barWidth / 2, y, barWidth, h);
+                    ctx.fillStyle = palette.textColor;
+                    ctx.font = '11px Segoe UI, Arial, sans-serif';
+                    ctx.fillText(String(p.y), x - 10, Math.max(pad.top + 10, y - 6));
                 });
-                ctx.stroke();
             } else {
-                const all = points.slice().sort((a, b) => a.x - b.x);
-                let started = false;
-                ctx.beginPath();
-                all.forEach((p) => {
-                    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-                        started = false;
-                        return;
-                    }
+                ctx.strokeStyle = palette.lineColor;
+                ctx.lineWidth = 2;
+                if (connectGaps) {
+                    const sorted = valid.slice().sort((a, b) => a.x - b.x);
+                    ctx.beginPath();
+                    sorted.forEach((p, i) => {
+                        const x = toX(p.x);
+                        const y = toY(p.y);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                } else {
+                    const all = points.slice().sort((a, b) => a.x - b.x);
+                    let started = false;
+                    ctx.beginPath();
+                    all.forEach((p) => {
+                        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+                            started = false;
+                            return;
+                        }
+                        const x = toX(p.x);
+                        const y = toY(p.y);
+                        if (!started) {
+                            ctx.moveTo(x, y);
+                            started = true;
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    ctx.stroke();
+                }
+
+                const sortedForPoints = points.slice().sort((a, b) => a.x - b.x);
+                sortedForPoints.forEach((p) => {
+                    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
                     const x = toX(p.x);
                     const y = toY(p.y);
-                    if (!started) {
-                        ctx.moveTo(x, y);
-                        started = true;
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
+                    ctx.fillStyle = palette.pointColor;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
                 });
-                ctx.stroke();
             }
 
-            const sortedForPoints = points.slice().sort((a, b) => a.x - b.x);
-            sortedForPoints.forEach((p) => {
-                if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-                const x = toX(p.x);
-                const y = toY(p.y);
-                ctx.fillStyle = '#0ea5e9';
-                ctx.beginPath();
-                ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-                ctx.fill();
-            });
-
-            ctx.fillStyle = '#334155';
+            ctx.fillStyle = palette.textColor;
             ctx.font = '11px Segoe UI, Arial, sans-serif';
-            const xTicks = Array.from(new Set(valid.map((p) => p.x))).sort((a, b) => a - b);
-            xTicks.forEach((tick) => {
-                const x = toX(tick);
-                ctx.fillText(String(tick), x - 10, pad.top + plotH + 16);
-            });
+            if (String(chartType || 'line_curve') === 'bar_chart') {
+                const sortedBars = valid.slice().sort((a, b) => a.x - b.x);
+                const count = Math.max(1, sortedBars.length);
+                const slot = plotW / (count + 1);
+                sortedBars.forEach((p, idx) => {
+                    const x = pad.left + (slot * (idx + 1));
+                    const tickLabel = Number.isFinite(p.x) ? String(p.x) : '';
+                    ctx.fillText(tickLabel, x - 8, pad.top + plotH + 16);
+                });
+            } else {
+                const xTicks = Array.from(new Set(valid.map((p) => p.x))).sort((a, b) => a - b);
+                xTicks.forEach((tick) => {
+                    const x = toX(tick);
+                    ctx.fillText(String(tick), x - 10, pad.top + plotH + 16);
+                });
+            }
 
             ctx.fillText(minY.toFixed(1), 6, pad.top + plotH);
             ctx.fillText(maxY.toFixed(1), 6, pad.top + 10);
@@ -1370,20 +1413,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 const validCount = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y)).length;
                 const minRequired = Number.isFinite(parseInt(cfg.min_points_required, 10)) ? parseInt(cfg.min_points_required, 10) : 3;
                 const statusEl = curveCard.querySelector('.v2-curve-status');
+                const chartType = String(cfg.type || 'line_curve').toLowerCase();
+                const chartLabel = chartType === 'bar_chart' ? 'Gráfico de barras' : 'Curva';
                 if (statusEl) {
                     if (validCount >= minRequired) {
-                        statusEl.textContent = `Curva completa: ${validCount} punto(s) válidos.`;
+                        statusEl.textContent = `${chartLabel} completo: ${validCount} punto(s) válidos.`;
                         statusEl.classList.remove('text-warning');
                         statusEl.classList.add('text-success');
                     } else {
-                        statusEl.textContent = `Curva incompleta: ${validCount}/${minRequired} punto(s) válidos.`;
+                        statusEl.textContent = `${chartLabel} incompleto: ${validCount}/${minRequired} punto(s) válidos.`;
                         statusEl.classList.remove('text-success');
                         statusEl.classList.add('text-warning');
                     }
                 }
 
                 const canvas = curveCard.querySelector('.v2-curve-canvas');
-                drawCurveOnCanvas(canvas, points, !!cfg.connect_gaps);
+                drawCurveOnCanvas(canvas, points, !!cfg.connect_gaps, chartType, cfg);
             });
         };
 

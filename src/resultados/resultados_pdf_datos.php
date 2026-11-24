@@ -418,12 +418,16 @@ function obtenerItemsResultados($pdo, $rows) {
             $curvasV2 = [];
             $layoutRaw = is_array($formatDef['layout'] ?? null) ? $formatDef['layout'] : [];
             $chartsRaw = is_array($layoutRaw['charts'] ?? null) ? $layoutRaw['charts'] : [];
+            $pickColor = static function ($value, $fallback) {
+                $raw = trim((string)$value);
+                return preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $raw) ? $raw : $fallback;
+            };
             foreach ($chartsRaw as $chartIndex => $chartRaw) {
                 if (!is_array($chartRaw)) {
                     continue;
                 }
                 $chartType = strtolower(trim((string)($chartRaw['type'] ?? 'line_curve')));
-                if ($chartType !== 'line_curve') {
+                if (!in_array($chartType, ['line_curve', 'bar_chart'], true)) {
                     continue;
                 }
                 $yColId = trim((string)($chartRaw['y_col_id'] ?? ''));
@@ -500,12 +504,21 @@ function obtenerItemsResultados($pdo, $rows) {
                 $curvasV2[] = [
                     'id' => trim((string)($chartRaw['id'] ?? 'curva_' . ($chartIndex + 1))),
                     'label' => trim((string)($chartRaw['label'] ?? 'Curva ' . ($chartIndex + 1))),
+                    'type' => $chartType,
                     'y_col_id' => $yColId,
                     'min_points_required' => isset($chartRaw['min_points_required']) && is_numeric($chartRaw['min_points_required'])
                         ? max(2, min(20, (int)$chartRaw['min_points_required']))
                         : 3,
                     'connect_gaps' => !empty($chartRaw['connect_gaps']),
                     'strict_units' => !array_key_exists('strict_units', $chartRaw) || !empty($chartRaw['strict_units']),
+                    'line_color' => $pickColor($chartRaw['line_color'] ?? '', '#2563eb'),
+                    'point_color' => $pickColor($chartRaw['point_color'] ?? '', '#0ea5e9'),
+                    'bar_fill_color' => $pickColor($chartRaw['bar_fill_color'] ?? '', '#fef3c7'),
+                    'bar_border_color' => $pickColor($chartRaw['bar_border_color'] ?? '', '#1f2937'),
+                    'grid_color' => $pickColor($chartRaw['grid_color'] ?? '', '#cfd8e6'),
+                    'axis_color' => $pickColor($chartRaw['axis_color'] ?? '', '#94a3b8'),
+                    'text_color' => $pickColor($chartRaw['text_color'] ?? '', '#334155'),
+                    'reference_band_color' => $pickColor($chartRaw['reference_band_color'] ?? '', '#22c55e'),
                     'points' => $pointsOut,
                 ];
             }

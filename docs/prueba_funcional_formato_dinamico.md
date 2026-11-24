@@ -29,6 +29,21 @@ Usar un examen de laboratorio de ejemplo con estos elementos:
 - Parametro 3: Observacion libre
   - Debe conservar alineacion, color de fondo y color de texto.
 
+### Fixture sugerido para esta iteracion
+Para una validacion rapida del caso solicitado de Test de Aliento C14 en v2:
+
+```bash
+php scripts/crear_examen_prueba_aliento_c14_v2.php
+```
+
+Resultado esperado del script:
+- Inserta un examen con esquema `schema_version = 2`.
+- Incluye columnas dinamicas profesionales (Parametro, Valor CPM, Unidad, Referencia, Interpretacion).
+- Incluye rangos clinicos para clasificar resultado en Negativo / Indeterminado / Positivo.
+- Incluye curva v2 (`layout.charts`) para visualizar tendencia CPM en captura y PDF.
+- Puede definirse `type: "bar_chart"` para mostrar barras (como formato C14 de referencia).
+- El creador dinamico permite marcar referencias como alteradas y configurar valores/colores de alerta por texto (ej. POSITIVO, ALTERADO) de forma manual o desde opciones.
+
 ## Pacientes de prueba
 Usar al menos estos dos pacientes para forzar la logica de edad y sexo:
 

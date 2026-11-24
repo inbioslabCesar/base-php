@@ -220,7 +220,7 @@ class ExamCardView {
                     continue;
                 }
                 $chartType = strtolower(trim((string)($chartRaw['type'] ?? 'line_curve')));
-                if ($chartType !== 'line_curve') {
+                if (!in_array($chartType, ['line_curve', 'bar_chart'], true)) {
                     continue;
                 }
                 $yColId = trim((string)($chartRaw['y_col_id'] ?? ''));
@@ -278,15 +278,27 @@ class ExamCardView {
                 $minPoints = isset($chartRaw['min_points_required']) && is_numeric($chartRaw['min_points_required'])
                     ? max(2, min(20, (int)$chartRaw['min_points_required']))
                     : 3;
+                $pickColor = static function ($value, $fallback) {
+                    $raw = trim((string)$value);
+                    return preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $raw) ? $raw : $fallback;
+                };
 
                 $v2Curves[] = [
                     'id' => trim((string)($chartRaw['id'] ?? 'curva_' . ($idxChart + 1))),
                     'label' => trim((string)($chartRaw['label'] ?? 'Curva ' . ($idxChart + 1))),
-                    'type' => 'line_curve',
+                    'type' => $chartType,
                     'y_col_id' => $yColId,
                     'min_points_required' => $minPoints,
                     'connect_gaps' => !empty($chartRaw['connect_gaps']),
                     'strict_units' => !array_key_exists('strict_units', $chartRaw) || !empty($chartRaw['strict_units']),
+                    'line_color' => $pickColor($chartRaw['line_color'] ?? '', '#2563eb'),
+                    'point_color' => $pickColor($chartRaw['point_color'] ?? '', '#0ea5e9'),
+                    'bar_fill_color' => $pickColor($chartRaw['bar_fill_color'] ?? '', '#fef3c7'),
+                    'bar_border_color' => $pickColor($chartRaw['bar_border_color'] ?? '', '#1f2937'),
+                    'grid_color' => $pickColor($chartRaw['grid_color'] ?? '', '#cfd8e6'),
+                    'axis_color' => $pickColor($chartRaw['axis_color'] ?? '', '#94a3b8'),
+                    'text_color' => $pickColor($chartRaw['text_color'] ?? '', '#334155'),
+                    'reference_band_color' => $pickColor($chartRaw['reference_band_color'] ?? '', '#22c55e'),
                     'points' => $points,
                 ];
             }
@@ -837,7 +849,15 @@ class ExamCardView {
                                                                     $valorRef = trim((string)($refItem['valor'] ?? ''));
                                                                     $minRef = trim((string)($refItem['valor_min'] ?? ''));
                                                                     $maxRef = trim((string)($refItem['valor_max'] ?? ''));
-                                                                    $rangoRef = ($minRef !== '' || $maxRef !== '') ? trim(($minRef !== '' ? $minRef : '') . ' - ' . ($maxRef !== '' ? $maxRef : '')) : '';
+                                                                    if ($minRef !== '' && $maxRef !== '') {
+                                                                        $rangoRef = $minRef . ' - ' . $maxRef;
+                                                                    } elseif ($minRef !== '') {
+                                                                        $rangoRef = '>= ' . $minRef;
+                                                                    } elseif ($maxRef !== '') {
+                                                                        $rangoRef = '<= ' . $maxRef;
+                                                                    } else {
+                                                                        $rangoRef = '';
+                                                                    }
                                                                     $visibleRef = $valorRef !== '' ? $valorRef : $rangoRef;
                                                                     if ($descRef !== '' && $visibleRef !== '') {
                                                                         $refLines[] = $descRef . ' (' . $visibleRef . ')';

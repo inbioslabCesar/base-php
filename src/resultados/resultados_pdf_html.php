@@ -461,7 +461,13 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         return '<span style="' . $style . '">' . $prefix . $cellHtml . '</span>';
     };
 
-    $renderReferenciaV2 = static function ($value): string {
+    $normalizeOpenRangeText = static function (string $value): string {
+        $out = preg_replace('/\(\s*([+-]?\d+(?:[.,]\d+)?)\s*-\s*\)/u', '(>= $1)', $value);
+        $out = preg_replace('/\(\s*-\s*([+-]?\d+(?:[.,]\d+)?)\s*\)/u', '(<= $1)', (string)$out);
+        return (string)$out;
+    };
+
+    $renderReferenciaV2 = static function ($value) use ($normalizeOpenRangeText): string {
         $raw = trim((string)$value);
         if ($raw === '') {
             return '';
@@ -477,18 +483,34 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         }
 
         if (count($items) <= 1) {
-            return htmlspecialchars($raw);
+            return htmlspecialchars($normalizeOpenRangeText($raw));
         }
 
         $htmlList = '<table style="width:100%; border-collapse:collapse; font-size:10px;">';
         foreach ($items as $itemText) {
-            $htmlList .= '<tr><td style="padding:2px 0; border-bottom:0.4px solid #d9e3f5;">' . htmlspecialchars($itemText) . '</td></tr>';
+            $htmlList .= '<tr><td style="padding:2px 0; border-bottom:0.4px solid #d9e3f5;">' . htmlspecialchars($normalizeOpenRangeText($itemText)) . '</td></tr>';
         }
         $htmlList .= '</table>';
         return $htmlList;
     };
 
     $renderCurvaV2Pdf = static function (array $curve): string {
+        $chartType = strtolower(trim((string)($curve['type'] ?? 'line_curve')));
+        if (!in_array($chartType, ['line_curve', 'bar_chart'], true)) {
+            $chartType = 'line_curve';
+        }
+        $pickColor = static function ($value, $fallback) {
+            $raw = trim((string)$value);
+            return preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $raw) ? $raw : $fallback;
+        };
+        $lineColor = $pickColor($curve['line_color'] ?? '', '#2563eb');
+        $pointColor = $pickColor($curve['point_color'] ?? '', '#0ea5e9');
+        $barFillColor = $pickColor($curve['bar_fill_color'] ?? '', '#fef3c7');
+        $barBorderColor = $pickColor($curve['bar_border_color'] ?? '', '#1f2937');
+        $gridColor = $pickColor($curve['grid_color'] ?? '', '#cfd8e6');
+        $axisColor = $pickColor($curve['axis_color'] ?? '', '#94a3b8');
+        $textColor = $pickColor($curve['text_color'] ?? '', '#334155');
+        $refBandColor = $pickColor($curve['reference_band_color'] ?? '', '#22c55e');
         $points = is_array($curve['points'] ?? null) ? $curve['points'] : [];
         $pointsSorted = $points;
         usort($pointsSorted, static function ($a, $b) {
@@ -614,7 +636,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         }
         if ($hasBand && count($topPts) >= 2 && count($bottomPts) >= 2) {
             $poly = implode(' ', $topPts) . ' ' . implode(' ', array_reverse($bottomPts));
-            $refBand = '<polygon points="' . htmlspecialchars($poly, ENT_QUOTES, 'UTF-8') . '" fill="#22c55e" fill-opacity="0.12" stroke="none" />';
+            $refBand = '<polygon points="' . htmlspecialchars($poly, ENT_QUOTES, 'UTF-8') . '" fill="' . htmlspecialchars($refBandColor, ENT_QUOTES, 'UTF-8') . '" fill-opacity="0.12" stroke="none" />';
         }
 
         $xTicks = array_values(array_unique(array_map(static fn($p) => (string)((float)$p['x']), $validPoints)));
@@ -623,7 +645,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         foreach ($xTicks as $tick) {
             $t = (float)$tick;
             $xx = round($toX($t), 2);
-            $xLabels .= '<text x="' . $xx . '" y="' . ($padT + $plotH + 16) . '" font-size="10" fill="#334155" text-anchor="middle">' . htmlspecialchars((string)$tick) . '</text>';
+            $xLabels .= '<text x="' . $xx . '" y="' . ($padT + $plotH + 16) . '" font-size="10" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="middle">' . htmlspecialchars((string)$tick) . '</text>';
         }
 
         $pointCircles = '';
@@ -631,31 +653,53 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
         foreach ($validPoints as $p) {
             $cx = round($toX((float)$p['x']), 2);
             $cy = round($toY((float)$p['y']), 2);
-            $pointCircles .= '<circle cx="' . $cx . '" cy="' . $cy . '" r="3.2" fill="#0ea5e9" />';
-            $pointLabels .= '<text x="' . $cx . '" y="' . ($cy - 7) . '" font-size="9" fill="#0f172a" text-anchor="middle">' . htmlspecialchars((string)$p['y']) . '</text>';
+            $pointCircles .= '<circle cx="' . $cx . '" cy="' . $cy . '" r="3.2" fill="' . htmlspecialchars($pointColor, ENT_QUOTES, 'UTF-8') . '" />';
+            $pointLabels .= '<text x="' . $cx . '" y="' . ($cy - 7) . '" font-size="9" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="middle">' . htmlspecialchars((string)$p['y']) . '</text>';
         }
 
         $unitLabel = count($unitList) === 1 ? $unitList[0] : '';
         $unitInfo = $unitLabel !== '' ? ' (' . htmlspecialchars($unitLabel) . ')' : '';
 
+        $barsSvg = '';
+        $barAxisLabelsSvg = '';
+        if ($chartType === 'bar_chart') {
+            $bars = [];
+            $barCount = max(1, count($validPoints));
+            $slot = $plotW / ($barCount + 1);
+            $barWidth = min(68.0, max(18.0, ($slot * 0.72)));
+            foreach ($validPoints as $idx => $p) {
+                $xCenter = $padL + ($slot * ($idx + 1));
+                $yTop = $toY((float)$p['y']);
+                $bars[] = '<rect x="' . round($xCenter - ($barWidth / 2), 2) . '" y="' . round($yTop, 2) . '" width="' . round($barWidth, 2) . '" height="' . round(($padT + $plotH - $yTop), 2) . '" fill="' . htmlspecialchars($barFillColor, ENT_QUOTES, 'UTF-8') . '" stroke="' . htmlspecialchars($barBorderColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1.2" />';
+                $barAxisLabelsSvg .= '<text x="' . round($xCenter, 2) . '" y="' . ($padT + $plotH + 16) . '" font-size="10" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="middle">' . htmlspecialchars((string)((float)$p['x'])) . '</text>';
+            }
+            $barsSvg = implode('', $bars);
+        }
+
+        $seriesSvg = ($chartType === 'bar_chart')
+            ? $barsSvg
+            : '<polyline points="' . htmlspecialchars(implode(' ', $lineData), ENT_QUOTES, 'UTF-8') . '" fill="none" stroke="' . htmlspecialchars($lineColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="2" />';
+        $pointsSvg = ($chartType === 'bar_chart') ? '' : ($pointCircles . $pointLabels);
+        $xAxisTitle = ($chartType === 'bar_chart') ? 'Items' : 'Tiempo (min)';
+
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' . $svgW . ' ' . $svgH . '">'
             . '<rect x="0" y="0" width="' . $svgW . '" height="' . $svgH . '" fill="#ffffff" />'
-            . '<line x1="' . $padL . '" y1="' . $padT . '" x2="' . $padL . '" y2="' . ($padT + $plotH) . '" stroke="#94a3b8" stroke-width="1" />'
-            . '<line x1="' . $padL . '" y1="' . ($padT + $plotH) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + $plotH) . '" stroke="#94a3b8" stroke-width="1" />'
-            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.25)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.25)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
-            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.5)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.5)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
-            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.75)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.75)) . '" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 3" />'
+            . '<line x1="' . $padL . '" y1="' . $padT . '" x2="' . $padL . '" y2="' . ($padT + $plotH) . '" stroke="' . htmlspecialchars($axisColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + $plotH) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + $plotH) . '" stroke="' . htmlspecialchars($axisColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.25)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.25)) . '" stroke="' . htmlspecialchars($gridColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1" stroke-dasharray="4 3" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.5)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.5)) . '" stroke="' . htmlspecialchars($gridColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1" stroke-dasharray="4 3" />'
+            . '<line x1="' . $padL . '" y1="' . ($padT + ($plotH * 0.75)) . '" x2="' . ($padL + $plotW) . '" y2="' . ($padT + ($plotH * 0.75)) . '" stroke="' . htmlspecialchars($gridColor, ENT_QUOTES, 'UTF-8') . '" stroke-width="1" stroke-dasharray="4 3" />'
             . $refBand
-            . '<polyline points="' . htmlspecialchars(implode(' ', $lineData), ENT_QUOTES, 'UTF-8') . '" fill="none" stroke="#2563eb" stroke-width="2" />'
-            . $pointCircles
-            . $pointLabels
-            . '<text x="' . ($padL + $plotW / 2) . '" y="' . ($svgH - 7) . '" font-size="10" fill="#334155" text-anchor="middle">Tiempo (min)</text>'
-            . '<text x="12" y="' . ($padT + 10) . '" font-size="10" fill="#334155" text-anchor="start">' . htmlspecialchars((string)round($maxY, 2)) . '</text>'
-            . '<text x="12" y="' . ($padT + $plotH) . '" font-size="10" fill="#334155" text-anchor="start">' . htmlspecialchars((string)round($minY, 2)) . '</text>'
-            . $xLabels
+            . $seriesSvg
+            . $pointsSvg
+            . '<text x="' . ($padL + $plotW / 2) . '" y="' . ($svgH - 7) . '" font-size="10" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="middle">' . htmlspecialchars($xAxisTitle) . '</text>'
+            . '<text x="12" y="' . ($padT + 10) . '" font-size="10" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="start">' . htmlspecialchars((string)round($maxY, 2)) . '</text>'
+            . '<text x="12" y="' . ($padT + $plotH) . '" font-size="10" fill="' . htmlspecialchars($textColor, ENT_QUOTES, 'UTF-8') . '" text-anchor="start">' . htmlspecialchars((string)round($minY, 2)) . '</text>'
+            . ($chartType === 'bar_chart' ? $barAxisLabelsSvg : $xLabels)
             . '</svg>';
 
-        $status = 'Curva completa: ' . count($validPoints) . ' punto(s) validos. Y: ' . htmlspecialchars((string)($curve['y_col_id'] ?? 'resultado')) . $unitInfo . '.';
+        $chartLabel = ($chartType === 'bar_chart') ? 'Gráfico de barras' : 'Curva';
+        $status = $chartLabel . ' completo: ' . count($validPoints) . ' punto(s) validos. Y: ' . htmlspecialchars((string)($curve['y_col_id'] ?? 'resultado')) . $unitInfo . '.';
         return '<div style="margin:6px 0 10px 0; border:0.7px solid #d6e3f7; background:#f8fbff; padding:6px 8px;">'
             . '<div style="font-weight:700; color:#0f2a57; margin-bottom:4px;">' . htmlspecialchars($title) . '</div>'
             . $svg
@@ -854,7 +898,7 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                     $cellHtml = nl2br(htmlspecialchars((string)$val));
                     if ($kind === 'reference') {
                         $cellHtml = $renderReferenciaV2($val);
-                    } elseif (in_array($kind, ['result', 'select'], true) && $rowType === 'data') {
+                    } elseif (in_array($kind, ['result', 'select', 'number'], true) && $rowType === 'data') {
                         $currentReferences = [];
                         if (isset($rowRanges[$colId]) && is_array($rowRanges[$colId])) {
                             $currentReferences = $rowRanges[$colId];
@@ -970,7 +1014,12 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                         if ($sinReferenciaAplicable) {
                             $cellHtml .= '<br><em>Sin referencia aplicable</em>';
                         }
-                        if (!$sinReferenciaAplicable && $mostrarDescResultado && $descResultado !== '') {
+                        if (
+                            !$sinReferenciaAplicable
+                            && $mostrarDescResultado
+                            && $descResultado !== ''
+                            && $normalizeText((string)$val) !== $normalizeText($descResultado)
+                        ) {
                             $descHtml = htmlspecialchars($descResultado);
                             if ($descResultadoColor !== '') {
                                 $descHtml = '<span style="color:' . htmlspecialchars($descResultadoColor) . ';font-weight:600;">' . $descHtml . '</span>';
@@ -1152,7 +1201,12 @@ function armarHtmlReporte($paciente, $referencia, $empresa, $items) {
                 }
             }
             $valorFormateadoHtml = htmlspecialchars((string)$valorFormateado);
-            if (!$sin_referencia_aplicable && $mostrar_desc_resultado && $desc_resultado !== '') {
+            if (
+                !$sin_referencia_aplicable
+                && $mostrar_desc_resultado
+                && $desc_resultado !== ''
+                && $normalizeText((string)$valorOriginal) !== $normalizeText($desc_resultado)
+            ) {
                 $descHtml = htmlspecialchars($desc_resultado);
                 if ($desc_resultado_color !== '') {
                     $descHtml = '<span style="color:' . htmlspecialchars($desc_resultado_color) . ';font-weight:600;">' . $descHtml . '</span>';
