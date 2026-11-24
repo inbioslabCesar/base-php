@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/ui_theme.php';
+require_once __DIR__ . '/imagen_optimizar.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -700,14 +701,9 @@ if (!empty($_FILES['imagenes_carrusel']['name'][0])) {
     }
     foreach ($_FILES['imagenes_carrusel']['tmp_name'] as $key => $tmp_name) {
         if (!empty($tmp_name)) {
-            $nombreArchivo = basename($_FILES['imagenes_carrusel']['name'][$key]);
-            $ext = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
-            if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
-                $nuevoNombre = uniqid('carrusel_') . '.' . $ext;
-                $rutaRelativa = '../uploads/empresa/carrusel/' . $nuevoNombre;
-                if (move_uploaded_file($tmp_name, $uploadDir . $nuevoNombre)) {
-                    $imagenes_carrusel[] = $rutaRelativa;
-                }
+            $nuevoNombre = img_guardar_subida($tmp_name, basename($_FILES['imagenes_carrusel']['name'][$key]), $uploadDir, 'carrusel_', 1600);
+            if ($nuevoNombre !== null) {
+                $imagenes_carrusel[] = '../uploads/empresa/carrusel/' . $nuevoNombre;
             }
         }
     }
@@ -739,14 +735,9 @@ if (!empty($_FILES['imagenes_institucionales']['name'][0])) {
     }
     foreach ($_FILES['imagenes_institucionales']['tmp_name'] as $key => $tmp_name) {
         if (!empty($tmp_name)) {
-            $nombreArchivo = basename($_FILES['imagenes_institucionales']['name'][$key]);
-            $ext = strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION));
-            if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
-                $nuevoNombre = uniqid('institucional_') . '.' . $ext;
-                $rutaRelativa = '../uploads/empresa/institucional/' . $nuevoNombre;
-                if (move_uploaded_file($tmp_name, $uploadDir . $nuevoNombre)) {
-                    $imagenes_institucionales[] = $rutaRelativa;
-                }
+            $nuevoNombre = img_guardar_subida($tmp_name, basename($_FILES['imagenes_institucionales']['name'][$key]), $uploadDir, 'institucional_', 1200);
+            if ($nuevoNombre !== null) {
+                $imagenes_institucionales[] = '../uploads/empresa/institucional/' . $nuevoNombre;
             }
         }
     }
