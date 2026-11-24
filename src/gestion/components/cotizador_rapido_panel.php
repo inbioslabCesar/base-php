@@ -301,7 +301,8 @@ $generatedAt = date('Y-m-d H:i:s');
 }
 
 #<?= htmlspecialchars($tableId) ?> .btn-detalle-rapido,
-#<?= htmlspecialchars($tableId) ?> .btn-cotizar-rapido {
+#<?= htmlspecialchars($tableId) ?> .btn-cotizar-rapido,
+#<?= htmlspecialchars($tableId) ?> .btn-agregar-rapido {
     min-width: 96px;
 }
 
@@ -309,6 +310,61 @@ $generatedAt = date('Y-m-d H:i:s');
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.cotizador-rapido-carrito {
+    margin-top: 14px;
+    border: 1px solid #dce8f8;
+    border-radius: 12px;
+    background: #f8fbff;
+    padding: 12px;
+}
+
+.cotizador-rapido-carrito .carrito-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.cotizador-rapido-carrito .carrito-total {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1f3f60;
+}
+
+.cotizador-rapido-carrito .carrito-items {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.cotizador-rapido-carrito .carrito-item {
+    border: 1px solid #e2ebf7;
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.cotizador-rapido-carrito .carrito-item:last-child {
+    margin-bottom: 0;
+}
+
+.cotizador-rapido-carrito .carrito-empty {
+    font-size: 0.92rem;
+    color: #607890;
+    background: #fff;
+    border: 1px dashed #c9d9ec;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+}
+
+.cotizador-rapido-leyenda {
+    font-size: 0.83rem;
+    color: #607890;
 }
 
 #<?= htmlspecialchars($tableId) ?>_wrapper .dataTables_filter input,
@@ -385,15 +441,34 @@ $generatedAt = date('Y-m-d H:i:s');
                                     <button type="button" class="btn btn-outline-info btn-sm btn-detalle-rapido" data-examen="<?= $examenJson ?>">
                                         <i class="bi bi-eye"></i> Ver detalle
                                     </button>
-                                    <a href="<?= $contextType === 'cliente' ? 'dashboard.php?vista=form_cotizacion&examen_id=' . (int)$ex['id'] : 'dashboard.php?vista=buscar_cliente&examen_id=' . (int)$ex['id'] ?>" class="btn btn-sm btn-cotizar-rapido btn-cotizar-cta-global">
-                                        <i class="bi bi-cart-plus-fill"></i> Cotizar
-                                    </a>
+                                    <button type="button" class="btn btn-sm btn-success btn-agregar-rapido" data-examen="<?= $examenJson ?>">
+                                        <i class="bi bi-cart-plus-fill"></i> Agregar
+                                    </button>
                                 </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+
+        <div class="cotizador-rapido-carrito" id="<?= htmlspecialchars($tableId) ?>CarritoWrap">
+            <div class="carrito-head">
+                <div>
+                    <div class="fw-semibold text-primary">Lista rápida de exámenes</div>
+                    <div class="cotizador-rapido-leyenda">Arma la cotización sin registrar paciente.</div>
+                </div>
+                <div class="carrito-total" id="<?= htmlspecialchars($tableId) ?>CarritoTotal">Total: <?= htmlspecialchars($formatMoney(0)) ?></div>
+            </div>
+            <div class="carrito-items mb-2" id="<?= htmlspecialchars($tableId) ?>CarritoItems"></div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="<?= htmlspecialchars($tableId) ?>CarritoLimpiar">
+                    <i class="bi bi-trash"></i> Limpiar
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="<?= htmlspecialchars($tableId) ?>CarritoCotizarRapido">
+                    <i class="bi bi-receipt"></i> Cotización rápida (sin paciente)
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -406,6 +481,33 @@ $generatedAt = date('Y-m-d H:i:s');
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body" id="<?= htmlspecialchars($tableId) ?>DetalleBody"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="<?= htmlspecialchars($tableId) ?>ModalResumenRapido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cotización rápida sin registro de paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 small text-muted">
+                    <?= htmlspecialchars($entityLabel) ?>: <?= htmlspecialchars($entityName) ?><br>
+                    <?= htmlspecialchars($policyText) ?> | <?= htmlspecialchars($discountText) ?>
+                </div>
+                <div id="<?= htmlspecialchars($tableId) ?>ResumenRapidoBody"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary btn-sm" id="<?= htmlspecialchars($tableId) ?>ResumenCopiar">
+                    <i class="bi bi-clipboard"></i> Copiar
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="<?= htmlspecialchars($tableId) ?>ResumenImprimir">
+                    <i class="bi bi-printer"></i> Imprimir
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -426,6 +528,7 @@ $generatedAt = date('Y-m-d H:i:s');
     const tableId = <?= json_encode($tableId) ?>;
     const exportTitle = <?= json_encode($exportTitle) ?>;
     const exportFileBase = <?= json_encode($exportFileBase) ?>;
+    const currencyCfg = <?= json_encode($currencyCfg, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     const reportMeta = {
         companyName: <?= json_encode($companyName) ?>,
         companyRuc: <?= json_encode($companyRuc) ?>,
@@ -443,6 +546,211 @@ $generatedAt = date('Y-m-d H:i:s');
         discountText: <?= json_encode($discountText) ?>,
         generatedAt: <?= json_encode($generatedAt) ?>
     };
+    const carritoItemsEl = document.getElementById(tableId + 'CarritoItems');
+    const carritoTotalEl = document.getElementById(tableId + 'CarritoTotal');
+    const resumenBodyEl = document.getElementById(tableId + 'ResumenRapidoBody');
+    const modalResumenEl = document.getElementById(tableId + 'ModalResumenRapido');
+    const carrito = new Map();
+    const cartStorageKey = 'cotizador_rapido_carrito_' + <?= json_encode($contextType) ?> + '_' + <?= (int)$contextId ?>;
+
+    function formatMoney(value) {
+        const amount = Number(value || 0);
+        const decimals = Number(currencyCfg.decimals ?? 2);
+        const decimalSeparator = currencyCfg.decimal_separator ?? '.';
+        const thousandsSeparator = currencyCfg.thousands_separator ?? ',';
+        const symbol = currencyCfg.symbol ?? 'S/';
+        const position = currencyCfg.position === 'suffix' ? 'suffix' : 'prefix';
+        const fixed = amount.toFixed(decimals);
+        const parts = fixed.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSeparator);
+        const numberText = decimals > 0 ? parts.join(decimalSeparator) : parts[0];
+        return position === 'suffix' ? (numberText + ' ' + symbol) : (symbol + ' ' + numberText);
+    }
+
+    function escapeHtml(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function carritoToArray() {
+        return Array.from(carrito.values()).sort(function(a, b) {
+            return String(a.nombre || '').localeCompare(String(b.nombre || ''));
+        });
+    }
+
+    function saveCarritoToStorage() {
+        if (!window.localStorage) {
+            return;
+        }
+        const payload = carritoToArray().map(function(item) {
+            return {
+                id: Number(item.id || 0),
+                codigo: String(item.codigo || ''),
+                nombre: String(item.nombre || ''),
+                precio_efectivo: Number(item.precio_efectivo || 0)
+            };
+        }).filter(function(item) {
+            return item.id > 0 && item.nombre !== '';
+        });
+
+        if (payload.length === 0) {
+            window.localStorage.removeItem(cartStorageKey);
+            return;
+        }
+
+        window.localStorage.setItem(cartStorageKey, JSON.stringify(payload));
+    }
+
+    function loadCarritoFromStorage() {
+        if (!window.localStorage) {
+            return;
+        }
+        const raw = window.localStorage.getItem(cartStorageKey);
+        if (!raw) {
+            return;
+        }
+        let parsed = [];
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            parsed = [];
+        }
+        if (!Array.isArray(parsed)) {
+            return;
+        }
+        parsed.forEach(function(item) {
+            const id = Number(item && item.id ? item.id : 0);
+            if (id <= 0) {
+                return;
+            }
+            const price = Number(item.precio_efectivo || 0);
+            carrito.set(id, {
+                id: id,
+                codigo: String(item.codigo || ''),
+                nombre: String(item.nombre || ''),
+                precio_efectivo: isNaN(price) ? 0 : price
+            });
+        });
+    }
+
+    function calcularTotal() {
+        let total = 0;
+        carrito.forEach(function(item) {
+            total += Number(item.precio_efectivo || 0);
+        });
+        return total;
+    }
+
+    function renderCarrito() {
+        if (!carritoItemsEl || !carritoTotalEl) {
+            return;
+        }
+        const items = carritoToArray();
+        if (items.length === 0) {
+            carritoItemsEl.innerHTML = '<div class="carrito-empty">Aún no agregaste exámenes al carrito.</div>';
+            carritoTotalEl.textContent = 'Total: ' + formatMoney(0);
+            saveCarritoToStorage();
+            return;
+        }
+
+        let html = '';
+        items.forEach(function(item) {
+            const unit = Number(item.precio_efectivo || 0);
+            html += '' +
+                '<div class="carrito-item">' +
+                    '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                        '<div>' +
+                            '<div class="fw-semibold">' + escapeHtml(item.nombre || '-') + '</div>' +
+                            '<div class="small text-muted">Código: ' + escapeHtml(item.codigo || '-') + '</div>' +
+                            '<div class="small text-muted">Precio unitario: ' + escapeHtml(formatMoney(unit)) + '</div>' +
+                        '</div>' +
+                        '<button type="button" class="btn btn-outline-danger btn-sm btn-remove-cart" data-examen-id="' + Number(item.id) + '">' +
+                            '<i class="bi bi-x-lg"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="d-flex justify-content-between align-items-center mt-2">' +
+                        '<div class="small text-muted">Cada examen se agrega una sola vez.</div>' +
+                        '<div class="fw-semibold text-primary">Subtotal: ' + escapeHtml(formatMoney(unit)) + '</div>' +
+                    '</div>' +
+                '</div>';
+        });
+
+        carritoItemsEl.innerHTML = html;
+        carritoTotalEl.textContent = 'Total: ' + formatMoney(calcularTotal());
+        saveCarritoToStorage();
+    }
+
+    function addToCarrito(ex) {
+        const examId = Number(ex.id || 0);
+        if (examId <= 0) {
+            return;
+        }
+        const existing = carrito.get(examId);
+        if (existing) {
+            renderCarrito();
+            return;
+        } else {
+            carrito.set(examId, {
+                id: examId,
+                codigo: String(ex.codigo || ''),
+                nombre: String(ex.nombre || ''),
+                precio_efectivo: Number(ex.precio_efectivo || 0)
+            });
+        }
+        renderCarrito();
+    }
+
+    function buildResumenRapido() {
+        const items = carritoToArray();
+        if (items.length === 0) {
+            return {
+                html: '<div class="alert alert-warning mb-0">Agrega al menos un examen al carrito para cotizar.</div>',
+                text: ''
+            };
+        }
+
+        let linesHtml = '<div class="table-responsive"><table class="table table-sm table-bordered align-middle"><thead><tr><th>Examen</th><th style="width:140px;">P. unitario</th><th style="width:150px;">Subtotal</th></tr></thead><tbody>';
+        const linesText = [];
+        items.forEach(function(item) {
+            const unit = Number(item.precio_efectivo || 0);
+            const sub = unit;
+            linesHtml += '<tr>' +
+                '<td><strong>' + escapeHtml(item.nombre || '-') + '</strong><br><small class="text-muted">Código: ' + escapeHtml(item.codigo || '-') + '</small></td>' +
+                '<td>' + escapeHtml(formatMoney(unit)) + '</td>' +
+                '<td>' + escapeHtml(formatMoney(sub)) + '</td>' +
+            '</tr>';
+            linesText.push('- ' + (item.nombre || '-') + ' (' + formatMoney(sub) + ')');
+        });
+        linesHtml += '</tbody></table></div>';
+        const total = formatMoney(calcularTotal());
+        const remitente = reportMeta.entityName || reportMeta.companyName || 'Inbioslab';
+        const introHtml = '' +
+            '<div class="border rounded p-2 mb-2 bg-light">' +
+                '<div>Hola 👋</div>' +
+                '<div>Le saluda <strong>' + escapeHtml(remitente) + '</strong> 🧪, su laboratorio clínico de confianza.</div>' +
+                '<div>Con gusto le compartimos su cotización:</div>' +
+            '</div>';
+        const bodyHtml = introHtml + linesHtml + '<div class="fw-semibold text-end text-primary">Total: ' + escapeHtml(total) + '</div>';
+        const bodyText = [
+            'Hola 👋',
+            'Le saluda *' + remitente + '* 🧪, su laboratorio clínico de confianza.',
+            'Con gusto le compartimos su cotización:',
+            reportMeta.policyText + ' | ' + reportMeta.discountText,
+            '',
+            'Detalle:',
+            linesText.join('\n'),
+            '',
+            'Total: ' + total
+        ].join('\n');
+
+        return { html: bodyHtml, text: bodyText };
+    }
+
+    renderCarrito();
 
     const reportSubtitleLines = [
         reportMeta.entityLabel + ': ' + reportMeta.entityName,
@@ -695,6 +1003,80 @@ $generatedAt = date('Y-m-d H:i:s');
             const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
             modalInstance.show();
         }
+    });
+
+    $(document).on('click', '#' + tableId + ' .btn-agregar-rapido', function() {
+        const raw = $(this).attr('data-examen') || '{}';
+        let ex = {};
+        try {
+            ex = JSON.parse(raw);
+        } catch (e) {
+            ex = {};
+        }
+        addToCarrito(ex);
+    });
+
+    $(document).on('click', '#' + tableId + ' .btn-remove-cart', function() {
+        const examId = Number($(this).attr('data-examen-id') || 0);
+        carrito.delete(examId);
+        renderCarrito();
+    });
+
+    $('#' + tableId + 'CarritoLimpiar').on('click', function() {
+        carrito.clear();
+        renderCarrito();
+    });
+
+    $('#' + tableId + 'CarritoCotizarRapido').on('click', function() {
+        const resumen = buildResumenRapido();
+        if (resumenBodyEl) {
+            resumenBodyEl.innerHTML = resumen.html;
+            resumenBodyEl.setAttribute('data-copy-text', resumen.text);
+        }
+        if (modalResumenEl && window.bootstrap && typeof window.bootstrap.Modal === 'function') {
+            const modalInstance = window.bootstrap.Modal.getOrCreateInstance(modalResumenEl);
+            modalInstance.show();
+        }
+    });
+
+    $('#' + tableId + 'ResumenCopiar').on('click', function() {
+        if (!resumenBodyEl) {
+            return;
+        }
+        const text = resumenBodyEl.getAttribute('data-copy-text') || '';
+        if (!text) {
+            return;
+        }
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(text);
+        }
+    });
+
+    $('#' + tableId + 'ResumenImprimir').on('click', function() {
+        if (!resumenBodyEl) {
+            return;
+        }
+        const html = resumenBodyEl.innerHTML || '';
+        if (!html) {
+            return;
+        }
+        const w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) {
+            return;
+        }
+        w.document.open();
+        w.document.write(
+            '<html><head><title>Cotización rápida</title>' +
+            '<style>body{font-family:Arial,sans-serif;padding:18px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d5dfec;padding:6px;text-align:left}.text-end{text-align:right}.text-primary{color:#1f3f60}</style>' +
+            '</head><body>' +
+            '<h3>Cotización rápida</h3>' +
+            '<div style="margin-bottom:8px;font-size:13px;color:#4a637d">' + escapeHtml(reportMeta.entityLabel + ': ' + reportMeta.entityName) + '</div>' +
+            html +
+            '</body></html>'
+        );
+        w.document.close();
+        w.focus();
+        w.print();
     });
 })();
 </script>

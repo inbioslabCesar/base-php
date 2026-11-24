@@ -137,6 +137,7 @@ if ($rolSidebar === 'empresa') {
 } elseif ($rolSidebar === 'engineer') {
     $agregarItemSidebar($sidebarItems, 'configuracion', 'config_operacion_engineer', 'Configuracion Operativa', 'bi-sliders');
     $agregarItemSidebar($sidebarItems, 'configuracion', 'config_personalizacion_engineer', 'Personalizacion', 'bi-palette');
+    $agregarItemSidebar($sidebarItems, 'configuracion', 'control_pagos_engineer', 'Control de pagos', 'bi-cash-coin');
 }
 
 $renderSidebarAccordion = static function (string $accordionId, array $sections, array $items): void {

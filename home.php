@@ -41,7 +41,7 @@ if (!function_exists('normalizar_ruta_empresa')) {
          </div>
          <div class="carousel-inner">
              <?php foreach ($imagenes_carrusel as $i => $img): ?>
-                 <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>">
+                 <div class="carousel-item <?= $i === 0 ? 'active' : '' ?>" style="--hero-bg:url('<?= htmlspecialchars(str_replace(["'", '\\'], ['%27', '/'], normalizar_ruta_empresa($img)), ENT_QUOTES, 'UTF-8') ?>')">
                      <img src="<?= htmlspecialchars(normalizar_ruta_empresa($img)) ?>" class="d-block w-100" alt="Slider <?= $i + 1 ?>">
                  </div>
              <?php endforeach; ?>

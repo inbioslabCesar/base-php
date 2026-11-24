@@ -564,6 +564,33 @@ if ($portalPublicoEstilo === 'premium_b') {
             }
         }
 
+        /* Carrusel principal: imagen completa (sin recortar) sobre su propia versión difuminada */
+        #sliderEmpresa .carousel-item {
+            position: relative;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        #sliderEmpresa .carousel-item::before {
+            content: '';
+            position: absolute;
+            inset: -24px;
+            background: var(--hero-bg) center / cover no-repeat;
+            filter: blur(24px) brightness(0.72);
+        }
+
+        #sliderEmpresa .carousel-item img {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            height: min(560px, 62vw);
+            max-height: none;
+            object-fit: contain;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
         .promo-section-title {
             text-align: center;
             font-size: 2rem;

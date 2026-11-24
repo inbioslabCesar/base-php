@@ -98,7 +98,6 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
                             <thead>
                                 <tr>
                                     <th>Examen</th>
-                                    <th style="width:90px">Cant.</th>
                                     <?php if ($conPrecios): ?><th class="text-end" style="width:100px">P. unit.</th><th class="text-end" style="width:110px">Subtotal</th><?php endif; ?>
                                     <th style="width:40px"></th>
                                 </tr>
@@ -246,7 +245,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
     }
     function totales() {
         let sub = 0;
-        carrito.forEach((cant, id) => { sub += Math.round(precioUnit(porId.get(id)) * cant * 100) / 100; });
+        carrito.forEach((_, id) => { sub += Math.round(precioUnit(porId.get(id)) * 100) / 100; });
         const d = descExtra();
         const monto = Math.round(sub * d) / 100;
         return { sub, d, monto, total: Math.round((sub - monto) * 100) / 100 };
@@ -313,7 +312,10 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
     }
 
     function agregar(id) {
-        carrito.set(id, (carrito.get(id) || 0) + 1);
+        if (carrito.has(id)) {
+            return;
+        }
+        carrito.set(id, 1);
         refrescar();
     }
 
@@ -321,24 +323,12 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
     function renderCarrito() {
         const tb = $('cxCarrito');
         tb.textContent = '';
-        carrito.forEach((cant, id) => {
+        carrito.forEach((_, id) => {
             const e = porId.get(id);
             const tr = document.createElement('tr');
             const tdN = document.createElement('td');
             tdN.textContent = e.nombre;
-            const tdC = document.createElement('td');
-            const inp = document.createElement('input');
-            inp.type = 'number';
-            inp.min = 1;
-            inp.max = 99;
-            inp.value = cant;
-            inp.className = 'form-control form-control-sm';
-            inp.addEventListener('change', () => {
-                carrito.set(id, Math.min(99, Math.max(1, parseInt(inp.value, 10) || 1)));
-                refrescar();
-            });
-            tdC.appendChild(inp);
-            tr.append(tdN, tdC);
+            tr.append(tdN);
             if (D.precios) {
                 const u = precioUnit(e);
                 const tdU = document.createElement('td');
@@ -346,7 +336,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
                 tdU.textContent = fmt(u);
                 const tdS = document.createElement('td');
                 tdS.className = 'text-end';
-                tdS.textContent = fmt(Math.round(u * cant * 100) / 100);
+                tdS.textContent = fmt(Math.round(u * 100) / 100);
                 tr.append(tdU, tdS);
             }
             const tdX = document.createElement('td');
@@ -370,7 +360,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
                 const fila = (txt, val, fuerte) => {
                     const tr = document.createElement('tr');
                     const a = document.createElement('td');
-                    a.colSpan = 3;
+                    a.colSpan = 2;
                     a.className = 'text-end' + (fuerte ? ' fw-bold fs-5' : '');
                     a.textContent = txt;
                     const b = document.createElement('td');
@@ -402,13 +392,13 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
         const entregas = [];
         const indicaciones = [];
         let i = 0;
-        carrito.forEach((cant, id) => {
+        carrito.forEach((_, id) => {
             const e = porId.get(id);
             i++;
             if (D.precios) {
                 const u = precioUnit(e);
-                const sub = Math.round(u * cant * 100) / 100;
-                detalle.push(i + '. ' + e.nombre + (cant > 1 ? ' (' + cant + ' x ' + fmt(u) + ')' : '') + ' — ' + fmt(sub));
+                const sub = Math.round(u * 100) / 100;
+                detalle.push(i + '. ' + e.nombre + ' — ' + fmt(sub));
             } else {
                 detalle.push(i + '. *' + e.nombre + '*');
                 if (e.tipo_muestra) detalle.push('   🧫 Muestra: ' + e.tipo_muestra);
@@ -489,7 +479,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
     /* ---------- Guardado en historial ---------- */
     function estadoCarrito() {
         const items = [];
-        carrito.forEach((cant, id) => items.push({ id, cant }));
+        carrito.forEach((_, id) => items.push({ id, cant: 1 }));
         return {
             items: JSON.stringify(items),
             perfil: D.precios ? $('cxPerfil').value : 'particular',
@@ -617,11 +607,11 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
         if (!requerirItems()) return;
         await asegurarGuardado('ticket');
         let filas = '';
-        carrito.forEach((cant, id) => {
+        carrito.forEach((_, id) => {
             const e = porId.get(id);
             if (D.precios) {
                 const u = precioUnit(e);
-                filas += '<div class="it"><div>' + esc(e.nombre) + '</div><div class="r">' + cant + ' x ' + esc(fmt(u)) + ' = ' + esc(fmt(Math.round(u * cant * 100) / 100)) + '</div></div>';
+                filas += '<div class="it"><div>' + esc(e.nombre) + '</div><div class="r">' + esc(fmt(Math.round(u * 100) / 100)) + '</div></div>';
             } else {
                 filas += '<div class="it"><div><b>' + esc(e.nombre) + '</b></div>'
                     + (e.tipo_muestra ? '<div class="s">Muestra: ' + esc(e.tipo_muestra) + '</div>' : '')
@@ -679,7 +669,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
         await asegurarGuardado('pdf');
         const f = $('cxPdfForm');
         const items = [];
-        carrito.forEach((cant, id) => items.push({ id, cant }));
+        carrito.forEach((_, id) => items.push({ id, cant: 1 }));
         const setF = (name, val) => { f.querySelector('[name="' + name + '"]').value = val; };
         f.target = '_blank';
         setF('items', JSON.stringify(items));
@@ -861,7 +851,7 @@ $jsonExpress = json_encode($payloadExpress, JSON_UNESCAPED_UNICODE | JSON_HEX_TA
 
     /* ---------- Reutilizar una cotización anterior ---------- */
     if (D.prefill) {
-        D.prefill.items.forEach((it) => { if (porId.has(it.id)) carrito.set(it.id, Math.min(99, Math.max(1, it.cant))); });
+        D.prefill.items.forEach((it) => { if (porId.has(it.id)) carrito.set(it.id, 1); });
         if (D.precios) {
             if ([...$('cxPerfil').options].some((o) => o.value === D.prefill.perfil)) $('cxPerfil').value = D.prefill.perfil;
             $('cxDesc').value = D.prefill.desc;
