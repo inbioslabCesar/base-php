@@ -565,6 +565,7 @@ if (!is_string($ubicacionesJsonPretty) || $ubicacionesJsonPretty === '') {
                 </div>
                 <label for="imagenes_carrusel" class="form-label mt-2">Agregar nuevas imágenes (PNG/JPG/JPEG):</label>
                 <input type="file" class="form-control" id="imagenes_carrusel" name="imagenes_carrusel[]" accept="image/png, image/jpeg" multiple>
+                <small class="text-muted">Recomendado 1600×900 px (16:9). Se muestran completas, sin recortar, y se optimizan automáticamente al subir.</small>
             </div>
 
             <!-- Imágenes institucionales -->

@@ -412,25 +412,65 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             backdrop-filter: blur(7px);
         }
 
-        .hero-carousel,
-        .hero-carousel .carousel-item,
-        .hero-carousel img {
+        .hero-carousel {
+            position: relative;
+            overflow: hidden;
             width: 100%;
             border-radius: 16px;
+            background: #0f172a;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.22);
         }
 
-        .hero-carousel img {
-            height: 300px;
-            object-fit: cover;
+        /* La imagen se muestra completa (sin recortar) sobre su propia versión difuminada */
+        .hero-carousel .carousel-item {
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            max-height: min(600px, 70vh);
+            background: #0f172a;
+        }
+
+        .hero-carousel .carousel-item::before {
+            content: '';
+            position: absolute;
+            inset: -24px;
+            background: var(--hero-bg) center / cover no-repeat;
+            filter: blur(24px) brightness(0.72);
+        }
+
+        .hero-carousel .carousel-item img {
+            position: relative;
             display: block;
-            box-shadow: 0 10px 24px rgba(0,0,0,0.16);
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .hero-carousel .carousel-indicators {
+            margin-bottom: .6rem;
+        }
+
+        .hero-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem 1.25rem;
+            margin-top: 1rem;
+            padding: .9rem 1.2rem;
+        }
+
+        .hero-bar p {
+            font-size: clamp(0.85rem, 1.2vw, 1rem);
+            margin: 0;
         }
 
         .hero-title {
-            font-size: clamp(1.9rem, 3.6vw, 3.1rem);
-            font-weight: 800;
-            line-height: 1.04;
-            letter-spacing: -0.02em;
+            font-size: clamp(1.15rem, 2.1vw, 1.7rem);
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+            margin: 0 0 .2rem;
         }
 
         .btn-pb {
@@ -573,8 +613,8 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
 
         .institucional-strip img {
             width: 100%;
-            height: 140px;
-            object-fit: cover;
+            aspect-ratio: 4 / 3;
+            object-fit: contain;
             border-radius: 12px;
             border: 1px solid rgba(0,0,0,0.06);
             box-shadow: 0 8px 16px rgba(0,0,0,0.08);
@@ -711,8 +751,11 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             .brand-logo-premium-b {
                 height: 62px;
             }
-            .hero-carousel img {
-                height: 220px;
+            .hero-carousel .carousel-item {
+                aspect-ratio: 4 / 3;
+            }
+            .hero-bar {
+                padding: .8rem 1rem;
             }
             .institucional-strip {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -757,44 +800,57 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
                 </div>
             </nav>
 
+            <?php
+            $heroSlides = [];
+            foreach ($carruselData as $img) {
+                $u = $toPublicAsset((string)$img);
+                if ($u !== '') {
+                    $heroSlides[] = $u;
+                }
+            }
+            ?>
             <div class="hero-wrap">
-                <div class="row align-items-center g-4">
-                    <div class="col-12 col-lg-7">
-                        <div class="hero-card">
-                            <h1 class="hero-title mb-2"><?= htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') ?></h1>
-                            <p class="mb-3"><?= htmlspecialchars($subline, ENT_QUOTES, 'UTF-8') ?></p>
-                            <a class="btn btn-pb" href="#contacto">Solicitar atencion</a>
-                        </div>
-                    </div>
-                    <div class="col-12 col-lg-5">
-                        <?php if (!empty($carruselData[0])): ?>
-                            <div id="premiumHeroCarouselB" class="carousel slide hero-carousel" data-bs-ride="carousel" data-bs-interval="3200">
-                                <div class="carousel-inner">
-                                    <?php foreach ($carruselData as $idx => $img): ?>
-                                        <?php $imgUrl = $toPublicAsset((string)$img); ?>
-                                        <?php if ($imgUrl === '') continue; ?>
-                                        <div class="carousel-item <?= $idx === 0 ? 'active' : '' ?>">
-                                            <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Carrusel <?= (int)$idx + 1 ?>">
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                                <button class="carousel-control-prev" type="button" data-bs-target="#premiumHeroCarouselB" data-bs-slide="prev">
-                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Anterior</span>
-                                </button>
-                                <button class="carousel-control-next" type="button" data-bs-target="#premiumHeroCarouselB" data-bs-slide="next">
-                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Siguiente</span>
-                                </button>
-                            </div>
-                        <?php else: ?>
-                            <div class="hero-card">
-                                <i class="bi bi-hospital fs-2"></i>
-                                <div class="mt-2">Cuidamos tu salud con precision y confianza.</div>
+                <?php if (!empty($heroSlides)): ?>
+                    <div id="premiumHeroCarouselB" class="carousel slide carousel-fade hero-carousel" data-bs-ride="carousel" data-bs-interval="5000">
+                        <?php if (count($heroSlides) > 1): ?>
+                            <div class="carousel-indicators">
+                                <?php foreach ($heroSlides as $idx => $imgUrl): ?>
+                                    <button type="button" data-bs-target="#premiumHeroCarouselB" data-bs-slide-to="<?= (int)$idx ?>" class="<?= $idx === 0 ? 'active' : '' ?>" <?= $idx === 0 ? 'aria-current="true"' : '' ?> aria-label="Imagen <?= (int)$idx + 1 ?>"></button>
+                                <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
+                        <div class="carousel-inner">
+                            <?php foreach ($heroSlides as $idx => $imgUrl): ?>
+                                <div class="carousel-item <?= $idx === 0 ? 'active' : '' ?>" style="--hero-bg:url('<?= htmlspecialchars(str_replace(["'", '\\'], ['%27', '/'], $imgUrl), ENT_QUOTES, 'UTF-8') ?>')">
+                                    <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Carrusel <?= (int)$idx + 1 ?>">
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php if (count($heroSlides) > 1): ?>
+                            <button class="carousel-control-prev" type="button" data-bs-target="#premiumHeroCarouselB" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Anterior</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#premiumHeroCarouselB" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Siguiente</span>
+                            </button>
+                        <?php endif; ?>
                     </div>
-                </div>
+                    <div class="hero-card hero-bar">
+                        <div>
+                            <h1 class="hero-title"><?= htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') ?></h1>
+                            <p><?= htmlspecialchars($subline, ENT_QUOTES, 'UTF-8') ?></p>
+                        </div>
+                        <a class="btn btn-pb" href="#contacto">Solicitar atencion</a>
+                    </div>
+                <?php else: ?>
+                    <div class="hero-card">
+                        <h1 class="hero-title mb-2"><?= htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') ?></h1>
+                        <p class="mb-3"><?= htmlspecialchars($subline, ENT_QUOTES, 'UTF-8') ?></p>
+                        <a class="btn btn-pb" href="#contacto">Solicitar atencion</a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </header>

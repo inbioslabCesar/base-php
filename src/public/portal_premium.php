@@ -403,30 +403,64 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             padding: 1.6rem;
         }
 
-        .hero-carousel,
-        .hero-carousel .carousel-item,
-        .hero-carousel img {
+        .hero-carousel {
+            position: relative;
+            overflow: hidden;
             width: 100%;
             border-radius: 18px;
+            background: #0f172a;
+            box-shadow: 0 14px 34px rgba(0,0,0,0.24);
         }
 
-        .hero-carousel img {
-            height: 300px;
-            object-fit: cover;
+        /* La imagen se muestra completa (sin recortar) sobre su propia versión difuminada */
+        .hero-carousel .carousel-item {
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            max-height: min(600px, 70vh);
+            background: #0f172a;
+        }
+
+        .hero-carousel .carousel-item::before {
+            content: '';
+            position: absolute;
+            inset: -24px;
+            background: var(--hero-bg) center / cover no-repeat;
+            filter: blur(24px) brightness(0.72);
+        }
+
+        .hero-carousel .carousel-item img {
+            position: relative;
             display: block;
-            box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .hero-carousel .carousel-indicators {
+            margin-bottom: .6rem;
+        }
+
+        .hero-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: .75rem 1.25rem;
+            margin-top: 1rem;
+            padding: .9rem 1.2rem;
         }
 
         .hero h1 {
-            font-size: clamp(2rem, 4vw, 3.2rem);
-            line-height: 1.05;
-            margin-bottom: 0.8rem;
-            font-weight: 800;
-            letter-spacing: -0.03em;
+            font-size: clamp(1.15rem, 2.1vw, 1.7rem);
+            line-height: 1.15;
+            margin-bottom: 0.2rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
         }
 
         .hero p {
-            font-size: 1.05rem;
+            font-size: clamp(0.85rem, 1.2vw, 1rem);
             opacity: 0.96;
         }
 
@@ -479,8 +513,8 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
 
         .institucional-grid img {
             width: 100%;
-            height: 160px;
-            object-fit: cover;
+            aspect-ratio: 4 / 3;
+            object-fit: contain;
             border-radius: 14px;
             box-shadow: 0 8px 18px rgba(0,0,0,0.08);
             border: 1px solid rgba(0,0,0,0.06);
@@ -722,8 +756,11 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
             .promo-media {
                 height: 170px;
             }
-            .hero-carousel img {
-                height: 220px;
+            .hero-carousel .carousel-item {
+                aspect-ratio: 4 / 3;
+            }
+            .hero-bar {
+                padding: .8rem 1rem;
             }
             .institucional-grid {
                 grid-template-columns: 1fr;
@@ -748,50 +785,58 @@ if (!empty($redes_sociales) && is_array($redes_sociales)) {
 <body>
     <?php include __DIR__ . '/../../nav.php'; ?>
 
+    <?php
+    $heroSlides = [];
+    foreach ($imgCarrusel as $img) {
+        $u = $toPublicAsset((string)$img);
+        if ($u !== '') {
+            $heroSlides[] = $u;
+        }
+    }
+    ?>
     <section class="hero" id="inicio">
         <div class="container">
-            <div class="row g-4 align-items-center">
-                <div class="col-12 col-lg-7">
-                    <div class="hero-panel">
-                        <h1><?= htmlspecialchars($heroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
-                        <p class="mb-3"><?= htmlspecialchars($heroSubtitle, ENT_QUOTES, 'UTF-8') ?></p>
-                        <a class="btn btn-premium" href="#contacto">Agendar consulta</a>
-                    </div>
-                </div>
-                <div class="col-12 col-lg-5">
-                    <?php if (!empty($imgCarrusel[0])): ?>
-                        <div id="premiumHeroCarouselA" class="carousel slide hero-carousel" data-bs-ride="carousel" data-bs-interval="3200">
-                            <div class="carousel-inner">
-                                <?php foreach ($imgCarrusel as $idx => $img): ?>
-                                    <?php $imgUrl = $toPublicAsset((string)$img); ?>
-                                    <?php if ($imgUrl === '') continue; ?>
-                                    <div class="carousel-item <?= $idx === 0 ? 'active' : '' ?>">
-                                        <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Carrusel <?= (int)$idx + 1 ?>">
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <button class="carousel-control-prev" type="button" data-bs-target="#premiumHeroCarouselA" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Anterior</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#premiumHeroCarouselA" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Siguiente</span>
-                            </button>
-                        </div>
-                    <?php else: ?>
-                        <div class="hero-panel">
-                            <div class="d-flex align-items-center gap-3">
-                                <i class="bi bi-heart-pulse-fill fs-2"></i>
-                                <div>
-                                    <strong>Profesionales en accion</strong>
-                                    <div>Cuidamos tu salud con precision y confianza.</div>
-                                </div>
-                            </div>
+            <?php if (!empty($heroSlides)): ?>
+                <div id="premiumHeroCarouselA" class="carousel slide carousel-fade hero-carousel" data-bs-ride="carousel" data-bs-interval="5000">
+                    <?php if (count($heroSlides) > 1): ?>
+                        <div class="carousel-indicators">
+                            <?php foreach ($heroSlides as $idx => $imgUrl): ?>
+                                <button type="button" data-bs-target="#premiumHeroCarouselA" data-bs-slide-to="<?= (int)$idx ?>" class="<?= $idx === 0 ? 'active' : '' ?>" <?= $idx === 0 ? 'aria-current="true"' : '' ?> aria-label="Imagen <?= (int)$idx + 1 ?>"></button>
+                            <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
+                    <div class="carousel-inner">
+                        <?php foreach ($heroSlides as $idx => $imgUrl): ?>
+                            <div class="carousel-item <?= $idx === 0 ? 'active' : '' ?>" style="--hero-bg:url('<?= htmlspecialchars(str_replace(["'", '\\'], ['%27', '/'], $imgUrl), ENT_QUOTES, 'UTF-8') ?>')">
+                                <img src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Carrusel <?= (int)$idx + 1 ?>">
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if (count($heroSlides) > 1): ?>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#premiumHeroCarouselA" data-bs-slide="prev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Anterior</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#premiumHeroCarouselA" data-bs-slide="next">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Siguiente</span>
+                        </button>
+                    <?php endif; ?>
                 </div>
-            </div>
+                <div class="hero-panel hero-bar">
+                    <div>
+                        <h1><?= htmlspecialchars($heroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+                        <p class="mb-0"><?= htmlspecialchars($heroSubtitle, ENT_QUOTES, 'UTF-8') ?></p>
+                    </div>
+                    <a class="btn btn-premium" href="#contacto">Agendar consulta</a>
+                </div>
+            <?php else: ?>
+                <div class="hero-panel">
+                    <h1><?= htmlspecialchars($heroTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+                    <p class="mb-3"><?= htmlspecialchars($heroSubtitle, ENT_QUOTES, 'UTF-8') ?></p>
+                    <a class="btn btn-premium" href="#contacto">Agendar consulta</a>
+                </div>
+            <?php endif; ?>
         </div>
     </section>
 
