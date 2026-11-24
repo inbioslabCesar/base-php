@@ -73,6 +73,13 @@ if (!isset($_SESSION['rol'])) {
     exit;
 }
 
+// Suspension por falta de pago del sistema (solo roles internos; el engineer y los pacientes no se bloquean)
+require_once __DIR__ . '/config/sistema_pagos.php';
+$estadoPagoSistema = sp_estado_para_rol($pdo, (string)$_SESSION['rol']);
+if ($estadoPagoSistema !== null && !empty($estadoPagoSistema['bloqueado'])) {
+    sp_render_suspension($pdo, $estadoPagoSistema);
+}
+
 if (isset($_SESSION['usuario']) && is_array($_SESSION['usuario'])) {
     $nombre = trim((string)($_SESSION['usuario']['nombre'] ?? ''));
     $apellido = trim((string)($_SESSION['usuario']['apellido'] ?? ''));
@@ -94,7 +101,7 @@ $acciones_por_rol = [
     'cliente' => ['crear_cotizacion', 'procesar_agenda', 'cotizaciones_api', 'examenes_api','descargar_cotizacion'],
     'convenio' => ['crear_cotizacion','buscar_cliente_accion','asociar_cliente_existente','procesar_agenda','crear_cliente','editar_cliente','eliminar_cliente', 'cotizaciones_api', 'examenes_api','descargar_cotizacion', 'consultar_documento_identidad'],
     'servicio' => ['descarga-pdf'],
-    'engineer' => ['config_operacion_engineer_guardar', 'config_personalizacion_engineer_guardar', 'config_sis_codigos_guardar']
+    'engineer' => ['config_operacion_engineer_guardar', 'config_personalizacion_engineer_guardar', 'config_sis_codigos_guardar', 'control_pagos_engineer_guardar']
 ];
 
 $acciones_por_privilegio = [
@@ -179,6 +186,7 @@ $acciones = [
     'config_empresa_guardar' => __DIR__ . '/config/config_empresa_guardar.php',
     'config_operacion_engineer_guardar' => __DIR__ . '/config/config_operacion_engineer_guardar.php',
     'config_sis_codigos_guardar' => __DIR__ . '/config/config_sis_codigos_guardar.php',
+    'control_pagos_engineer_guardar' => __DIR__ . '/config/control_pagos_engineer_guardar.php',
     'config_personalizacion_engineer_guardar' => __DIR__ . '/config/config_personalizacion_engineer_guardar.php',
     'crear_servicio' => __DIR__ . '/servicios/crear_servicio.php',
     'editar_servicio' => __DIR__ . '/servicios/editar_servicio.php',
@@ -308,6 +316,7 @@ $titulosPorVista = [
     'estadisticas' => 'Estadisticas',
     'estadisticas_sis' => 'Estadistica SIS',
     'offline_monitor' => 'Monitoreo Offline',
+    'control_pagos_engineer' => 'Control de pagos',
 ];
 $pageTitle = $titulosPorVista[$vista] ?? 'Panel de Administracion';
 
@@ -423,7 +432,7 @@ $acceso_por_rol = [
     'cliente' => ['clientes', 'cliente', 'cotizaciones', 'form_cotizacion', 'detalle_cotizacion', 'ver_cotizacion', 'descargar_cotizacion', 'cotizaciones_clientes', 'agendar_cita', 'detalle_promocion'],
     'convenio' => ['convenio','buscar_cliente','form_cotizacion','agendar_cita','cotizaciones_convenios','detalle_cotizacion','form_cliente','clientes_convenio','detalle_promocion'],
     'servicio' => ['servicio', 'servicio_clientes', 'servicio_resultados', 'servicio_auditoria'],
-    'engineer' => ['config_operacion_engineer', 'config_personalizacion_engineer']
+    'engineer' => ['config_operacion_engineer', 'config_personalizacion_engineer', 'control_pagos_engineer']
 ];
 
 $vistas = [
@@ -460,6 +469,7 @@ $vistas = [
     'config_empresa_datos' => __DIR__ . '/config/config_empresa_datos.php',
     'config_operacion_engineer' => __DIR__ . '/config/config_operacion_engineer.php',
     'config_personalizacion_engineer' => __DIR__ . '/config/config_personalizacion_engineer.php',
+    'control_pagos_engineer' => __DIR__ . '/config/control_pagos_engineer.php',
     'servicios' => __DIR__ . '/servicios/servicios.php',
     'form_servicio' => __DIR__ . '/servicios/form_servicio.php',
     'profesionales_solicitantes' => __DIR__ . '/servicios/profesionales_solicitantes.php',

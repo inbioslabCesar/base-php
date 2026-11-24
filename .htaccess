@@ -9,8 +9,8 @@ Options -Indexes
 # Redirección 301 a HTTPS (compatible con proxy/CDN), excepto localhost
 RewriteCond %{HTTP_HOST} !^localhost$ [NC]
 RewriteCond %{HTTP_HOST} !^127\.0\.0\.1$ [NC]
-RewriteCond %{HTTPS} !=on [OR]
-RewriteCond %{HTTP:X-Forwarded-Proto} =http
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Bloquear acceso público a vendor (opcional pero recomendado)

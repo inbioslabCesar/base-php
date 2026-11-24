@@ -3,7 +3,9 @@ require_once __DIR__ . '/../conexion/conexion.php';
 require_once __DIR__ . '/../auth/empresa_config.php';
 require_once __DIR__ . '/../config/currency.php';
 require_once __DIR__ . '/../config/ui_theme.php';
+require_once __DIR__ . '/../config/sistema_pagos.php';
 
+$avisoPagoSistema = sp_estado_para_rol($pdo, (string)($_SESSION['rol'] ?? ''));
 $usuarioSesion = $_SESSION['usuario'] ?? 'Usuario';
 
 if (is_array($usuarioSesion)) {
@@ -251,24 +253,33 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
 <body>
 
     <header class="header-gradient shadow mb-3 position-relative" style="z-index: 1050;">
-        <div class="container-fluid d-flex align-items-center justify-content-between py-3">
-            <div class="d-flex align-items-center">
+        <div class="container-fluid d-flex flex-wrap align-items-center justify-content-between py-3 header-row">
+            <div class="d-flex align-items-center header-brand">
                 <div class="header-logo-box me-3">
                     <img src="<?= htmlspecialchars($logoTagSrc, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($config['nombre']) ?>" style="height:64px; border-radius:16px; box-shadow:0 2px 12px #764ba233;">
                 </div>
-                <div>
+                <div class="header-brand-text">
                     <span class="fw-bold text-white" style="font-size:1.5rem; letter-spacing:1px;">
                         <?= htmlspecialchars($config['nombre']) ?>
                     </span><br>
                     <span class="text-white" style="font-size:1.1rem;">Bienvenido, <?= htmlspecialchars($nombreFormateado) ?>!</span>
                 </div>
             </div>
+            <!-- Aviso de pago del sistema (no se puede cerrar: desaparece al registrar el pago) -->
+            <?php if ($avisoPagoSistema !== null): ?>
+                <div class="header-aviso-pago ms-auto">
+                    <?= sp_render_chip($avisoPagoSistema) ?>
+                </div>
+            <?php endif; ?>
             <!-- Botón solo visible en móvil -->
-            <button class="btn btn-light d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
+            <button class="btn btn-light d-md-none header-menu-btn ms-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarToggle" aria-controls="sidebarToggle" aria-label="Menú">
                 <i class="bi bi-list fs-2"></i>
             </button>
         </div>
     </header>
+    <?php if ($avisoPagoSistema !== null): ?>
+        <?= sp_render_modal($avisoPagoSistema) ?>
+    <?php endif; ?>
     <style>
         .header-gradient {
             background: var(--ui-navbar-bg);
@@ -301,6 +312,34 @@ $logoTagSrc = $logoPublic . '?v=' . $logoVersion;
                 z-index: 1100 !important;
                 margin-bottom: 0 !important;
                 border-radius: 0 0 18px 18px;
+            }
+            .header-row {
+                row-gap: .5rem;
+            }
+            .header-brand {
+                flex: 1 1 0;
+                min-width: 0;
+            }
+            .header-brand-text {
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+            .header-menu-btn {
+                flex: 0 0 auto;
+                line-height: 1;
+                padding: .35rem .55rem;
+            }
+            .header-aviso-pago {
+                order: 3;
+                flex: 0 0 100%;
+                margin-left: 0 !important;
+            }
+            .header-aviso-pago .sp-chip {
+                display: block;
+                width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center;
             }
         }
     </style>
